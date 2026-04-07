@@ -1,0 +1,63 @@
+{
+  "headline": [
+    {"value": "Limited time: 40% off today only", "description": "Urgency + discount"},
+    {"value": "Join 12,000+ happy customers", "description": "Social proof + count"},
+    {"value": "What are you waiting for?", "description": "Question style"},
+    {"value": "The smarter choice for your team", "description": "Benefit focused"},
+    {"value": "Stop wasting money on [competitor]", "description": "Competitive callout"},
+    {"value": "See why teams are switching", "description": "Curiosity + social proof"},
+    {"value": "Your team deserves better tools", "description": "Aspirational"},
+    {"value": "Try it free — no credit card needed", "description": "Low friction offer"}
+  ],
+  "subhead": [
+    {"value": "Join 12,000+ happy customers", "description": "Social proof count"},
+    {"value": "As seen in Forbes and TechCrunch", "description": "Press mentions"},
+    {"value": "Rated 4.9/5 by verified users", "description": "Rating proof"},
+    {"value": "Setup takes less than 5 minutes", "description": "Ease of use"},
+    {"value": "Free 14-day trial, cancel anytime", "description": "Risk reversal"}
+  ],
+  "cta_text": [
+    {"value": "Get started free", "description": "Low commitment"},
+    {"value": "Claim my discount", "description": "Ownership language"},
+    {"value": "Start my free trial", "description": "Trial focused"},
+    {"value": "See it in action", "description": "Demo oriented"},
+    {"value": "Learn more", "description": "Soft CTA"}
+  ],
+  "cta_color": [
+    {"value": "green", "description": "High contrast, action"},
+    {"value": "blue", "description": "Trust, professional"},
+    {"value": "orange", "description": "Energetic, attention"},
+    {"value": "black", "description": "Premium, minimal"}
+  ],
+  "hero_style": [
+    {"value": "lifestyle_photo", "description": "People using product"},
+    {"value": "product_screenshot", "description": "UI/product shot"},
+    {"value": "illustration", "description": "Custom illustration"},
+    {"value": "testimonial_card", "description": "Quote with headshot"}
+  ],
+  "media_asset": [
+    {"value": "placeholder_lifestyle", "description": "Placeholder: lifestyle photo"},
+    {"value": "placeholder_product", "description": "Placeholder: product shot"}
+  ],
+  "social_proof": [
+    {"value": "customer_count", "description": "12,000+ customers"},
+    {"value": "testimonial", "description": "Named customer quote"},
+    {"value": "press_logos", "description": "Media outlet logos"},
+    {"value": "rating", "description": "Star rating badge"},
+    {"value": "none", "description": "No social proof"}
+  ],
+  "urgency": [
+    {"value": "time_limited", "description": "Ends tonight style"},
+    {"value": "stock_limited", "description": "Only X spots left"},
+    {"value": "seasonal", "description": "Tied to event/season"},
+    {"value": "none", "description": "No urgency element"}
+  ],
+  "audience": [
+    {"value": "retargeting_30d", "description": "Site visitors, last 30 days"},
+    {"value": "retargeting_7d", "description": "Site visitors, last 7 days"},
+    {"value": "lookalike_1pct", "description": "1% lookalike of converters"},
+    {"value": "lookalike_5pct", "description": "5% lookalike of converters"},
+    {"value": "interest_based", "description": "Interest/behavior targeting"},
+    {"value": "broad", "description": "Broad targeting, no filters"}
+  ]
+}
