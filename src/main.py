@@ -1165,7 +1165,8 @@ def backfill_elements(campaign_id: str) -> None:
 @click.option("--date-preset", default="last_30d", help="Meta date preset (last_7d, last_30d, etc.).")
 @click.option("--ad-account-id", default=None, type=str, help="Override Meta ad account ID (e.g. act_123456).")
 @click.option("--dry-run", is_flag=True, default=False, help="Preview what would be imported without writing.")
-def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | None, dry_run: bool) -> None:
+@click.option("--refresh-metrics", is_flag=True, default=False, help="Re-fetch and update metrics for already-imported ads.")
+def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | None, dry_run: bool, refresh_metrics: bool) -> None:
     """Import existing Meta ads and their historical metrics into the system.
 
     Discovers all ads in the Meta campaign linked to CAMPAIGN_ID,
@@ -1269,8 +1270,90 @@ def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | Non
             for ad in ads:
                 ad_id = str(ad["ad_id"])
 
-                if ad_id in existing_ad_ids:
-                    click.echo(f"  Skipping {ad_id} (already imported)")
+                if ad_id in existing_ad_ids and not refresh_metrics:
+                    click.echo(f"  Skipping {ad_id} (already imported, use --refresh-metrics to update)")
+                    continue
+
+                if ad_id in existing_ad_ids and refresh_metrics:
+                    # Just refresh metrics for this existing ad
+                    click.echo(f"  Refreshing metrics for {ad_id}...")
+                    dep_row = await session.execute(
+                        sa_text("""
+                            SELECT d.id, d.variant_id FROM deployments d
+                            JOIN variants v ON v.id = d.variant_id
+                            WHERE d.platform_ad_id = :ad_id AND v.campaign_id = :cid
+                        """),
+                        {"ad_id": ad_id, "cid": UUID(campaign_id)},
+                    )
+                    dep = dep_row.fetchone()
+                    if dep:
+                        deployment_id = dep[0]
+                        variant_id = dep[1]
+                        try:
+                            daily_metrics = await adapter.get_historical_metrics(
+                                ad_id, date_preset=date_preset,
+                            )
+                            for day in daily_metrics:
+                                if int(day["impressions"]) == 0:
+                                    continue
+                                day_ts = datetime.strptime(
+                                    str(day["date_start"]), "%Y-%m-%d"
+                                ).replace(hour=23, minute=59, tzinfo=timezone.utc)
+
+                                await session.execute(
+                                    sa_text("""
+                                        INSERT INTO metrics (variant_id, deployment_id,
+                                                            impressions, clicks, conversions, spend,
+                                                            reach, video_views_3s, video_views_15s,
+                                                            thruplays, link_clicks, landing_page_views,
+                                                            add_to_carts, purchases, purchase_value,
+                                                            recorded_at)
+                                        VALUES (:vid, :did,
+                                                :impressions, :clicks, :conversions, :spend,
+                                                :reach, :video_views_3s, :video_views_15s,
+                                                :thruplays, :link_clicks, :landing_page_views,
+                                                :add_to_carts, :purchases, :purchase_value,
+                                                :recorded_at)
+                                        ON CONFLICT (recorded_at, variant_id) DO UPDATE SET
+                                            impressions = EXCLUDED.impressions,
+                                            clicks = EXCLUDED.clicks,
+                                            conversions = EXCLUDED.conversions,
+                                            spend = EXCLUDED.spend,
+                                            reach = EXCLUDED.reach,
+                                            video_views_3s = EXCLUDED.video_views_3s,
+                                            video_views_15s = EXCLUDED.video_views_15s,
+                                            thruplays = EXCLUDED.thruplays,
+                                            link_clicks = EXCLUDED.link_clicks,
+                                            landing_page_views = EXCLUDED.landing_page_views,
+                                            add_to_carts = EXCLUDED.add_to_carts,
+                                            purchases = EXCLUDED.purchases,
+                                            purchase_value = EXCLUDED.purchase_value
+                                    """),
+                                    {
+                                        "vid": variant_id,
+                                        "did": deployment_id,
+                                        "impressions": int(day["impressions"]),
+                                        "clicks": int(day["clicks"]),
+                                        "conversions": int(day["conversions"]),
+                                        "spend": Decimal(str(day["spend"])),
+                                        "reach": int(day.get("reach", 0)),
+                                        "video_views_3s": int(day.get("video_views_3s", 0)),
+                                        "video_views_15s": int(day.get("video_views_15s", 0)),
+                                        "thruplays": int(day.get("thruplays", 0)),
+                                        "link_clicks": int(day.get("link_clicks", 0)),
+                                        "landing_page_views": int(day.get("landing_page_views", 0)),
+                                        "add_to_carts": int(day.get("add_to_carts", 0)),
+                                        "purchases": int(day.get("purchases", 0)),
+                                        "purchase_value": Decimal(str(day.get("purchase_value", 0))),
+                                        "recorded_at": day_ts,
+                                    },
+                                )
+                                metrics_imported += 1
+                            if daily_metrics:
+                                click.echo(f"    → Updated {len(daily_metrics)} days of metrics")
+                        except Exception as exc:
+                            click.echo(f"    → Warning: Could not fetch metrics: {exc}")
+                    await session.flush()
                     continue
 
                 # 5. Build a best-effort genome from the creative data
@@ -1364,7 +1447,20 @@ def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | Non
                                         :thruplays, :link_clicks, :landing_page_views,
                                         :add_to_carts, :purchases, :purchase_value,
                                         :recorded_at)
-                                ON CONFLICT DO NOTHING
+                                ON CONFLICT (recorded_at, variant_id) DO UPDATE SET
+                                    impressions = EXCLUDED.impressions,
+                                    clicks = EXCLUDED.clicks,
+                                    conversions = EXCLUDED.conversions,
+                                    spend = EXCLUDED.spend,
+                                    reach = EXCLUDED.reach,
+                                    video_views_3s = EXCLUDED.video_views_3s,
+                                    video_views_15s = EXCLUDED.video_views_15s,
+                                    thruplays = EXCLUDED.thruplays,
+                                    link_clicks = EXCLUDED.link_clicks,
+                                    landing_page_views = EXCLUDED.landing_page_views,
+                                    add_to_carts = EXCLUDED.add_to_carts,
+                                    purchases = EXCLUDED.purchases,
+                                    purchase_value = EXCLUDED.purchase_value
                             """),
                             {
                                 "vid": variant_id,
