@@ -36,17 +36,19 @@ class EmailReporter:
         self,
         report: WeeklyReport,
         html_content: str | None = None,
+        report_type: str = "Weekly",
     ) -> bool:
-        """Send the weekly report email. Returns True on success.
+        """Send a report email. Returns True on success.
 
         If *html_content* is not provided, the HTML is rendered from the
-        Jinja2 template automatically.
+        Jinja2 template automatically.  *report_type* controls the subject
+        line prefix (e.g. "Daily" or "Weekly").
         """
         if html_content is None:
-            html_content = self._render_html(report)
+            html_content = self._render_html(report, report_type=report_type)
 
         subject = (
-            f"Weekly Ad Report: {report.campaign_name} "
+            f"{report_type} Ad Report: {report.campaign_name} "
             f"({report.week_start.isoformat()} - {report.week_end.isoformat()})"
         )
 
@@ -104,8 +106,8 @@ class EmailReporter:
     # Template rendering
     # ------------------------------------------------------------------
 
-    def _render_html(self, report: WeeklyReport) -> str:
-        """Render the weekly report HTML from the Jinja2 template.
+    def _render_html(self, report: WeeklyReport, report_type: str = "Weekly") -> str:
+        """Render the report HTML from the Jinja2 template.
 
         Passes flat template variables as specified by the template contract.
         """
@@ -127,6 +129,7 @@ class EmailReporter:
                 variants.append(report.worst_variant)
 
         return template.render(
+            report_type=report_type,
             campaign_name=report.campaign_name,
             week_start=report.week_start.isoformat(),
             week_end=report.week_end.isoformat(),
