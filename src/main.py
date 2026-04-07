@@ -222,7 +222,7 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
     """Generate and send a weekly report for a campaign."""
 
     async def _run() -> None:
-        from datetime import date, timedelta
+        from datetime import date, datetime, timedelta, timezone
 
         from sqlalchemy import text as sa_text
 
@@ -246,9 +246,15 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                 return
             campaign_name = str(campaign_result[0])
 
-            # Gather last 7 days of cycle data
-            week_end = date.today()
-            week_start = week_end - timedelta(days=7)
+            # Previous full week: Monday through Sunday
+            today = date.today()
+            # today.weekday(): Mon=0, Sun=6
+            # Previous Sunday = today - (weekday + 1)
+            week_end = today - timedelta(days=today.weekday() + 1)  # last Sunday
+            week_start = week_end - timedelta(days=6)               # Monday before that
+
+            week_start_ts = datetime(week_start.year, week_start.month, week_start.day, tzinfo=timezone.utc)
+            week_end_ts = datetime(week_end.year, week_end.month, week_end.day, tzinfo=timezone.utc) + timedelta(days=1)  # midnight after Sunday
 
             cycles_row = await session.execute(
                 sa_text("""
@@ -256,19 +262,19 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                            variants_promoted, summary_text, started_at
                     FROM test_cycles
                     WHERE campaign_id = :id
-                      AND started_at >= NOW() - INTERVAL '7 days'
+                      AND started_at >= :ws AND started_at < :we
                     ORDER BY cycle_number DESC
                 """),
-                {"id": campaign_id},
+                {"id": campaign_id, "ws": week_start_ts, "we": week_end_ts},
             )
             cycles = cycles_row.fetchall()
 
             if not cycles:
-                click.echo(f"No cycles found in the last 7 days for campaign {campaign_id}.")
+                click.echo(f"No cycles found for week {week_start} to {week_end} for campaign {campaign_id}.")
                 await close_db()
                 return
 
-            # Aggregate full-funnel metrics across all active variants
+            # Aggregate full-funnel metrics for the previous week
             metrics_row = await session.execute(
                 sa_text("""
                     SELECT COALESCE(SUM(m.impressions), 0),
@@ -287,9 +293,9 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                     FROM metrics m
                     JOIN variants v ON v.id = m.variant_id
                     WHERE v.campaign_id = :id
-                      AND m.recorded_at >= NOW() - INTERVAL '7 days'
+                      AND m.recorded_at >= :ws AND m.recorded_at < :we
                 """),
-                {"id": campaign_id},
+                {"id": campaign_id, "ws": week_start_ts, "we": week_end_ts},
             )
             m = metrics_row.fetchone()
             total_impressions = int(m[0])
@@ -382,7 +388,7 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                                SUM(add_to_carts) AS add_to_carts, SUM(purchases) AS purchases,
                                SUM(purchase_value) AS purchase_value
                         FROM metrics WHERE variant_id = v.id
-                          AND recorded_at >= NOW() - INTERVAL '7 days'
+                          AND recorded_at >= :ws AND recorded_at < :we
                     ) m ON TRUE
                     WHERE v.campaign_id = :id AND v.status IN ('active', 'winner', 'paused')
                     ORDER BY CASE WHEN COALESCE(m.purchases, 0) > 0 AND COALESCE(m.spend, 0) > 0
@@ -391,7 +397,7 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                                   THEN COALESCE(m.clicks, 0)::NUMERIC / m.impressions
                                   ELSE 0 END DESC
                 """),
-                {"id": campaign_id},
+                {"id": campaign_id, "ws": week_start_ts, "we": week_end_ts},
             )
             variant_rows = variant_row.fetchall()
 
@@ -633,9 +639,12 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
 @cli.command()
 @click.option("--campaign-id", required=True, type=str, help="Campaign UUID.")
 @click.option("--send-email/--no-send-email", default=True, help="Send report via email (default: True).")
-@click.option("--lookback-hours", default=24, type=int, help="Hours of data to include (default: 24).")
-def daily_report(campaign_id: str, send_email: bool, lookback_hours: int) -> None:
-    """Generate and send a daily performance report for a campaign."""
+@click.option("--report-date", default=None, type=str, help="Date to report on (YYYY-MM-DD). Defaults to yesterday.")
+def daily_report(campaign_id: str, send_email: bool, report_date: str | None) -> None:
+    """Generate and send a daily performance report for a campaign.
+
+    Reports on a single calendar day (defaults to yesterday).
+    """
 
     async def _run() -> None:
         from datetime import date, datetime, timedelta, timezone
@@ -649,7 +658,14 @@ def daily_report(campaign_id: str, send_email: bool, lookback_hours: int) -> Non
         settings = get_settings()
         await init_db()
 
-        cutoff = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
+        # Report on a single calendar day — yesterday by default
+        if report_date:
+            report_day = date.fromisoformat(report_date)
+        else:
+            report_day = date.today() - timedelta(days=1)
+
+        day_start = datetime(report_day.year, report_day.month, report_day.day, tzinfo=timezone.utc)
+        day_end = day_start + timedelta(days=1)
 
         async with get_session() as session:
             # Get campaign name
@@ -664,25 +680,21 @@ def daily_report(campaign_id: str, send_email: bool, lookback_hours: int) -> Non
                 return
             campaign_name = str(campaign_result[0])
 
-            # Date range
-            report_end = date.today()
-            report_start = report_end - timedelta(hours=lookback_hours)
-
-            # Check for recent cycles
+            # Check for cycles on this day
             cycles_row = await session.execute(
                 sa_text("""
                     SELECT cycle_number, phase, variants_launched, variants_paused,
                            variants_promoted, summary_text, started_at
                     FROM test_cycles
                     WHERE campaign_id = :id
-                      AND started_at >= :cutoff
+                      AND started_at >= :day_start AND started_at < :day_end
                     ORDER BY cycle_number DESC
                 """),
-                {"id": campaign_id, "cutoff": cutoff},
+                {"id": campaign_id, "day_start": day_start, "day_end": day_end},
             )
             cycles = cycles_row.fetchall()
 
-            # Aggregate full-funnel metrics for the lookback period
+            # Aggregate full-funnel metrics for the calendar day
             metrics_row = await session.execute(
                 sa_text("""
                     SELECT COALESCE(SUM(m.impressions), 0),
@@ -701,9 +713,9 @@ def daily_report(campaign_id: str, send_email: bool, lookback_hours: int) -> Non
                     FROM metrics m
                     JOIN variants v ON v.id = m.variant_id
                     WHERE v.campaign_id = :id
-                      AND m.recorded_at >= :cutoff
+                      AND m.recorded_at >= :day_start AND m.recorded_at < :day_end
                 """),
-                {"id": campaign_id, "cutoff": cutoff},
+                {"id": campaign_id, "day_start": day_start, "day_end": day_end},
             )
             m = metrics_row.fetchone()
             total_impressions = int(m[0])
@@ -796,7 +808,7 @@ def daily_report(campaign_id: str, send_email: bool, lookback_hours: int) -> Non
                                SUM(add_to_carts) AS add_to_carts, SUM(purchases) AS purchases,
                                SUM(purchase_value) AS purchase_value
                         FROM metrics WHERE variant_id = v.id
-                          AND recorded_at >= :cutoff
+                          AND recorded_at >= :day_start AND recorded_at < :day_end
                     ) m ON TRUE
                     WHERE v.campaign_id = :id AND v.status IN ('active', 'winner', 'paused')
                     ORDER BY CASE WHEN COALESCE(m.purchases, 0) > 0 AND COALESCE(m.spend, 0) > 0
@@ -805,7 +817,7 @@ def daily_report(campaign_id: str, send_email: bool, lookback_hours: int) -> Non
                                   THEN COALESCE(m.clicks, 0)::NUMERIC / m.impressions
                                   ELSE 0 END DESC
                 """),
-                {"id": campaign_id, "cutoff": cutoff},
+                {"id": campaign_id, "day_start": day_start, "day_end": day_end},
             )
             variant_rows = variant_row.fetchall()
 
@@ -932,8 +944,8 @@ def daily_report(campaign_id: str, send_email: bool, lookback_hours: int) -> Non
             report = WeeklyReport(
                 campaign_id=UUID(campaign_id),
                 campaign_name=campaign_name,
-                week_start=report_start if isinstance(report_start, date) else report_end - timedelta(days=1),
-                week_end=report_end,
+                week_start=report_day,
+                week_end=report_day,
                 total_spend=total_spend,
                 total_impressions=total_impressions,
                 total_clicks=total_clicks,
@@ -971,7 +983,7 @@ def daily_report(campaign_id: str, send_email: bool, lookback_hours: int) -> Non
         click.echo(f"\n{'='*60}")
         click.echo(f"DAILY REPORT — {campaign_name}")
         click.echo(f"{'='*60}")
-        click.echo(f"Period: last {lookback_hours} hours ({report_end})")
+        click.echo(f"Period: {report_day.isoformat()} (yesterday)")
         click.echo(f"Cycles completed: {len(cycles)}")
         click.echo(f"Variants launched: {total_launched}")
         click.echo(f"Variants paused: {total_paused}")
