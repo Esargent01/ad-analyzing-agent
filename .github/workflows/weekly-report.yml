@@ -1,0 +1,27 @@
+name: Weekly Ad Report
+
+on:
+  schedule:
+    - cron: '0 14 * * 1'  # 9am CT (UTC-5) every Monday
+  workflow_dispatch:       # manual trigger via GitHub UI
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Send weekly report
+        run: python -m src.main weekly-report --campaign-id aa068b5d-19ec-4e48-95aa-7dc8a1764ae2 --send-email
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO }}
+          REPORT_EMAIL_FROM: ${{ secrets.REPORT_EMAIL_FROM }}
