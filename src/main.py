@@ -1018,7 +1018,7 @@ def daily_report(campaign_id: str, send_email: bool, lookback_hours: int) -> Non
                     from_email=settings.report_email_from,
                     to_email=settings.report_email_to,
                 )
-                success = await reporter.send_weekly_report(report)
+                success = await reporter.send_weekly_report(report, report_type="Daily")
                 if success:
                     click.echo(f"\nEmail report sent to {settings.report_email_to}")
                 else:
