@@ -24,6 +24,9 @@ def _get_jinja_env() -> Environment:
     )
     env.filters["currency"] = _format_currency
     env.filters["pct"] = _format_pct
+    env.filters["intcomma"] = _format_intcomma
+    env.filters["signpct"] = _format_signed_pct
+    env.filters["onedecimal"] = _format_one_decimal
     return env
 
 
@@ -37,6 +40,21 @@ def _format_currency(value: object) -> str:
 def _format_pct(value: object) -> str:
     v = float(value) if value is not None else 0.0
     return f"{v * 100:.1f}%" if v < 1 else f"{v:.1f}%"
+
+
+def _format_intcomma(value: object) -> str:
+    v = int(value) if value is not None else 0
+    return f"{v:,}"
+
+
+def _format_signed_pct(value: object) -> str:
+    v = float(value) if value is not None else 0.0
+    return f"{v:+.0%}"
+
+
+def _format_one_decimal(value: object) -> str:
+    v = float(value) if value is not None else 0.0
+    return f"{v:.1f}"
 
 
 def _output_dir() -> Path:

@@ -2,7 +2,7 @@
 
 {% block title %}Weekly Report — {{ week_label }}{% endblock %}
 {% block og_title %}{{ campaign_name }} Weekly Report — {{ week_label }}{% endblock %}
-{% block og_description %}Week {{ week_label }}: Spend {{ total_spend|currency }}, {{ total_purchases }} purchases, ROAS {% if avg_roas %}{{ "%.1f"|format(avg_roas|float) }}x{% else %}N/A{% endif %}{% endblock %}
+{% block og_description %}Week {{ week_label }}: Spend {{ total_spend|currency }}, {{ total_purchases }} purchases, ROAS {% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}{% endblock %}
 
 {% block content %}
 <header class="report-header">
@@ -31,7 +31,7 @@
         </div>
         <div class="sm">
             <div class="sm-label">ROAS</div>
-            <div class="sm-value">{% if avg_roas %}{{ "%.1f"|format(avg_roas|float) }}x{% else %}N/A{% endif %}</div>
+            <div class="sm-value">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</div>
         </div>
         <div class="sm">
             <div class="sm-label">Hook Rate</div>
@@ -66,11 +66,11 @@
     </div>
     <div class="mc">
         <div class="mc-label">Impressions</div>
-        <div class="mc-value">{{ "{:,}"|format(total_impressions) }}</div>
+        <div class="mc-value">{{ total_impressions|intcomma }}</div>
     </div>
     <div class="mc">
         <div class="mc-label">Reach</div>
-        <div class="mc-value">{{ "{:,}"|format(total_reach) }}</div>
+        <div class="mc-value">{{ total_reach|intcomma }}</div>
     </div>
     <div class="mc">
         <div class="mc-label">Hook Rate (3s)</div>
@@ -90,7 +90,7 @@
     </div>
     <div class="mc">
         <div class="mc-label">Frequency</div>
-        <div class="mc-value">{{ "%.1f"|format(avg_frequency|float) }}</div>
+        <div class="mc-value">{{ avg_frequency|onedecimal }}</div>
     </div>
     <div class="mc">
         <div class="mc-label">Purchases</div>
@@ -102,7 +102,7 @@
     </div>
     <div class="mc">
         <div class="mc-label">ROAS</div>
-        <div class="mc-value">{% if avg_roas %}{{ "%.1f"|format(avg_roas|float) }}x{% else %}N/A{% endif %}</div>
+        <div class="mc-value">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</div>
     </div>
     <div class="mc">
         <div class="mc-label">Cost/Purchase</div>
@@ -118,7 +118,7 @@
     {% for stage in funnel_stages %}
     <div class="funnel-stage">
         <span class="funnel-name">{{ stage.stage_name }}</span>
-        <span class="funnel-value">{{ "{:,}"|format(stage.value) }}</span>
+        <span class="funnel-value">{{ stage.value|intcomma }}</span>
         <div class="funnel-bar-container">
             <div class="funnel-bar" style="width: {{ (stage.value / max_value * 100)|int if max_value > 0 else 0 }}%"></div>
         </div>
@@ -152,13 +152,13 @@
             <tr>
                 <td class="mono">{{ v.variant_code }}</td>
                 <td><span class="status status-{{ v.status }}">{{ v.status }}</span></td>
-                <td class="mono">{{ "{:,}"|format(v.impressions) }}</td>
+                <td class="mono">{{ v.impressions|intcomma }}</td>
                 <td class="mono">{{ v.hook_rate|pct }}</td>
                 <td class="mono">{{ v.hold_rate|pct }}</td>
                 <td class="mono">{{ v.ctr|pct }}</td>
                 <td class="mono">{{ v.spend|currency }}</td>
                 <td class="mono">{{ v.purchases }}</td>
-                <td class="mono">{% if v.roas %}{{ "%.1f"|format(v.roas|float) }}x{% else %}—{% endif %}</td>
+                <td class="mono">{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}—{% endif %}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -210,7 +210,7 @@
             + <strong>{{ i.slot_b_name }}</strong>: {{ i.slot_b_value|truncate(25) }}
         </div>
         <span class="interaction-lift {% if i.interaction_lift and i.interaction_lift|float > 0 %}lift-positive{% else %}lift-negative{% endif %}">
-            {% if i.interaction_lift %}{{ "{:+.0%}"|format(i.interaction_lift|float) }}{% else %}—{% endif %}
+            {% if i.interaction_lift %}{{ i.interaction_lift|signpct }}{% else %}—{% endif %}
         </span>
     </div>
     {% endfor %}
