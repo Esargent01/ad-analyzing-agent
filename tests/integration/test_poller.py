@@ -42,7 +42,7 @@ class TestMetricsPollerWithMockAdapter:
         ad_id = await adapter.create_ad(
             campaign_id="camp-1",
             variant_code="V1",
-            genome={"headline": "test", "cta_color": "green"},
+            genome={"headline": "test", "cta_text": "Learn more", "subhead": "test", "media_asset": "placeholder_lifestyle", "audience": "broad"},
             daily_budget=50.0,
         )
 

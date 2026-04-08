@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.tables import (
     ActionType,
+    ApprovalQueueItem,
     Campaign,
     CycleAction,
     Deployment,
@@ -52,6 +53,119 @@ async def get_gene_pool_by_slot(session: AsyncSession) -> dict[str, list[GenePoo
     for entry in entries:
         by_slot.setdefault(entry.slot_name, []).append(entry)
     return by_slot
+
+
+async def list_gene_pool_entries(
+    session: AsyncSession,
+    slot_name: str | None = None,
+    include_inactive: bool = False,
+) -> list[GenePoolEntry]:
+    """Return gene pool entries, optionally filtered by slot and active status."""
+    stmt = select(GenePoolEntry).order_by(GenePoolEntry.slot_name, GenePoolEntry.slot_value)
+    if slot_name is not None:
+        stmt = stmt.where(GenePoolEntry.slot_name == slot_name)
+    if not include_inactive:
+        stmt = stmt.where(GenePoolEntry.is_active.is_(True))
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def add_gene_pool_entry(
+    session: AsyncSession,
+    slot_name: str,
+    slot_value: str,
+    description: str | None = None,
+    metadata: dict | None = None,
+    source: str = "user",
+) -> GenePoolEntry:
+    """Add a new gene pool entry. Raises IntegrityError on duplicate (slot_name, slot_value)."""
+    entry = GenePoolEntry(
+        slot_name=slot_name,
+        slot_value=slot_value,
+        description=description,
+        metadata_=metadata,
+        source=source,
+        is_active=source != "llm_suggested",  # LLM suggestions start inactive
+    )
+    session.add(entry)
+    await session.flush()
+    return entry
+
+
+async def deactivate_gene_pool_entry(
+    session: AsyncSession,
+    slot_name: str,
+    slot_value: str,
+) -> bool:
+    """Retire a gene pool entry. Returns False if not found."""
+    stmt = select(GenePoolEntry).where(
+        GenePoolEntry.slot_name == slot_name,
+        GenePoolEntry.slot_value == slot_value,
+        GenePoolEntry.is_active.is_(True),
+    )
+    result = await session.execute(stmt)
+    entry = result.scalar_one_or_none()
+    if entry is None:
+        return False
+    entry.is_active = False
+    entry.retired_at = func.now()
+    await session.flush()
+    return True
+
+
+async def get_pending_suggestions(session: AsyncSession) -> list[GenePoolEntry]:
+    """Return LLM-suggested gene pool entries awaiting approval."""
+    stmt = (
+        select(GenePoolEntry)
+        .where(
+            GenePoolEntry.source == "llm_suggested",
+            GenePoolEntry.is_active.is_(False),
+            GenePoolEntry.retired_at.is_(None),
+        )
+        .order_by(GenePoolEntry.slot_name, GenePoolEntry.created_at)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def approve_suggestion(session: AsyncSession, entry_id: UUID) -> GenePoolEntry | None:
+    """Activate a pending LLM suggestion, returning None if not found."""
+    stmt = select(GenePoolEntry).where(GenePoolEntry.id == entry_id)
+    result = await session.execute(stmt)
+    entry = result.scalar_one_or_none()
+    if entry is None:
+        return None
+    entry.is_active = True
+    entry.source = "llm_approved"
+    await session.flush()
+    return entry
+
+
+async def reject_suggestion(session: AsyncSession, entry_id: UUID) -> bool:
+    """Mark a pending LLM suggestion as rejected (retired). Returns False if not found."""
+    stmt = select(GenePoolEntry).where(GenePoolEntry.id == entry_id)
+    result = await session.execute(stmt)
+    entry = result.scalar_one_or_none()
+    if entry is None:
+        return False
+    entry.retired_at = func.now()
+    await session.flush()
+    return True
+
+
+async def get_gene_pool_entry(
+    session: AsyncSession,
+    slot_name: str,
+    slot_value: str,
+) -> GenePoolEntry | None:
+    """Look up a single active gene pool entry by slot name and value."""
+    stmt = select(GenePoolEntry).where(
+        GenePoolEntry.slot_name == slot_name,
+        GenePoolEntry.slot_value == slot_value,
+        GenePoolEntry.is_active.is_(True),
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 # ---------------------------------------------------------------------------
@@ -432,11 +546,7 @@ async def update_cycle_phase(
     """Update the phase of a test cycle."""
     from src.db.tables import CyclePhase
 
-    stmt = (
-        update(TestCycle)
-        .where(TestCycle.id == cycle_id)
-        .values(phase=CyclePhase(phase))
-    )
+    stmt = update(TestCycle).where(TestCycle.id == cycle_id).values(phase=CyclePhase(phase))
     await session.execute(stmt)
     await session.flush()
 
@@ -523,3 +633,104 @@ async def get_latest_cycle(
     )
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
+
+
+async def get_recent_cycles(
+    session: AsyncSession,
+    campaign_id: UUID,
+    limit: int = 10,
+) -> list[TestCycle]:
+    """Return the most recent test cycles for a campaign."""
+    stmt = (
+        select(TestCycle)
+        .where(TestCycle.campaign_id == campaign_id)
+        .order_by(TestCycle.cycle_number.desc())
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+# ---------------------------------------------------------------------------
+# Approval queue
+# ---------------------------------------------------------------------------
+
+
+async def submit_for_approval(
+    session: AsyncSession,
+    variant_id: UUID,
+    campaign_id: UUID,
+    genome: dict[str, str],
+    hypothesis: str | None = None,
+) -> ApprovalQueueItem:
+    """Insert a variant into the approval queue for human review."""
+    item = ApprovalQueueItem(
+        variant_id=variant_id,
+        campaign_id=campaign_id,
+        genome_snapshot=genome,
+        hypothesis=hypothesis,
+    )
+    session.add(item)
+    await session.flush()
+    return item
+
+
+async def get_pending_approvals(
+    session: AsyncSession,
+    campaign_id: UUID | None = None,
+) -> list[ApprovalQueueItem]:
+    """Return approval queue items awaiting review (approved IS NULL)."""
+    stmt = (
+        select(ApprovalQueueItem)
+        .where(ApprovalQueueItem.approved.is_(None))
+        .order_by(ApprovalQueueItem.submitted_at)
+    )
+    if campaign_id is not None:
+        stmt = stmt.where(ApprovalQueueItem.campaign_id == campaign_id)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def approve_variant(
+    session: AsyncSession,
+    approval_id: UUID,
+    reviewer: str = "cli",
+) -> ApprovalQueueItem | None:
+    """Approve a queued variant. Returns None if not found."""
+    stmt = select(ApprovalQueueItem).where(ApprovalQueueItem.id == approval_id)
+    result = await session.execute(stmt)
+    item = result.scalar_one_or_none()
+    if item is None:
+        return None
+    item.approved = True
+    item.reviewed_at = func.now()
+    item.reviewer = reviewer
+    await session.flush()
+    return item
+
+
+async def reject_variant(
+    session: AsyncSession,
+    approval_id: UUID,
+    reason: str,
+    reviewer: str = "cli",
+) -> ApprovalQueueItem | None:
+    """Reject a queued variant and retire it. Returns None if not found."""
+    stmt = select(ApprovalQueueItem).where(ApprovalQueueItem.id == approval_id)
+    result = await session.execute(stmt)
+    item = result.scalar_one_or_none()
+    if item is None:
+        return None
+    item.approved = False
+    item.reviewed_at = func.now()
+    item.reviewer = reviewer
+    item.rejection_reason = reason
+
+    # Also retire the variant
+    variant = await session.get(Variant, item.variant_id)
+    if variant is not None:
+        variant.status = VariantStatus.retired
+        variant.retired_at = func.now()
+
+    await session.flush()
+    return item

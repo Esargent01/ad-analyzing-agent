@@ -32,10 +32,7 @@ def sample_genome() -> GenomeSchema:
         headline="Limited time: 40% off today only",
         subhead="Join 12,000+ happy customers",
         cta_text="Get started free",
-        cta_color="green",
-        hero_style="lifestyle_photo",
-        social_proof="customer_count",
-        urgency="time_limited",
+        media_asset="placeholder_lifestyle",
         audience="retargeting_30d",
     )
 
@@ -91,9 +88,6 @@ def sample_genome_dict() -> dict[str, str]:
         "headline": "Limited time: 40% off today only",
         "subhead": "Join 12,000+ happy customers",
         "cta_text": "Get started free",
-        "cta_color": "green",
-        "hero_style": "lifestyle_photo",
-        "social_proof": "customer_count",
-        "urgency": "time_limited",
+        "media_asset": "placeholder_lifestyle",
         "audience": "retargeting_30d",
     }

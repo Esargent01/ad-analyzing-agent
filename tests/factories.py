@@ -40,24 +40,10 @@ _CTA_TEXTS = [
     "See it in action",
 ]
 
-_CTA_COLORS = ["green", "blue", "orange", "black"]
-
-_HERO_STYLES = [
-    "lifestyle_photo",
-    "product_screenshot",
-    "illustration",
-    "testimonial_card",
+_MEDIA_ASSETS = [
+    "placeholder_lifestyle",
+    "placeholder_product",
 ]
-
-_SOCIAL_PROOFS = [
-    "customer_count",
-    "testimonial",
-    "press_logos",
-    "rating",
-    "none",
-]
-
-_URGENCIES = ["time_limited", "stock_limited", "seasonal", "none"]
 
 _AUDIENCES = [
     "retargeting_30d",
@@ -74,10 +60,7 @@ def build_genome(
     headline: str | None = None,
     subhead: str | None = None,
     cta_text: str | None = None,
-    cta_color: str | None = None,
-    hero_style: str | None = None,
-    social_proof: str | None = None,
-    urgency: str | None = None,
+    media_asset: str | None = None,
     audience: str | None = None,
     seed: int | None = None,
 ) -> dict[str, str]:
@@ -91,10 +74,7 @@ def build_genome(
         "headline": headline or rng.choice(_HEADLINES),
         "subhead": subhead or rng.choice(_SUBHEADS),
         "cta_text": cta_text or rng.choice(_CTA_TEXTS),
-        "cta_color": cta_color or rng.choice(_CTA_COLORS),
-        "hero_style": hero_style or rng.choice(_HERO_STYLES),
-        "social_proof": social_proof or rng.choice(_SOCIAL_PROOFS),
-        "urgency": urgency or rng.choice(_URGENCIES),
+        "media_asset": media_asset or rng.choice(_MEDIA_ASSETS),
         "audience": audience or rng.choice(_AUDIENCES),
     }
 

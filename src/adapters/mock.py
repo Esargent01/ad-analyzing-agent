@@ -159,6 +159,7 @@ class MockAdapter(BaseAdapter):
         genome: dict[str, str],
         daily_budget: float,
         media_info: dict[str, str] | None = None,
+        audience_meta: dict | None = None,
     ) -> str:
         self._record(
             "create_ad",

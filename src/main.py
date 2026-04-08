@@ -1402,10 +1402,7 @@ def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | Non
                     "headline": str(ad.get("headline", "")),
                     "subhead": str(ad.get("body", "")),
                     "cta_text": _meta_cta_to_genome(str(ad.get("cta_type", ""))),
-                    "cta_color": "blue",  # default — not available from Meta
-                    "hero_style": "lifestyle_photo",  # default
-                    "social_proof": "none",
-                    "urgency": "none",
+                    "media_asset": str(ad.get("media_asset", "placeholder_lifestyle")),
                     "audience": "broad",
                 }
 
@@ -1743,6 +1740,425 @@ def list_media(campaign_id: str) -> None:
         await close_db()
 
     asyncio.run(_run())
+
+
+# ---------------------------------------------------------------------------
+# Gene pool management
+# ---------------------------------------------------------------------------
+
+VALID_SLOTS = [
+    "headline", "subhead", "cta_text", "media_asset", "audience",
+]
+
+
+@cli.group()
+def pool() -> None:
+    """Manage the gene pool — creative elements available for testing."""
+
+
+@pool.command("add")
+@click.option("--slot", required=True, type=click.Choice(VALID_SLOTS), help="Slot name.")
+@click.option("--value", required=True, type=str, help="Slot value to add.")
+@click.option("--description", default=None, type=str, help="Human-readable description.")
+@click.option("--meta-audience-id", default=None, type=str, help="Meta custom audience ID (audience slot only).")
+def pool_add(slot: str, value: str, description: str | None, meta_audience_id: str | None) -> None:
+    """Add a new entry to the gene pool."""
+
+    async def _run() -> None:
+        from src.db.engine import get_session, close_db
+        from src.db.queries import add_gene_pool_entry
+
+        metadata = None
+        if meta_audience_id:
+            if slot != "audience":
+                click.echo("Error: --meta-audience-id is only valid for the audience slot.")
+                return
+            metadata = {"meta_audience_id": meta_audience_id}
+
+        async with get_session() as session:
+            try:
+                entry = await add_gene_pool_entry(
+                    session,
+                    slot_name=slot,
+                    slot_value=value,
+                    description=description,
+                    metadata=metadata,
+                    source="user",
+                )
+                click.echo(f"Added: [{slot}] {value} (id: {entry.id})")
+            except Exception as e:
+                if "uq_gene_pool_slot_value" in str(e):
+                    click.echo(f"Error: '{value}' already exists in slot '{slot}'.")
+                else:
+                    click.echo(f"Error: {e}")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@pool.command("list")
+@click.option("--slot", default=None, type=click.Choice(VALID_SLOTS), help="Filter by slot name.")
+def pool_list(slot: str | None) -> None:
+    """List gene pool entries."""
+
+    async def _run() -> None:
+        from src.db.engine import get_session, close_db
+        from src.db.queries import list_gene_pool_entries
+
+        async with get_session() as session:
+            entries = await list_gene_pool_entries(session, slot_name=slot)
+
+        if not entries:
+            click.echo("No gene pool entries found.")
+            await close_db()
+            return
+
+        current_slot = None
+        for entry in entries:
+            if entry.slot_name != current_slot:
+                current_slot = entry.slot_name
+                click.echo(f"\n{current_slot.upper()} ({sum(1 for e in entries if e.slot_name == current_slot)} entries)")
+                click.echo("-" * 60)
+            source_tag = f" [{entry.source}]" if entry.source and entry.source != "seed" else ""
+            meta_tag = ""
+            if entry.metadata_ and entry.metadata_.get("meta_audience_id"):
+                meta_tag = f" (Meta: {entry.metadata_['meta_audience_id']})"
+            desc = f" — {entry.description}" if entry.description else ""
+            click.echo(f"  {entry.slot_value}{desc}{source_tag}{meta_tag}")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@pool.command("retire")
+@click.option("--slot", required=True, type=click.Choice(VALID_SLOTS), help="Slot name.")
+@click.option("--value", required=True, type=str, help="Slot value to retire.")
+def pool_retire(slot: str, value: str) -> None:
+    """Retire a gene pool entry (prevents future use, does not affect active variants)."""
+
+    async def _run() -> None:
+        from src.db.engine import get_session, close_db
+        from src.db.queries import deactivate_gene_pool_entry
+
+        async with get_session() as session:
+            success = await deactivate_gene_pool_entry(session, slot_name=slot, slot_value=value)
+
+        if success:
+            click.echo(f"Retired: [{slot}] {value}")
+        else:
+            click.echo(f"Not found: [{slot}] {value}")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@pool.command("suggest")
+@click.option("--slot", default=None, type=click.Choice(["headline", "subhead", "cta_text"]), help="Slot to suggest for (default: all text slots).")
+@click.option("--brand-context", default=None, type=str, help="Brand voice / product description for context.")
+@click.option("--count", default=5, type=int, help="Number of suggestions to generate.")
+@click.option("--campaign-id", default=None, type=str, help="Campaign UUID for performance-informed suggestions.")
+def pool_suggest(slot: str | None, brand_context: str | None, count: int, campaign_id: str | None) -> None:
+    """Use the LLM to suggest new creative text for the gene pool."""
+
+    async def _run() -> None:
+        from src.agents.copywriter import CopywriterAgent
+        from src.db.engine import get_session, close_db
+        from src.db.queries import add_gene_pool_entry, get_element_rankings, list_gene_pool_entries
+
+        settings = get_settings()
+        if not settings.anthropic_api_key or settings.anthropic_api_key.startswith("placeholder"):
+            click.echo("Error: ANTHROPIC_API_KEY not configured.")
+            return
+
+        async with get_session() as session:
+            # Load current gene pool for context
+            existing = await list_gene_pool_entries(session, slot_name=slot)
+
+            # Load performance data if campaign specified
+            top_elements = None
+            if campaign_id:
+                top_elements = await get_element_rankings(session, UUID(campaign_id))
+
+            agent = CopywriterAgent(
+                api_key=settings.anthropic_api_key,
+                model=settings.anthropic_model,
+            )
+
+            click.echo(f"Generating {count} suggestions...")
+            try:
+                suggestions = await agent.suggest_entries(
+                    existing_entries=existing,
+                    top_elements=top_elements,
+                    slot_name=slot,
+                    brand_context=brand_context,
+                    count=count,
+                )
+            except Exception as e:
+                click.echo(f"Error: {e}")
+                await close_db()
+                return
+
+            # Insert as pending (inactive) entries
+            for s in suggestions:
+                await add_gene_pool_entry(
+                    session,
+                    slot_name=s.slot_name,
+                    slot_value=s.value,
+                    description=s.description,
+                    source="llm_suggested",
+                )
+                click.echo(f"  [{s.slot_name}] {s.value}")
+                click.echo(f"    Rationale: {s.rationale}")
+
+            click.echo(f"\n{len(suggestions)} suggestion(s) saved as pending.")
+            click.echo("Run 'adagent pool review' to see them, 'adagent pool approve --all' to activate.")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@pool.command("review")
+def pool_review() -> None:
+    """List pending LLM-suggested gene pool entries awaiting approval."""
+
+    async def _run() -> None:
+        from src.db.engine import get_session, close_db
+        from src.db.queries import get_pending_suggestions
+
+        async with get_session() as session:
+            suggestions = await get_pending_suggestions(session)
+
+        if not suggestions:
+            click.echo("No pending suggestions.")
+            await close_db()
+            return
+
+        click.echo(f"\n{len(suggestions)} pending suggestion(s):")
+        click.echo("-" * 60)
+        for s in suggestions:
+            desc = f" — {s.description}" if s.description else ""
+            click.echo(f"  [{s.id}] {s.slot_name}: {s.slot_value}{desc}")
+
+        click.echo(f"\nRun 'adagent pool approve --id <UUID>' to activate.")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@pool.command("approve")
+@click.option("--id", "entry_id", default=None, type=str, help="UUID of the suggestion to approve.")
+@click.option("--all", "approve_all", is_flag=True, default=False, help="Approve all pending suggestions.")
+def pool_approve(entry_id: str | None, approve_all: bool) -> None:
+    """Approve pending LLM-suggested gene pool entries."""
+
+    async def _run() -> None:
+        from src.db.engine import get_session, close_db
+        from src.db.queries import approve_suggestion, get_pending_suggestions
+
+        async with get_session() as session:
+            if approve_all:
+                suggestions = await get_pending_suggestions(session)
+                if not suggestions:
+                    click.echo("No pending suggestions to approve.")
+                    await close_db()
+                    return
+                for s in suggestions:
+                    await approve_suggestion(session, s.id)
+                    click.echo(f"  Approved: [{s.slot_name}] {s.slot_value}")
+                click.echo(f"\n{len(suggestions)} suggestion(s) approved.")
+            elif entry_id:
+                result = await approve_suggestion(session, UUID(entry_id))
+                if result:
+                    click.echo(f"Approved: [{result.slot_name}] {result.slot_value}")
+                else:
+                    click.echo(f"Not found: {entry_id}")
+            else:
+                click.echo("Provide --id <UUID> or --all.")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@pool.command("reject")
+@click.option("--id", "entry_id", required=True, type=str, help="UUID of the suggestion to reject.")
+def pool_reject(entry_id: str) -> None:
+    """Reject a pending LLM-suggested gene pool entry."""
+
+    async def _run() -> None:
+        from src.db.engine import get_session, close_db
+        from src.db.queries import reject_suggestion
+
+        async with get_session() as session:
+            success = await reject_suggestion(session, UUID(entry_id))
+
+        if success:
+            click.echo(f"Rejected: {entry_id}")
+        else:
+            click.echo(f"Not found: {entry_id}")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+# ---------------------------------------------------------------------------
+# Variant approval queue
+# ---------------------------------------------------------------------------
+
+
+@cli.group()
+def approve() -> None:
+    """Review and approve/reject generated variants before deployment."""
+
+
+@approve.command("list")
+@click.option("--campaign-id", default=None, type=str, help="Filter by campaign UUID.")
+def approve_list(campaign_id: str | None) -> None:
+    """Show variants pending approval."""
+
+    async def _run() -> None:
+        from src.db.engine import get_session, close_db
+        from src.db.queries import get_pending_approvals
+
+        cid = UUID(campaign_id) if campaign_id else None
+
+        async with get_session() as session:
+            items = await get_pending_approvals(session, campaign_id=cid)
+
+        if not items:
+            click.echo("No variants pending approval.")
+            await close_db()
+            return
+
+        click.echo(f"\n{len(items)} variant(s) pending approval:")
+        click.echo("=" * 70)
+        for item in items:
+            click.echo(f"\n  ID: {item.id}")
+            click.echo(f"  Variant: {item.variant_id}")
+            click.echo(f"  Campaign: {item.campaign_id}")
+            if item.hypothesis:
+                click.echo(f"  Hypothesis: {item.hypothesis}")
+            click.echo(f"  Submitted: {item.submitted_at}")
+            genome = item.genome_snapshot
+            if genome:
+                click.echo("  Genome:")
+                for k, v in sorted(genome.items()):
+                    click.echo(f"    {k}: {v}")
+            click.echo("-" * 70)
+
+        click.echo(f"\nRun 'adagent approve yes --id <UUID>' to approve.")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@approve.command("yes")
+@click.option("--id", "approval_id", default=None, type=str, help="Approval queue item UUID.")
+@click.option("--all", "approve_all", is_flag=True, default=False, help="Approve all pending variants.")
+@click.option("--deploy-now", is_flag=True, default=False, help="Deploy approved variants immediately.")
+@click.option("--campaign-id", default=None, type=str, help="Campaign UUID (required with --all).")
+def approve_yes(approval_id: str | None, approve_all: bool, deploy_now: bool, campaign_id: str | None) -> None:
+    """Approve pending variant(s) for deployment."""
+
+    async def _run() -> None:
+        from src.db.engine import get_session, close_db
+        from src.db.queries import approve_variant as approve_variant_q, get_pending_approvals
+
+        cid = UUID(campaign_id) if campaign_id else None
+
+        async with get_session() as session:
+            approved_items = []
+            if approve_all:
+                items = await get_pending_approvals(session, campaign_id=cid)
+                if not items:
+                    click.echo("No pending variants to approve.")
+                    await close_db()
+                    return
+                for item in items:
+                    result = await approve_variant_q(session, item.id)
+                    if result:
+                        approved_items.append(result)
+                        click.echo(f"  Approved: {item.id}")
+                click.echo(f"\n{len(approved_items)} variant(s) approved.")
+            elif approval_id:
+                result = await approve_variant_q(session, UUID(approval_id))
+                if result:
+                    approved_items.append(result)
+                    click.echo(f"Approved: {approval_id}")
+                else:
+                    click.echo(f"Not found: {approval_id}")
+            else:
+                click.echo("Provide --id <UUID> or --all.")
+                await close_db()
+                return
+
+            if deploy_now and approved_items:
+                click.echo("\nDeploying approved variants...")
+                from src.services.deployer import deploy_approved_variants
+
+                # Determine campaign from the first approved item
+                deploy_campaign_id = approved_items[0].campaign_id
+                campaign_row = await session.execute(
+                    __import__("sqlalchemy").select(
+                        __import__("src.db.tables", fromlist=["Campaign"]).Campaign
+                    ).where(
+                        __import__("src.db.tables", fromlist=["Campaign"]).Campaign.id == deploy_campaign_id
+                    )
+                )
+                campaign = campaign_row.scalar_one_or_none()
+                if campaign:
+                    adapter = _get_adapter(campaign.platform.value)
+                    results = await deploy_approved_variants(session, adapter, deploy_campaign_id)
+                    click.echo(f"Deployed {len(results)} variant(s).")
+                else:
+                    click.echo("Error: Campaign not found for deployment.")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@approve.command("no")
+@click.option("--id", "approval_id", required=True, type=str, help="Approval queue item UUID.")
+@click.option("--reason", required=True, type=str, help="Rejection reason.")
+def approve_no(approval_id: str, reason: str) -> None:
+    """Reject a pending variant."""
+
+    async def _run() -> None:
+        from src.db.engine import get_session, close_db
+        from src.db.queries import reject_variant as reject_variant_q
+
+        async with get_session() as session:
+            result = await reject_variant_q(session, UUID(approval_id), reason=reason)
+
+        if result:
+            click.echo(f"Rejected: {approval_id} — {reason}")
+        else:
+            click.echo(f"Not found: {approval_id}")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@cli.command()
+@click.option("--host", default="127.0.0.1", help="Host to bind to.")
+@click.option("--port", default=8080, type=int, help="Port to listen on.")
+def dashboard(host: str, port: int) -> None:
+    """Start the read-only web dashboard."""
+    import uvicorn
+
+    from src.dashboard.app import app  # noqa: F811
+
+    click.echo(f"Starting dashboard at http://{host}:{port}")
+    uvicorn.run(app, host=host, port=port, log_level="info")
 
 
 def main() -> None:

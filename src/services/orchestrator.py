@@ -81,10 +81,12 @@ class Orchestrator:
         adapter: BaseAdapter,
         session_factory: async_sessionmaker[AsyncSession],
         settings: Settings,
+        auto_deploy: bool = False,
     ) -> None:
         self._adapter = adapter
         self._session_factory = session_factory
         self._settings = settings
+        self._auto_deploy = auto_deploy
 
     async def run_cycle(
         self,
@@ -140,7 +142,10 @@ class Orchestrator:
                 report.errors["monitor"] = _format_error(exc)
                 logger.error(
                     "Cycle %d monitor failed for campaign %s: %s",
-                    cycle_number, campaign_id, exc, exc_info=True,
+                    cycle_number,
+                    campaign_id,
+                    exc,
+                    exc_info=True,
                 )
 
             # --- Phase 2: Analyze ---
@@ -155,7 +160,10 @@ class Orchestrator:
                 report.errors["analyze"] = _format_error(exc)
                 logger.error(
                     "Cycle %d analyze failed for campaign %s: %s",
-                    cycle_number, campaign_id, exc, exc_info=True,
+                    cycle_number,
+                    campaign_id,
+                    exc,
+                    exc_info=True,
                 )
 
             # --- Phase 3: Act (pause losers, scale winners) ---
@@ -163,9 +171,7 @@ class Orchestrator:
                 async with session.begin_nested():
                     actions = await self._phase_act(session, campaign_id, variant_data)
                     report.actions.extend(actions)
-                    report.variants_paused = sum(
-                        1 for a in actions if a.action == "pause"
-                    )
+                    report.variants_paused = sum(1 for a in actions if a.action == "pause")
                     report.variants_promoted = sum(
                         1 for a in actions if a.action == "promote_winner"
                     )
@@ -174,7 +180,10 @@ class Orchestrator:
                 report.errors["act"] = _format_error(exc)
                 logger.error(
                     "Cycle %d act failed for campaign %s: %s",
-                    cycle_number, campaign_id, exc, exc_info=True,
+                    cycle_number,
+                    campaign_id,
+                    exc,
+                    exc_info=True,
                 )
 
             # --- Phase 4: Generate ---
@@ -191,15 +200,16 @@ class Orchestrator:
                     report.errors["generate"] = _format_error(exc)
                     logger.error(
                         "Cycle %d generate failed for campaign %s: %s",
-                        cycle_number, campaign_id, exc, exc_info=True,
+                        cycle_number,
+                        campaign_id,
+                        exc,
+                        exc_info=True,
                     )
 
                 # --- Phase 5: Deploy ---
                 try:
                     async with session.begin_nested():
-                        deploy_actions = await self._phase_deploy(
-                            session, campaign_id, new_genomes
-                        )
+                        deploy_actions = await self._phase_deploy(session, campaign_id, new_genomes)
                         report.actions.extend(deploy_actions)
                         report.variants_launched = len(deploy_actions)
                         report.phase_reached = "deploy"
@@ -208,7 +218,10 @@ class Orchestrator:
                     report.errors["deploy"] = _format_error(exc)
                     logger.error(
                         "Cycle %d deploy failed for campaign %s: %s",
-                        cycle_number, campaign_id, exc, exc_info=True,
+                        cycle_number,
+                        campaign_id,
+                        exc,
+                        exc_info=True,
                     )
 
             # --- Phase 6: Report ---
@@ -221,7 +234,10 @@ class Orchestrator:
                 report.errors["report"] = _format_error(exc)
                 logger.error(
                     "Cycle %d report failed for campaign %s: %s",
-                    cycle_number, campaign_id, exc, exc_info=True,
+                    cycle_number,
+                    campaign_id,
+                    exc,
+                    exc_info=True,
                 )
 
             # Persist all cycle actions and finalize
@@ -311,9 +327,7 @@ class Orchestrator:
             ctr = v.clicks / v.impressions
             all_ctrs.append(ctr)
             for slot_name, slot_value in v.genome.items():
-                element_ctrs[(slot_name, slot_value)].append(
-                    (ctr, v.impressions, v.conversions)
-                )
+                element_ctrs[(slot_name, slot_value)].append((ctr, v.impressions, v.conversions))
 
         global_mean_ctr = sum(all_ctrs) / len(all_ctrs) if all_ctrs else 0.0
 
@@ -346,9 +360,7 @@ class Orchestrator:
 
         # --- Element interactions ---
         variants_with_metrics = [
-            (v.genome, v.clicks / v.impressions)
-            for v in variant_data
-            if v.impressions > 0
+            (v.genome, v.clicks / v.impressions) for v in variant_data if v.impressions > 0
         ]
         interactions = compute_interactions(variants_with_metrics, min_combined_variants=2)
 
@@ -388,7 +400,9 @@ class Orchestrator:
         actions: list[CycleAction] = []
 
         if len(variant_data) < 2:
-            logger.info("Fewer than 2 active variants for campaign %s, skipping act phase", campaign_id)
+            logger.info(
+                "Fewer than 2 active variants for campaign %s, skipping act phase", campaign_id
+            )
             return actions
 
         # Find the baseline (first variant or most impressions)
@@ -396,12 +410,20 @@ class Orchestrator:
 
         # Fetch campaign settings
         campaign_row = await session.execute(
-            text("SELECT min_impressions_for_significance, confidence_threshold FROM campaigns WHERE id = :id"),
+            text(
+                "SELECT min_impressions_for_significance, confidence_threshold FROM campaigns WHERE id = :id"
+            ),
             {"id": campaign_id},
         )
         campaign_settings = campaign_row.fetchone()
-        min_impressions = int(campaign_settings[0]) if campaign_settings else self._settings.min_impressions
-        confidence_threshold = float(campaign_settings[1]) if campaign_settings else self._settings.confidence_threshold
+        min_impressions = (
+            int(campaign_settings[0]) if campaign_settings else self._settings.min_impressions
+        )
+        confidence_threshold = (
+            float(campaign_settings[1])
+            if campaign_settings
+            else self._settings.confidence_threshold
+        )
 
         # Run significance tests
         for variant in variant_data:
@@ -469,7 +491,9 @@ class Orchestrator:
                 fatigue_result = detect_fatigue(daily_ctrs)
                 if fatigue_result.is_fatigued:
                     await session.execute(
-                        text("UPDATE variants SET status = 'paused', paused_at = NOW() WHERE id = :id"),
+                        text(
+                            "UPDATE variants SET status = 'paused', paused_at = NOW() WHERE id = :id"
+                        ),
                         {"id": variant.variant_id},
                     )
                     await self._adapter.pause_ad(
@@ -489,7 +513,8 @@ class Orchestrator:
 
         # Reallocate budgets for remaining active variants via Thompson sampling
         still_active = [
-            v for v in variant_data
+            v
+            for v in variant_data
             if v.variant_id not in {a.variant_id for a in actions if a.action == "pause"}
         ]
 
@@ -501,23 +526,24 @@ class Orchestrator:
             budget_row = campaign_budget_row.fetchone()
             if budget_row:
                 total_budget = Decimal(str(budget_row[0]))
-                thompson_input = [
-                    (v.variant_id, v.clicks, v.impressions)
-                    for v in still_active
-                ]
+                thompson_input = [(v.variant_id, v.clicks, v.impressions) for v in still_active]
                 allocations = allocate_budgets(thompson_input, total_budget)
 
                 for variant_id, new_budget in allocations.items():
                     platform_ad_id = await self._get_platform_ad_id(session, variant_id)
                     await self._adapter.update_budget(platform_ad_id, float(new_budget))
                     await session.execute(
-                        text("UPDATE deployments SET daily_budget = :budget, updated_at = NOW() WHERE variant_id = :vid AND is_active = TRUE"),
+                        text(
+                            "UPDATE deployments SET daily_budget = :budget, updated_at = NOW() WHERE variant_id = :vid AND is_active = TRUE"
+                        ),
                         {"budget": new_budget, "vid": variant_id},
                     )
                     actions.append(
                         CycleAction(
                             variant_id=variant_id,
-                            action="increase_budget" if new_budget > Decimal("0") else "decrease_budget",
+                            action="increase_budget"
+                            if new_budget > Decimal("0")
+                            else "decrease_budget",
                             details={
                                 "new_budget": float(new_budget),
                                 "allocation_method": "thompson_sampling",
@@ -554,7 +580,12 @@ class Orchestrator:
         slots_available = max(0, max_variants - active_count)
 
         if slots_available == 0:
-            logger.info("No variant slots available for campaign %s (max=%d, active=%d)", campaign_id, max_variants, active_count)
+            logger.info(
+                "No variant slots available for campaign %s (max=%d, active=%d)",
+                campaign_id,
+                max_variants,
+                active_count,
+            )
             return []
 
         max_new = min(slots_available, 3)  # generate up to 3 per cycle
@@ -647,7 +678,8 @@ class Orchestrator:
 
         logger.info(
             "Generated %d new variant genomes for campaign %s",
-            len(new_genomes), campaign_id,
+            len(new_genomes),
+            campaign_id,
         )
         return new_genomes
 
@@ -657,14 +689,14 @@ class Orchestrator:
         campaign_id: uuid.UUID,
         new_genomes: list[_NewGenome],
     ) -> list[CycleAction]:
-        """Create variant records and deploy new ads to the platform.
+        """Create variant records and either deploy or queue for approval.
 
-        Steps per genome:
-        1. Insert variant record with next_variant_code()
-        2. Determine per-variant budget from remaining campaign budget
-        3. Call adapter.create_ad() to push to the platform
-        4. Insert deployment record linking variant to platform ad ID
-        5. Activate the variant
+        When auto_deploy=True (legacy mode):
+        1. Insert variant as 'active', call adapter.create_ad(), create deployment.
+
+        When auto_deploy=False (default, approval gate):
+        1. Insert variant as 'pending', add to approval_queue.
+        2. Actual deployment happens later via deployer service.
         """
         if not new_genomes:
             return []
@@ -686,21 +718,6 @@ class Orchestrator:
         platform = str(campaign[0])
         platform_campaign_id = str(campaign[1]) if campaign[1] else ""
 
-        # Calculate remaining budget
-        remaining_row = await session.execute(
-            text("SELECT remaining_budget(:id)"),
-            {"id": campaign_id},
-        )
-        remaining = remaining_row.scalar_one()
-        remaining_budget = Decimal(str(remaining)) if remaining is not None else Decimal("0")
-
-        if remaining_budget <= 0:
-            logger.warning("No remaining budget for campaign %s, skipping deploy", campaign_id)
-            return []
-
-        # Split budget evenly among new variants
-        per_variant_budget = remaining_budget / len(new_genomes)
-
         for ng in new_genomes:
             try:
                 # 1. Get next variant code
@@ -710,13 +727,14 @@ class Orchestrator:
                 )
                 variant_code = str(code_row.scalar_one())
 
-                # 2. Insert variant
+                # 2. Insert variant (pending or active depending on mode)
                 variant_id = uuid.uuid4()
+                initial_status = "active" if self._auto_deploy else "pending"
                 await session.execute(
                     text("""
                         INSERT INTO variants (id, campaign_id, variant_code, genome, status,
                                              generation, hypothesis, created_at)
-                        VALUES (:id, :campaign_id, :variant_code, :genome, 'active',
+                        VALUES (:id, :campaign_id, :variant_code, :genome, :status,
                                 :generation, :hypothesis, NOW())
                     """),
                     {
@@ -724,92 +742,63 @@ class Orchestrator:
                         "campaign_id": campaign_id,
                         "variant_code": variant_code,
                         "genome": json.dumps(ng.genome),
+                        "status": initial_status,
                         "generation": ng.generation,
                         "hypothesis": ng.hypothesis,
                     },
                 )
 
-                # 3. Resolve media asset (if genome uses media_asset slot)
-                media_info = None
-                media_asset_name = ng.genome.get("media_asset")
-                if media_asset_name:
-                    asset_row = await session.execute(
-                        text("""
-                            SELECT asset_type, platform_id
-                            FROM media_assets
-                            WHERE campaign_id = :cid
-                              AND name = :name
-                              AND is_active = TRUE
-                            LIMIT 1
-                        """),
-                        {"cid": campaign_id, "name": media_asset_name},
+                if self._auto_deploy:
+                    # Legacy: deploy immediately
+                    action = await self._deploy_single_variant(
+                        session,
+                        campaign_id,
+                        variant_id,
+                        variant_code,
+                        ng,
+                        platform,
+                        platform_campaign_id,
                     )
-                    asset = asset_row.fetchone()
-                    if asset:
-                        media_info = {
-                            "asset_type": str(asset[0]),
-                            "platform_id": str(asset[1]),
-                        }
-                        logger.info(
-                            "Resolved media_asset '%s' → %s %s",
-                            media_asset_name, asset[0], asset[1][:20],
-                        )
-
-                # 4. Deploy to platform
-                platform_ad_id = await self._adapter.create_ad(
-                    campaign_id=platform_campaign_id,
-                    variant_code=variant_code,
-                    genome=ng.genome,
-                    daily_budget=float(per_variant_budget),
-                    media_info=media_info,
-                )
-
-                # 4. Insert deployment record
-                deployment_id = uuid.uuid4()
-                await session.execute(
-                    text("""
-                        INSERT INTO deployments (id, variant_id, platform, platform_ad_id,
-                                                daily_budget, is_active, created_at, updated_at)
-                        VALUES (:id, :variant_id, :platform, :platform_ad_id,
-                                :daily_budget, TRUE, NOW(), NOW())
-                    """),
-                    {
-                        "id": deployment_id,
-                        "variant_id": variant_id,
-                        "platform": platform,
-                        "platform_ad_id": platform_ad_id,
-                        "daily_budget": per_variant_budget,
-                    },
-                )
-
-                # 5. Update variant with deployed_at
-                await session.execute(
-                    text("UPDATE variants SET deployed_at = NOW() WHERE id = :id"),
-                    {"id": variant_id},
-                )
-
-                actions.append(
-                    CycleAction(
-                        variant_id=variant_id,
-                        action="launch",
-                        details={
-                            "variant_code": variant_code,
-                            "platform_ad_id": platform_ad_id,
-                            "daily_budget": float(per_variant_budget),
+                    actions.append(action)
+                else:
+                    # Queue for human approval
+                    await session.execute(
+                        text("""
+                            INSERT INTO approval_queue
+                                (id, variant_id, campaign_id, genome_snapshot, hypothesis, submitted_at)
+                            VALUES (:id, :variant_id, :campaign_id, :genome, :hypothesis, NOW())
+                        """),
+                        {
+                            "id": uuid.uuid4(),
+                            "variant_id": variant_id,
+                            "campaign_id": campaign_id,
+                            "genome": json.dumps(ng.genome),
                             "hypothesis": ng.hypothesis,
-                            "genome": ng.genome,
                         },
                     )
-                )
 
-                logger.info(
-                    "Deployed variant %s (ad_id=%s) with budget %.2f",
-                    variant_code, platform_ad_id, per_variant_budget,
-                )
+                    actions.append(
+                        CycleAction(
+                            variant_id=variant_id,
+                            action="queue_for_approval",
+                            details={
+                                "variant_code": variant_code,
+                                "hypothesis": ng.hypothesis,
+                                "genome": ng.genome,
+                            },
+                        )
+                    )
+
+                    logger.info(
+                        "Queued variant %s for approval (hypothesis: %s)",
+                        variant_code,
+                        ng.hypothesis,
+                    )
             except Exception as exc:
                 logger.warning(
-                    "Failed to deploy variant for genome %s: %s",
-                    ng.genome, exc,
+                    "Failed to process variant for genome %s: %s",
+                    ng.genome,
+                    exc,
                 )
 
         await session.flush()
@@ -819,12 +808,112 @@ class Orchestrator:
     # Helper methods
     # ------------------------------------------------------------------
 
+    async def _deploy_single_variant(
+        self,
+        session: AsyncSession,
+        campaign_id: uuid.UUID,
+        variant_id: uuid.UUID,
+        variant_code: str,
+        ng: _NewGenome,
+        platform: str,
+        platform_campaign_id: str,
+    ) -> CycleAction:
+        """Deploy a single variant to the ad platform (auto-deploy mode).
+
+        Resolves media assets, calls adapter.create_ad(), inserts deployment
+        record, and updates variant deployed_at timestamp.
+        """
+        # Calculate remaining budget
+        remaining_row = await session.execute(
+            text("SELECT remaining_budget(:id)"),
+            {"id": campaign_id},
+        )
+        remaining = remaining_row.scalar_one()
+        remaining_budget = Decimal(str(remaining)) if remaining is not None else Decimal("0")
+        per_variant_budget = max(remaining_budget, Decimal("1.00"))
+
+        # Resolve media asset
+        media_info = None
+        media_asset_name = ng.genome.get("media_asset")
+        if media_asset_name:
+            asset_row = await session.execute(
+                text("""
+                    SELECT asset_type, platform_id
+                    FROM media_assets
+                    WHERE campaign_id = :cid
+                      AND name = :name
+                      AND is_active = TRUE
+                    LIMIT 1
+                """),
+                {"cid": campaign_id, "name": media_asset_name},
+            )
+            asset = asset_row.fetchone()
+            if asset:
+                media_info = {
+                    "asset_type": str(asset[0]),
+                    "platform_id": str(asset[1]),
+                }
+
+        # Deploy to platform
+        platform_ad_id = await self._adapter.create_ad(
+            campaign_id=platform_campaign_id,
+            variant_code=variant_code,
+            genome=ng.genome,
+            daily_budget=float(per_variant_budget),
+            media_info=media_info,
+        )
+
+        # Insert deployment record
+        deployment_id = uuid.uuid4()
+        await session.execute(
+            text("""
+                INSERT INTO deployments (id, variant_id, platform, platform_ad_id,
+                                        daily_budget, is_active, created_at, updated_at)
+                VALUES (:id, :variant_id, :platform, :platform_ad_id,
+                        :daily_budget, TRUE, NOW(), NOW())
+            """),
+            {
+                "id": deployment_id,
+                "variant_id": variant_id,
+                "platform": platform,
+                "platform_ad_id": platform_ad_id,
+                "daily_budget": per_variant_budget,
+            },
+        )
+
+        # Update variant with deployed_at
+        await session.execute(
+            text("UPDATE variants SET deployed_at = NOW() WHERE id = :id"),
+            {"id": variant_id},
+        )
+
+        logger.info(
+            "Deployed variant %s (ad_id=%s) with budget %.2f",
+            variant_code,
+            platform_ad_id,
+            per_variant_budget,
+        )
+
+        return CycleAction(
+            variant_id=variant_id,
+            action="launch",
+            details={
+                "variant_code": variant_code,
+                "platform_ad_id": platform_ad_id,
+                "daily_budget": float(per_variant_budget),
+                "hypothesis": ng.hypothesis,
+                "genome": ng.genome,
+            },
+        )
+
     async def _load_gene_pool(self, session: AsyncSession) -> GenePool:
         """Load the gene pool from the database and build a GenePool model."""
         from src.models.genome import GenePoolEntry as GenePoolEntryModel
 
         rows = await session.execute(
-            text("SELECT slot_name, slot_value, description FROM gene_pool WHERE is_active = TRUE ORDER BY slot_name, slot_value")
+            text(
+                "SELECT slot_name, slot_value, description FROM gene_pool WHERE is_active = TRUE ORDER BY slot_name, slot_value"
+            )
         )
 
         by_slot: dict[str, list[dict[str, str]]] = {}
@@ -835,9 +924,7 @@ class Orchestrator:
 
         return GenePool.model_validate(by_slot)
 
-    async def _next_cycle_number(
-        self, session: AsyncSession, campaign_id: uuid.UUID
-    ) -> int:
+    async def _next_cycle_number(self, session: AsyncSession, campaign_id: uuid.UUID) -> int:
         """Get the next sequential cycle number for a campaign."""
         result = await session.execute(
             text("""
@@ -908,9 +995,7 @@ class Orchestrator:
             },
         )
 
-    async def _get_platform_ad_id(
-        self, session: AsyncSession, variant_id: uuid.UUID
-    ) -> str:
+    async def _get_platform_ad_id(self, session: AsyncSession, variant_id: uuid.UUID) -> str:
         """Look up the platform ad ID for a variant's active deployment."""
         result = await session.execute(
             text("""

@@ -16,19 +16,16 @@ class TestGenomeSchema:
     def test_valid_genome_creation(self, sample_genome: GenomeSchema) -> None:
         """A genome with all valid slots should be created without error."""
         assert sample_genome.headline == "Limited time: 40% off today only"
-        assert sample_genome.cta_color == "green"
+        assert sample_genome.media_asset == "placeholder_lifestyle"
 
     def test_to_dict_returns_all_slots(self, sample_genome: GenomeSchema) -> None:
-        """to_dict() should include all 8 slot keys."""
+        """to_dict() should include all 5 slot keys."""
         d = sample_genome.to_dict()
         expected_keys = {
             "headline",
             "subhead",
             "cta_text",
-            "cta_color",
-            "hero_style",
-            "social_proof",
-            "urgency",
+            "media_asset",
             "audience",
         }
         assert set(d.keys()) == expected_keys
@@ -40,10 +37,7 @@ class TestGenomeSchema:
                 headline="Limited time: 40% off today only",
                 subhead="Join 12,000+ happy customers",
                 # cta_text missing
-                cta_color="green",
-                hero_style="lifestyle_photo",
-                social_proof="customer_count",
-                urgency="time_limited",
+                media_asset="placeholder_lifestyle",
                 audience="retargeting_30d",
             )
 
@@ -54,10 +48,7 @@ class TestGenomeSchema:
                 headline="Limited time: 40% off today only",
                 subhead="Join 12,000+ happy customers",
                 cta_text="Get started free",
-                cta_color="green",
-                hero_style="lifestyle_photo",
-                social_proof="customer_count",
-                urgency="time_limited",
+                media_asset="placeholder_lifestyle",
                 audience="retargeting_30d",
                 bonus_slot="unexpected",
             )
@@ -69,10 +60,7 @@ class TestGenomeSchema:
                 headline=42,  # type: ignore[arg-type]
                 subhead="Join 12,000+ happy customers",
                 cta_text="Get started free",
-                cta_color="green",
-                hero_style="lifestyle_photo",
-                social_proof="customer_count",
-                urgency="time_limited",
+                media_asset="placeholder_lifestyle",
                 audience="retargeting_30d",
             )
 
@@ -94,10 +82,7 @@ class TestGenomeSchema:
             headline="NOT A REAL HEADLINE",
             subhead="Join 12,000+ happy customers",
             cta_text="Get started free",
-            cta_color="green",
-            hero_style="lifestyle_photo",
-            social_proof="customer_count",
-            urgency="time_limited",
+            media_asset="placeholder_lifestyle",
             audience="retargeting_30d",
         )
         with pytest.raises(GenomeValidationError, match="headline"):
@@ -108,16 +93,13 @@ class TestGenePool:
     """Tests for the GenePool model and file loading."""
 
     def test_from_file_loads_all_slots(self) -> None:
-        """GenePool.from_file() should load all 8 slots from the seed file."""
+        """GenePool.from_file() should load all 5 slots from the seed file."""
         pool = GenePool.from_file(GENE_POOL_SEED_PATH)
         expected_slots = {
             "headline",
             "subhead",
             "cta_text",
-            "cta_color",
-            "hero_style",
-            "social_proof",
-            "urgency",
+            "media_asset",
             "audience",
         }
         assert set(pool.all_slot_names()) == expected_slots
@@ -125,11 +107,11 @@ class TestGenePool:
     def test_allowed_values_for_returns_strings(self) -> None:
         """allowed_values_for() should return a set of string values."""
         pool = GenePool.from_file(GENE_POOL_SEED_PATH)
-        colors = pool.allowed_values_for("cta_color")
-        assert isinstance(colors, set)
-        assert "green" in colors
-        assert "blue" in colors
-        assert "red" not in colors
+        ctas = pool.allowed_values_for("cta_text")
+        assert isinstance(ctas, set)
+        assert "Get started free" in ctas
+        assert "Learn more" in ctas
+        assert "nonexistent" not in ctas
 
     def test_allowed_values_for_headline(self) -> None:
         """Headline slot should have multiple entries from the seed file."""
@@ -149,10 +131,7 @@ class TestGenePool:
             "headline": [],  # empty
             "subhead": [{"value": "x", "description": "d"}],
             "cta_text": [{"value": "x", "description": "d"}],
-            "cta_color": [{"value": "x", "description": "d"}],
-            "hero_style": [{"value": "x", "description": "d"}],
-            "social_proof": [{"value": "x", "description": "d"}],
-            "urgency": [{"value": "x", "description": "d"}],
+            "media_asset": [{"value": "x", "description": "d"}],
             "audience": [{"value": "x", "description": "d"}],
         }
         with pytest.raises(ValueError, match="headline"):

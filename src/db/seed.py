@@ -41,11 +41,13 @@ def _load_seed_data(file_path: Path) -> list[dict[str, str | None]]:
     slots = data.get("slots", data)
     for slot_name, entries in slots.items():
         for entry in entries:
-            records.append({
-                "slot_name": slot_name,
-                "slot_value": entry["value"],
-                "description": entry.get("description"),
-            })
+            records.append(
+                {
+                    "slot_name": slot_name,
+                    "slot_value": entry["value"],
+                    "description": entry.get("description"),
+                }
+            )
     return records
 
 
@@ -72,6 +74,7 @@ async def seed_gene_pool(
                 slot_value=record["slot_value"],
                 description=record["description"],
                 is_active=True,
+                source="seed",
             )
             .on_conflict_do_update(
                 constraint="uq_gene_pool_slot_value",
@@ -79,6 +82,7 @@ async def seed_gene_pool(
                     "description": record["description"],
                     "is_active": True,
                     "retired_at": None,
+                    "source": "seed",
                 },
             )
         )

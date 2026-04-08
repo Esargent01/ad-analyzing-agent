@@ -48,10 +48,7 @@ def _valid_genome() -> dict[str, str]:
         "headline": "Limited time: 40% off today only",
         "subhead": "Join 12,000+ happy customers",
         "cta_text": "Get started free",
-        "cta_color": "green",
-        "hero_style": "lifestyle_photo",
-        "social_proof": "customer_count",
-        "urgency": "time_limited",
+        "media_asset": "placeholder_lifestyle",
         "audience": "retargeting_30d",
     }
 
@@ -59,7 +56,7 @@ def _valid_genome() -> dict[str, str]:
 def _alt_genome() -> dict[str, str]:
     """Return a different valid genome (one slot changed)."""
     g = _valid_genome()
-    g["cta_color"] = "blue"
+    g["audience"] = "broad"
     return g
 
 
@@ -128,7 +125,7 @@ class TestGeneratorAgent:
     ) -> None:
         """A genome with an invalid value should be skipped; valid ones kept."""
         invalid_genome = _valid_genome()
-        invalid_genome["cta_color"] = "INVALID_COLOR"  # not in gene pool
+        invalid_genome["audience"] = "INVALID_AUDIENCE"  # not in gene pool
 
         valid_genome = _alt_genome()
 
@@ -242,7 +239,7 @@ class TestGeneratorAgent:
         g1 = _valid_genome()
         g2 = _alt_genome()
         g3 = _valid_genome()
-        g3["hero_style"] = "illustration"
+        g3["media_asset"] = "placeholder_product"
 
         mock_client.messages.create.return_value = _make_response(
             _make_tool_use_block(g1, "H1"),

@@ -98,17 +98,14 @@ ad-creative-agent/
 ## Key domain concepts
 
 ### Creative genome
-A JSON object where each key is a **slot name** and each value is a **slot value** drawn from the gene pool. The genome fully describes a creative variant — its copy, visual style, CTA, and targeting.
+A JSON object where each key is a **slot name** and each value is a **slot value** drawn from the gene pool. The genome fully describes a creative variant — its copy, media, CTA, and targeting. Each slot maps directly to a controllable ad platform field.
 
 ```json
 {
   "headline": "Limited time: 40% off today only",
   "subhead": "Join 12,000+ happy customers",
   "cta_text": "Claim my discount",
-  "cta_color": "green",
-  "hero_style": "lifestyle_photo",
-  "social_proof": "customer_count",
-  "urgency": "time_limited",
+  "media_asset": "Short Form - Top Down Outro - Caption1.mov",
   "audience": "retargeting_30d"
 }
 ```
@@ -120,10 +117,10 @@ The set of approved values for each slot. The generator agent can ONLY select va
 A genome plus metadata: unique code (V1, V2...), status (draft/active/paused/winner/retired), generation number, parent variant IDs, and the hypothesis being tested.
 
 ### Element performance
-Aggregated stats for a single gene pool element across all variants that used it. Answers: "How do urgency headlines perform on average?" Updated after each cycle by the analyst.
+Aggregated stats for a single gene pool element across all variants that used it. Answers: "How does this headline perform on average across all variants that use it?" Updated after each cycle by the analyst.
 
 ### Element interactions
-Pairwise lift between element combinations. Answers: "Do green CTAs perform differently when paired with social proof vs. benefit-focused subheadlines?" The most valuable long-term data asset. Stored with canonical ordering (slot_a < slot_b) to prevent duplicates.
+Pairwise lift between element combinations. Answers: "Does this video perform differently when paired with different headlines?" The most valuable long-term data asset. Stored with canonical ordering (slot_a < slot_b) to prevent duplicates.
 
 ### Test cycle
 One execution of the orchestrator. Produces a CycleReport with: metrics pulled, significance tests run, actions taken, variants launched/paused, and the natural-language summary.

@@ -70,7 +70,7 @@ class GoogleAdsAdapter(BaseAdapter):
                     if hasattr(err.error_code, "quota_error")
                 )
                 if is_rate_limit:
-                    delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                    delay = _RETRY_BASE_DELAY * (2**attempt)
                     logger.warning(
                         "Google Ads rate limit hit (attempt %d/%d), backing off %.1fs",
                         attempt + 1,
@@ -133,6 +133,8 @@ class GoogleAdsAdapter(BaseAdapter):
         variant_code: str,
         genome: dict[str, str],
         daily_budget: float,
+        media_info: dict[str, str] | None = None,
+        audience_meta: dict | None = None,
     ) -> str:
         """Create a responsive search ad in *campaign_id*.
 

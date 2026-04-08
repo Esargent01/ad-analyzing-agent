@@ -10,9 +10,12 @@ from src.exceptions import GenomeValidationError
 class GenomeSchema(BaseModel):
     """A creative genome — one value per slot, all drawn from the gene pool.
 
-    The ``media_asset`` slot replaces the older ``hero_style`` slot.
-    Both are accepted for backward compatibility with existing genomes,
-    but ``media_asset`` is preferred for new variants.
+    Slots map directly to ad platform fields:
+    - headline: Ad headline text
+    - subhead: Primary text / body copy
+    - cta_text: Call-to-action button text
+    - media_asset: Reference to a real image or video asset
+    - audience: Targeting group (mapped to platform audience IDs)
     """
 
     model_config = ConfigDict(strict=True, frozen=True, extra="forbid")
@@ -20,21 +23,8 @@ class GenomeSchema(BaseModel):
     headline: str
     subhead: str
     cta_text: str
-    cta_color: str
-    media_asset: str = ""  # new: references a real media asset name
-    hero_style: str = ""   # deprecated: kept for backward compat
-    social_proof: str
-    urgency: str
+    media_asset: str
     audience: str
-
-    @model_validator(mode="after")
-    def _require_media_or_hero(self) -> GenomeSchema:
-        """Ensure at least one of media_asset or hero_style is set."""
-        if not self.media_asset and not self.hero_style:
-            raise ValueError(
-                "At least one of 'media_asset' or 'hero_style' must be provided"
-            )
-        return self
 
     def to_dict(self) -> dict[str, str]:
         """Serialize the genome to a plain dict suitable for JSONB storage."""
@@ -65,8 +55,7 @@ class GenePool(BaseModel):
     """The full gene pool loaded from gene_pool_seed.json.
 
     Keys are slot names, values are lists of approved entries.
-    ``media_asset`` and ``hero_style`` are both optional — campaigns
-    can use either or both depending on whether real media is synced.
+    Each slot maps directly to a controllable ad element.
     """
 
     model_config = ConfigDict(strict=True)
@@ -74,15 +63,11 @@ class GenePool(BaseModel):
     headline: list[GenePoolEntry]
     subhead: list[GenePoolEntry]
     cta_text: list[GenePoolEntry]
-    cta_color: list[GenePoolEntry]
     media_asset: list[GenePoolEntry] = []  # populated from media_assets table
-    hero_style: list[GenePoolEntry] = []   # legacy slot
-    social_proof: list[GenePoolEntry]
-    urgency: list[GenePoolEntry]
     audience: list[GenePoolEntry]
 
-    # Slots that are allowed to be empty (optional visual slots)
-    _OPTIONAL_SLOTS: set[str] = {"media_asset", "hero_style"}
+    # media_asset can start empty — populated when media is synced from platform
+    _OPTIONAL_SLOTS: set[str] = {"media_asset"}
 
     @model_validator(mode="after")
     def _ensure_required_slots_non_empty(self) -> GenePool:
@@ -92,9 +77,6 @@ class GenePool(BaseModel):
             entries: list[GenePoolEntry] = getattr(self, slot_name)
             if len(entries) == 0 and slot_name not in self._OPTIONAL_SLOTS:
                 raise ValueError(f"Gene pool slot '{slot_name}' must have at least one entry")
-        # At least one visual slot must have entries
-        if not self.media_asset and not self.hero_style:
-            raise ValueError("At least one of 'media_asset' or 'hero_style' must have entries")
         return self
 
     def allowed_values_for(self, slot_name: str) -> set[str]:

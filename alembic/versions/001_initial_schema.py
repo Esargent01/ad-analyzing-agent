@@ -470,30 +470,9 @@ def upgrade() -> None:
             ('cta_text', 'See it in action',                        'Demo oriented'),
             ('cta_text', 'Learn more',                              'Soft CTA'),
 
-            -- CTA color
-            ('cta_color', 'green',                                  'High contrast, action'),
-            ('cta_color', 'blue',                                   'Trust, professional'),
-            ('cta_color', 'orange',                                 'Energetic, attention'),
-            ('cta_color', 'black',                                  'Premium, minimal'),
-
-            -- Hero image style
-            ('hero_style', 'lifestyle_photo',                       'People using product'),
-            ('hero_style', 'product_screenshot',                    'UI/product shot'),
-            ('hero_style', 'illustration',                          'Custom illustration'),
-            ('hero_style', 'testimonial_card',                      'Quote with headshot'),
-
-            -- Social proof type
-            ('social_proof', 'customer_count',                      '"12,000+ customers"'),
-            ('social_proof', 'testimonial',                         'Named customer quote'),
-            ('social_proof', 'press_logos',                          'Media outlet logos'),
-            ('social_proof', 'rating',                              'Star rating badge'),
-            ('social_proof', 'none',                                'No social proof'),
-
-            -- Urgency element
-            ('urgency', 'time_limited',                             '"Ends tonight" style'),
-            ('urgency', 'stock_limited',                            '"Only X spots left"'),
-            ('urgency', 'seasonal',                                 'Tied to event/season'),
-            ('urgency', 'none',                                     'No urgency element'),
+            -- Media assets (populated from platform sync)
+            ('media_asset', 'placeholder_lifestyle',                'Placeholder: lifestyle photo'),
+            ('media_asset', 'placeholder_product',                  'Placeholder: product shot'),
 
             -- Audience segment
             ('audience', 'retargeting_30d',                         'Site visitors, last 30 days'),

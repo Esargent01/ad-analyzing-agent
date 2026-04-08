@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ campaign.name }} — Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        :root { --pico-font-size: 15px; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
+        .badge-active { background: #EAF3DE; color: #27500A; }
+        .badge-pending { background: #FAEEDA; color: #633806; }
+        .badge-winner { background: #EEEDFE; color: #3C3489; }
+        .badge-paused { background: #f0f0f0; color: #666; }
+        .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+        .stat-card { background: var(--pico-card-background-color); border-radius: 8px; padding: 16px; }
+        .stat-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6; }
+        .stat-value { font-size: 22px; font-weight: 600; }
+        .mono { font-family: "SF Mono", "Fira Code", monospace; font-size: 13px; }
+        nav { margin-bottom: 2rem; }
+        section { margin-bottom: 2.5rem; }
+        .genome-preview { font-size: 12px; opacity: 0.7; max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <nav>
+            <ul><li><a href="/"><strong>Ad Creative Agent</strong></a></li></ul>
+            <ul>
+                <li><a href="/">Dashboard</a></li>
+                <li>{{ campaign.name }}</li>
+            </ul>
+        </nav>
+
+        <h1>{{ campaign.name }}</h1>
+        <p>
+            <span class="badge badge-active">{{ campaign.platform.value | upper }}</span>
+            ${{ "%.0f"|format(campaign.daily_budget) }}/day &middot;
+            {{ campaign.max_concurrent_variants }} max variants &middot;
+            Confidence: {{ "%.0f"|format(campaign.confidence_threshold * 100) }}%
+        </p>
+
+        <!-- Pending Approvals -->
+        {% if approvals %}
+        <section>
+            <h2>Pending Approvals ({{ approvals|length }})</h2>
+            <table>
+                <thead>
+                    <tr><th>ID</th><th>Hypothesis</th><th>Genome</th><th>Submitted</th></tr>
+                </thead>
+                <tbody>
+                    {% for a in approvals %}
+                    <tr>
+                        <td class="mono">{{ a.id | string | truncate(8, True, '') }}</td>
+                        <td>{{ a.hypothesis or '—' }}</td>
+                        <td class="genome-preview">
+                            {% for k, v in a.genome_snapshot.items() %}{{ k }}={{ v }}{% if not loop.last %}, {% endif %}{% endfor %}
+                        </td>
+                        <td class="mono">{{ a.submitted_at.strftime('%Y-%m-%d %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p><small>Approve via CLI: <code>adagent approve yes --all --campaign-id {{ campaign.id }} --deploy-now</code></small></p>
+        </section>
+        {% endif %}
+
+        <!-- Active Variants -->
+        <section>
+            <h2>Active Variants ({{ variants|length }})</h2>
+            {% if variants %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Code</th>
+                        <th>Status</th>
+                        <th>Generation</th>
+                        <th>Hypothesis</th>
+                        <th>Deployed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in variants %}
+                    <tr>
+                        <td class="mono">{{ v.variant_code }}</td>
+                        <td><span class="badge badge-{{ v.status.value }}">{{ v.status.value }}</span></td>
+                        <td class="mono">{{ v.generation }}</td>
+                        <td>{{ v.hypothesis or '—' }}</td>
+                        <td class="mono">{{ v.deployed_at.strftime('%Y-%m-%d') if v.deployed_at else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p><em>No active variants.</em></p>
+            {% endif %}
+        </section>
+
+        <!-- Element Performance -->
+        {% if elements %}
+        <section>
+            <h2>Element Performance</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Slot</th>
+                        <th>Value</th>
+                        <th>Avg CTR</th>
+                        <th>Variants</th>
+                        <th>Confidence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for e in elements[:20] %}
+                    <tr>
+                        <td>{{ e.slot_name }}</td>
+                        <td>{{ e.slot_value | truncate(40) }}</td>
+                        <td class="mono">{{ "%.2f"|format(e.avg_ctr * 100) }}%</td>
+                        <td class="mono">{{ e.variants_tested }}</td>
+                        <td class="mono">{{ "%.0f"|format(e.confidence) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endif %}
+
+        <!-- Interactions -->
+        {% if interactions %}
+        <section>
+            <h2>Top Interactions</h2>
+            <table>
+                <thead>
+                    <tr><th>Element A</th><th>Element B</th><th>Lift</th><th>Variants</th></tr>
+                </thead>
+                <tbody>
+                    {% for i in interactions[:10] %}
+                    <tr>
+                        <td>{{ i.slot_a_name }}: {{ i.slot_a_value | truncate(20) }}</td>
+                        <td>{{ i.slot_b_name }}: {{ i.slot_b_value | truncate(20) }}</td>
+                        <td class="mono" style="color: {% if i.interaction_lift and i.interaction_lift > 0 %}#1D9E75{% else %}#D85A30{% endif %}">
+                            {% if i.interaction_lift %}{{ "%+.0f"|format(i.interaction_lift * 100) }}%{% else %}—{% endif %}
+                        </td>
+                        <td class="mono">{{ i.variants_tested }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endif %}
+
+        <!-- Recent Cycles -->
+        {% if cycles %}
+        <section>
+            <h2>Recent Cycles</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Phase</th>
+                        <th>Launched</th>
+                        <th>Paused</th>
+                        <th>Completed</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for c in cycles %}
+                    <tr>
+                        <td class="mono">{{ c.cycle_number }}</td>
+                        <td><span class="badge badge-active">{{ c.phase.value }}</span></td>
+                        <td class="mono">{{ c.variants_launched or 0 }}</td>
+                        <td class="mono">{{ c.variants_paused or 0 }}</td>
+                        <td class="mono">{{ c.completed_at.strftime('%Y-%m-%d %H:%M') if c.completed_at else 'running' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endif %}
+
+        <!-- JSON API Links -->
+        <section>
+            <h2>API</h2>
+            <ul>
+                <li><a href="/api/campaigns/{{ campaign.id }}/variants">Variants (JSON)</a></li>
+                <li><a href="/api/campaigns/{{ campaign.id }}/elements">Elements (JSON)</a></li>
+                <li><a href="/api/campaigns/{{ campaign.id }}/interactions">Interactions (JSON)</a></li>
+                <li><a href="/api/campaigns/{{ campaign.id }}/cycles">Cycles (JSON)</a></li>
+            </ul>
+        </section>
+    </main>
+
+    <script>
+        // Auto-refresh every 30 seconds
+        setTimeout(function() { location.reload(); }, 30000);
+    </script>
+</body>
+</html>

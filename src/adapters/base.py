@@ -134,6 +134,7 @@ class BaseAdapter(ABC):
         genome: dict[str, str],
         daily_budget: float,
         media_info: dict[str, str] | None = None,
+        audience_meta: dict | None = None,
     ) -> str:
         """Create an ad on the platform from a creative genome.
 
@@ -144,6 +145,8 @@ class BaseAdapter(ABC):
             daily_budget: Daily spend cap in the campaign currency.
             media_info: Optional dict with ``asset_type`` ("image"/"video")
                 and ``platform_id`` to use a real media asset.
+            audience_meta: Optional gene pool metadata for the audience slot,
+                containing platform-specific audience IDs (e.g. ``meta_audience_id``).
 
         Returns:
             The platform-native ad ID (e.g. Meta ad ID, Google ad resource name).
@@ -194,7 +197,8 @@ class BaseAdapter(ABC):
         """
 
     async def list_media_library(
-        self, asset_type: str = "all",
+        self,
+        asset_type: str = "all",
     ) -> list[MediaAsset]:
         """List media assets (images/videos) from the platform's library.
 

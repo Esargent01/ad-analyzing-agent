@@ -23,34 +23,9 @@
     {"value": "See it in action", "description": "Demo oriented"},
     {"value": "Learn more", "description": "Soft CTA"}
   ],
-  "cta_color": [
-    {"value": "green", "description": "High contrast, action"},
-    {"value": "blue", "description": "Trust, professional"},
-    {"value": "orange", "description": "Energetic, attention"},
-    {"value": "black", "description": "Premium, minimal"}
-  ],
-  "hero_style": [
-    {"value": "lifestyle_photo", "description": "People using product"},
-    {"value": "product_screenshot", "description": "UI/product shot"},
-    {"value": "illustration", "description": "Custom illustration"},
-    {"value": "testimonial_card", "description": "Quote with headshot"}
-  ],
   "media_asset": [
     {"value": "placeholder_lifestyle", "description": "Placeholder: lifestyle photo"},
     {"value": "placeholder_product", "description": "Placeholder: product shot"}
-  ],
-  "social_proof": [
-    {"value": "customer_count", "description": "12,000+ customers"},
-    {"value": "testimonial", "description": "Named customer quote"},
-    {"value": "press_logos", "description": "Media outlet logos"},
-    {"value": "rating", "description": "Star rating badge"},
-    {"value": "none", "description": "No social proof"}
-  ],
-  "urgency": [
-    {"value": "time_limited", "description": "Ends tonight style"},
-    {"value": "stock_limited", "description": "Only X spots left"},
-    {"value": "seasonal", "description": "Tied to event/season"},
-    {"value": "none", "description": "No urgency element"}
   ],
   "audience": [
     {"value": "retargeting_30d", "description": "Site visitors, last 30 days"},

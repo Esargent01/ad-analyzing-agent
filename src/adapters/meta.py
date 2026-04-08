@@ -78,7 +78,7 @@ class MetaAdapter(BaseAdapter):
                 last_error = exc
                 # Rate-limit errors: code 17 or 32
                 if exc.api_error_code() in (17, 32, 4):
-                    delay = _RETRY_BASE_DELAY * (2 ** attempt)
+                    delay = _RETRY_BASE_DELAY * (2**attempt)
                     logger.warning(
                         "Meta rate limit hit (attempt %d/%d), backing off %.1fs",
                         attempt + 1,
@@ -135,7 +135,11 @@ class MetaAdapter(BaseAdapter):
 
             def _png_chunk(chunk_type: bytes, data: bytes) -> bytes:
                 chunk = chunk_type + data
-                return struct.pack(">I", len(data)) + chunk + struct.pack(">I", zlib.crc32(chunk) & 0xFFFFFFFF)
+                return (
+                    struct.pack(">I", len(data))
+                    + chunk
+                    + struct.pack(">I", zlib.crc32(chunk) & 0xFFFFFFFF)
+                )
 
             ihdr_data = struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0)
             png = b"\x89PNG\r\n\x1a\n"
@@ -153,6 +157,7 @@ class MetaAdapter(BaseAdapter):
             image.remote_create()
 
             import os
+
             os.unlink(tmp_path)
 
             return str(image[AdImage.Field.hash])
@@ -213,6 +218,7 @@ class MetaAdapter(BaseAdapter):
         genome: dict[str, str],
         daily_budget: float,
         media_info: dict[str, str] | None = None,
+        audience_meta: dict | None = None,
     ) -> str:
         """Create a Meta ad inside *campaign_id*.
 
@@ -236,7 +242,8 @@ class MetaAdapter(BaseAdapter):
         if media_info and media_info.get("asset_type") == "video":
             # Video creative — use video_data path
             creative_params = self._build_video_creative_params(
-                variant_code, genome,
+                variant_code,
+                genome,
                 video_id=media_info["platform_id"],
                 thumbnail_hash=media_info.get("thumbnail_hash"),
             )
@@ -245,9 +252,9 @@ class MetaAdapter(BaseAdapter):
             image_hash = media_info["platform_id"]
             creative_params = self._build_creative_params(variant_code, genome, image_hash)
         else:
-            # Fallback: generate a placeholder PNG
-            hero_style = genome.get("hero_style", genome.get("media_asset", "lifestyle_photo"))
-            image_hash = await self._upload_image(hero_style)
+            # Fallback: generate a placeholder PNG from media_asset name
+            style_key = genome.get("media_asset", "lifestyle_photo")
+            image_hash = await self._upload_image(style_key)
             creative_params = self._build_creative_params(variant_code, genome, image_hash)
 
         def _create_creative() -> str:
@@ -265,7 +272,7 @@ class MetaAdapter(BaseAdapter):
             "optimization_goal": "LINK_CLICKS",
             "bid_strategy": "LOWEST_COST_WITHOUT_CAP",
             "status": "ACTIVE",
-            "targeting": self._build_targeting(genome),
+            "targeting": self._build_targeting(genome, audience_meta=audience_meta),
         }
 
         def _create_adset() -> str:
@@ -376,7 +383,9 @@ class MetaAdapter(BaseAdapter):
                     total += int(float(a.get("value", 0)))
             return total
 
-        def _action_float_value(actions: list[dict[str, str]] | None, action_types: list[str]) -> float:
+        def _action_float_value(
+            actions: list[dict[str, str]] | None, action_types: list[str]
+        ) -> float:
             """Sum float values for matching action types (e.g. purchase_value)."""
             if not actions:
                 return 0.0
@@ -407,22 +416,33 @@ class MetaAdapter(BaseAdapter):
             link_clicks = _action_value(actions, ["link_click"])
 
         landing_page_views = _action_value(actions, ["landing_page_view"])
-        add_to_carts = _action_value(actions, ["offsite_conversion.fb_pixel_add_to_cart", "add_to_cart"])
-        purchases = _action_value(actions, [
-            "offsite_conversion.fb_pixel_purchase",
-            "purchase",
-        ])
-        purchase_value = _action_float_value(action_values, [
-            "offsite_conversion.fb_pixel_purchase",
-            "purchase",
-        ])
+        add_to_carts = _action_value(
+            actions, ["offsite_conversion.fb_pixel_add_to_cart", "add_to_cart"]
+        )
+        purchases = _action_value(
+            actions,
+            [
+                "offsite_conversion.fb_pixel_purchase",
+                "purchase",
+            ],
+        )
+        purchase_value = _action_float_value(
+            action_values,
+            [
+                "offsite_conversion.fb_pixel_purchase",
+                "purchase",
+            ],
+        )
 
         # Conversions: purchases + leads
-        conversions = purchases + _action_value(actions, [
-            "offsite_conversion",
-            "lead",
-            "offsite_conversion.fb_pixel_lead",
-        ])
+        conversions = purchases + _action_value(
+            actions,
+            [
+                "offsite_conversion",
+                "lead",
+                "offsite_conversion.fb_pixel_lead",
+            ],
+        )
 
         return AdMetrics(
             impressions=int(raw.get("impressions", 0)),
@@ -470,7 +490,10 @@ class MetaAdapter(BaseAdapter):
             campaign = Campaign(campaign_id)
             ads = campaign.get_ads(
                 fields=[
-                    "id", "name", "status", "adset_id",
+                    "id",
+                    "name",
+                    "status",
+                    "adset_id",
                     "creative{id,name,title,body,object_story_spec,thumbnail_url}",
                 ],
             )
@@ -480,19 +503,21 @@ class MetaAdapter(BaseAdapter):
                 story_spec = creative.get("object_story_spec", {})
                 link_data = story_spec.get("link_data", {})
 
-                results.append({
-                    "ad_id": str(ad["id"]),
-                    "ad_name": ad.get("name", ""),
-                    "status": ad.get("status", "UNKNOWN"),
-                    "adset_id": str(ad.get("adset_id", "")),
-                    "creative_id": str(creative.get("id", "")),
-                    "creative_name": creative.get("name", ""),
-                    "headline": link_data.get("name", creative.get("title", "")),
-                    "body": link_data.get("message", creative.get("body", "")),
-                    "link_url": link_data.get("link", ""),
-                    "cta_type": link_data.get("call_to_action", {}).get("type", ""),
-                    "image_url": link_data.get("picture", creative.get("thumbnail_url", "")),
-                })
+                results.append(
+                    {
+                        "ad_id": str(ad["id"]),
+                        "ad_name": ad.get("name", ""),
+                        "status": ad.get("status", "UNKNOWN"),
+                        "adset_id": str(ad.get("adset_id", "")),
+                        "creative_id": str(creative.get("id", "")),
+                        "creative_name": creative.get("name", ""),
+                        "headline": link_data.get("name", creative.get("title", "")),
+                        "body": link_data.get("message", creative.get("body", "")),
+                        "link_url": link_data.get("link", ""),
+                        "cta_type": link_data.get("call_to_action", {}).get("type", ""),
+                        "image_url": link_data.get("picture", creative.get("thumbnail_url", "")),
+                    }
+                )
             return results
 
         ads_list: list[dict[str, object]] = await self._run_sync(partial(_list_ads))  # type: ignore[assignment]
@@ -541,23 +566,25 @@ class MetaAdapter(BaseAdapter):
             rows: list[dict[str, object]] = []
             for row in insights:
                 metrics = MetaAdapter._parse_insights_to_metrics(dict(row))
-                rows.append({
-                    "date_start": row.get("date_start", ""),
-                    "date_stop": row.get("date_stop", ""),
-                    "impressions": metrics.impressions,
-                    "reach": metrics.reach,
-                    "clicks": metrics.clicks,
-                    "conversions": metrics.conversions,
-                    "spend": metrics.spend,
-                    "video_views_3s": metrics.video_views_3s,
-                    "video_views_15s": metrics.video_views_15s,
-                    "thruplays": metrics.thruplays,
-                    "link_clicks": metrics.link_clicks,
-                    "landing_page_views": metrics.landing_page_views,
-                    "add_to_carts": metrics.add_to_carts,
-                    "purchases": metrics.purchases,
-                    "purchase_value": metrics.purchase_value,
-                })
+                rows.append(
+                    {
+                        "date_start": row.get("date_start", ""),
+                        "date_stop": row.get("date_stop", ""),
+                        "impressions": metrics.impressions,
+                        "reach": metrics.reach,
+                        "clicks": metrics.clicks,
+                        "conversions": metrics.conversions,
+                        "spend": metrics.spend,
+                        "video_views_3s": metrics.video_views_3s,
+                        "video_views_15s": metrics.video_views_15s,
+                        "thruplays": metrics.thruplays,
+                        "link_clicks": metrics.link_clicks,
+                        "landing_page_views": metrics.landing_page_views,
+                        "add_to_carts": metrics.add_to_carts,
+                        "purchases": metrics.purchases,
+                        "purchase_value": metrics.purchase_value,
+                    }
+                )
             return rows
 
         result: list[dict[str, object]] = await self._run_sync(partial(_fetch))  # type: ignore[assignment]
@@ -568,30 +595,27 @@ class MetaAdapter(BaseAdapter):
     # Targeting helper
     # ------------------------------------------------------------------
 
-    def _build_targeting(self, genome: dict[str, str]) -> dict[str, object]:
+    def _build_targeting(
+        self,
+        genome: dict[str, str],
+        audience_meta: dict | None = None,
+    ) -> dict[str, object]:
         """Build Meta targeting spec from genome audience slot.
 
-        Custom audience IDs are looked up from ``_custom_audience_ids``.
-        If an audience type has no real ID configured, broad targeting is
-        used instead (no custom_audiences key).
+        If ``audience_meta`` contains a ``meta_audience_id`` key (from the
+        gene pool metadata), it is used as the custom audience. Otherwise
+        broad targeting is used.
         """
-        audience = genome.get("audience", "broad")
         targeting: dict[str, object] = {
             "geo_locations": {"countries": ["US"]},
             "age_min": 18,
             "age_max": 65,
         }
-        # Map audience slot values to real custom audience IDs.
-        # Populate this dict with real IDs once custom audiences exist
-        # in your Meta ad account.
-        audience_id_map: dict[str, str | None] = {
-            "retargeting_30d": None,
-            "retargeting_7d": None,
-            "lookalike_1pct": None,
-        }
-        real_id = audience_id_map.get(audience)
-        if real_id:
-            targeting["custom_audiences"] = [{"id": real_id}]
+
+        # Use real Meta audience ID from gene pool metadata if available
+        if audience_meta and audience_meta.get("meta_audience_id"):
+            targeting["custom_audiences"] = [{"id": audience_meta["meta_audience_id"]}]
+
         return targeting
 
     # ------------------------------------------------------------------
@@ -599,7 +623,8 @@ class MetaAdapter(BaseAdapter):
     # ------------------------------------------------------------------
 
     async def list_media_library(
-        self, asset_type: str = "all",
+        self,
+        asset_type: str = "all",
     ) -> list[MediaAsset]:
         """List images and/or videos from the Meta ad account's library.
 
@@ -612,6 +637,7 @@ class MetaAdapter(BaseAdapter):
         assets: list[MediaAsset] = []
 
         if asset_type in ("image", "all"):
+
             def _list_images() -> list[MediaAsset]:
                 images = self._account.get_ad_images(
                     fields=[
@@ -628,20 +654,22 @@ class MetaAdapter(BaseAdapter):
                 )
                 result: list[MediaAsset] = []
                 for img in images:
-                    result.append(MediaAsset(
-                        asset_type="image",
-                        platform_id=str(img.get(AdImage.Field.hash, "")),
-                        name=str(img.get(AdImage.Field.name, "Untitled")),
-                        thumbnail_url=str(img.get(AdImage.Field.url_128, "")),
-                        source_url=str(img.get(AdImage.Field.url, "")),
-                        width=int(img.get(AdImage.Field.width, 0)),
-                        height=int(img.get(AdImage.Field.height, 0)),
-                        metadata={
-                            "permalink_url": str(img.get(AdImage.Field.permalink_url, "")),
-                            "created_time": str(img.get(AdImage.Field.created_time, "")),
-                            "status": str(img.get(AdImage.Field.status, "")),
-                        },
-                    ))
+                    result.append(
+                        MediaAsset(
+                            asset_type="image",
+                            platform_id=str(img.get(AdImage.Field.hash, "")),
+                            name=str(img.get(AdImage.Field.name, "Untitled")),
+                            thumbnail_url=str(img.get(AdImage.Field.url_128, "")),
+                            source_url=str(img.get(AdImage.Field.url, "")),
+                            width=int(img.get(AdImage.Field.width, 0)),
+                            height=int(img.get(AdImage.Field.height, 0)),
+                            metadata={
+                                "permalink_url": str(img.get(AdImage.Field.permalink_url, "")),
+                                "created_time": str(img.get(AdImage.Field.created_time, "")),
+                                "status": str(img.get(AdImage.Field.status, "")),
+                            },
+                        )
+                    )
                 return result
 
             img_assets: list[MediaAsset] = await self._run_sync(partial(_list_images))  # type: ignore[assignment]
@@ -649,6 +677,7 @@ class MetaAdapter(BaseAdapter):
             logger.info("Found %d images in media library", len(img_assets))
 
         if asset_type in ("video", "all"):
+
             def _list_videos() -> list[MediaAsset]:
                 videos = self._account.get_ad_videos(
                     fields=[
@@ -663,18 +692,20 @@ class MetaAdapter(BaseAdapter):
                 )
                 result: list[MediaAsset] = []
                 for vid in videos:
-                    result.append(MediaAsset(
-                        asset_type="video",
-                        platform_id=str(vid.get(AdVideo.Field.id, "")),
-                        name=str(vid.get(AdVideo.Field.title, "Untitled")),
-                        thumbnail_url=str(vid.get(AdVideo.Field.picture, "")),
-                        source_url=str(vid.get(AdVideo.Field.source, "")),
-                        duration_secs=float(vid.get(AdVideo.Field.length, 0)),
-                        metadata={
-                            "description": str(vid.get(AdVideo.Field.description, "")),
-                            "created_time": str(vid.get(AdVideo.Field.created_time, "")),
-                        },
-                    ))
+                    result.append(
+                        MediaAsset(
+                            asset_type="video",
+                            platform_id=str(vid.get(AdVideo.Field.id, "")),
+                            name=str(vid.get(AdVideo.Field.title, "Untitled")),
+                            thumbnail_url=str(vid.get(AdVideo.Field.picture, "")),
+                            source_url=str(vid.get(AdVideo.Field.source, "")),
+                            duration_secs=float(vid.get(AdVideo.Field.length, 0)),
+                            metadata={
+                                "description": str(vid.get(AdVideo.Field.description, "")),
+                                "created_time": str(vid.get(AdVideo.Field.created_time, "")),
+                            },
+                        )
+                    )
                 return result
 
             vid_assets: list[MediaAsset] = await self._run_sync(partial(_list_videos))  # type: ignore[assignment]
