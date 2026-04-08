@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Daily Report — 2026-04-07</title>
+    <meta name="robots" content="index, follow">
+
+    <meta property="og:title" content="Existing Meta Campaign Daily Report — 2026-04-07">
+    <meta property="og:description" content="Hook rate 0.0%, CTR 0.0%, Spend $0.00">
+    <meta property="og:type" content="article">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <style>
+        :root {
+            --bg: #ffffff;
+            --bg-secondary: #f7f7f8;
+            --text: #1a1a1a;
+            --text-secondary: #6b6b6b;
+            --text-tertiary: #999;
+            --border: #e5e5e5;
+            --accent: #534AB7;
+            --green: #1D9E75;
+            --red: #D85A30;
+            --orange: #E09533;
+            --font: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            --mono: "SF Mono", "Fira Code", monospace;
+            --radius: 8px;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --bg: #161616;
+                --bg-secondary: #222;
+                --text: #e5e5e5;
+                --text-secondary: #999;
+                --text-tertiary: #666;
+                --border: #333;
+            }
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: var(--font);
+            color: var(--text);
+            background: var(--bg);
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+        .report-header { margin-bottom: 2rem; }
+        .report-meta {
+            display: flex; gap: 12px; align-items: center;
+            font-size: 14px; color: var(--text-secondary); margin-bottom: 4px;
+        }
+        .report-type {
+            background: var(--accent); color: white;
+            padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500;
+        }
+        h1 { font-size: 24px; font-weight: 600; line-height: 1.3; }
+        .cycle-info { font-size: 13px; color: var(--text-tertiary); margin-top: 4px; }
+        h2 { font-size: 16px; font-weight: 600; margin-bottom: 12px; }
+        h3 { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+        .section { margin-bottom: 2rem; }
+        .section-note { font-size: 12px; color: var(--text-tertiary); margin: -8px 0 12px; }
+
+        /* Metric cards */
+        .metric-cards {
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 10px; margin-bottom: 2rem;
+        }
+        @media (max-width: 600px) {
+            .metric-cards { grid-template-columns: repeat(2, 1fr); }
+        }
+        .mc {
+            background: var(--bg-secondary); border-radius: var(--radius);
+            padding: 14px 16px;
+        }
+        .mc-label { font-size: 12px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px; }
+        .mc-value { font-size: 20px; font-weight: 600; line-height: 1.3; }
+
+        /* Hook rate bars */
+        .hook-row {
+            display: flex; align-items: center; gap: 10px;
+            padding: 6px 0; font-size: 13px;
+        }
+        .hook-row .variant-code {
+            width: 50px; font-family: var(--mono); font-size: 12px; flex-shrink: 0;
+        }
+        .bar-container {
+            flex: 1; height: 8px; background: var(--bg-secondary);
+            border-radius: 4px; overflow: hidden;
+        }
+        .bar { height: 100%; background: var(--accent); border-radius: 4px; transition: width 0.3s; }
+        .hook-value { width: 50px; text-align: right; font-family: var(--mono); font-size: 12px; }
+        .low-hook .bar { background: var(--red); }
+        .low-hook .hook-value { color: var(--red); }
+        .flag {
+            font-size: 11px; color: var(--red); background: #FDE8E1;
+            padding: 1px 6px; border-radius: 4px;
+        }
+
+        /* Funnel */
+        .funnel-stage {
+            display: flex; align-items: center; gap: 12px;
+            padding: 10px 0; border-bottom: 1px solid var(--border);
+            font-size: 13px;
+        }
+        .funnel-stage:last-child { border-bottom: none; }
+        .funnel-name { width: 140px; font-weight: 500; }
+        .funnel-value { width: 80px; font-family: var(--mono); font-size: 12px; text-align: right; }
+        .funnel-rate { width: 60px; font-family: var(--mono); font-size: 12px; text-align: right; color: var(--text-secondary); }
+        .funnel-bar-container { flex: 1; height: 6px; background: var(--bg-secondary); border-radius: 3px; overflow: hidden; }
+        .funnel-bar { height: 100%; background: var(--accent); border-radius: 3px; }
+        .funnel-cost { width: 70px; font-family: var(--mono); font-size: 11px; text-align: right; color: var(--text-tertiary); }
+
+        /* Leaderboard table */
+        .leaderboard { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .leaderboard th {
+            text-align: left; font-weight: 500; font-size: 11px;
+            text-transform: uppercase; letter-spacing: 0.5px;
+            color: var(--text-tertiary); padding: 8px 10px;
+            border-bottom: 1px solid var(--border);
+        }
+        .leaderboard td { padding: 10px; border-bottom: 1px solid var(--border); }
+        .leaderboard .mono { font-family: var(--mono); font-size: 12px; }
+        .leaderboard tr:hover { background: var(--bg-secondary); }
+
+        /* Status pills */
+        .status { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .status-active { background: #EAF3DE; color: #27500A; }
+        .status-winner { background: #EEEDFE; color: #3C3489; }
+        .status-paused { background: #FAEEDA; color: #633806; }
+
+        /* Dual ranking */
+        .dual-ranking { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 600px) { .dual-ranking { grid-template-columns: 1fr; } }
+        .ranking-subtitle { font-size: 12px; color: var(--text-tertiary); margin-bottom: 8px; }
+        .element-row {
+            display: flex; gap: 8px; align-items: center;
+            padding: 5px 0; font-size: 13px; border-bottom: 1px solid var(--border);
+        }
+        .element-row:last-child { border-bottom: none; }
+        .rank { width: 28px; color: var(--text-tertiary); font-size: 12px; }
+        .slot { font-weight: 500; width: 90px; font-size: 12px; }
+        .value-label { flex: 1; color: var(--text-secondary); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .metric { font-family: var(--mono); font-size: 12px; }
+
+        /* Interactions */
+        .interaction-row {
+            display: flex; gap: 10px; padding: 8px 0; font-size: 13px;
+            border-bottom: 1px solid var(--border);
+        }
+        .interaction-row:last-child { border-bottom: none; }
+        .interaction-pair { flex: 1; }
+        .interaction-lift { font-family: var(--mono); font-size: 12px; font-weight: 600; }
+        .lift-positive { color: var(--green); }
+        .lift-negative { color: var(--red); }
+
+        /* Empty state */
+        .empty-state { font-size: 13px; color: var(--text-tertiary); font-style: italic; }
+
+        /* Footer */
+        .report-footer {
+            margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border);
+            font-size: 12px; color: var(--text-tertiary);
+        }
+        .report-footer a { color: var(--accent); }
+
+        /* Tweet snapshot region */
+        .tweet-snapshot {
+            padding: 20px; border-radius: var(--radius);
+            background: var(--bg-secondary); margin-bottom: 2rem;
+        }
+        .snapshot-header {
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 13px; color: var(--text-secondary); margin-bottom: 12px;
+        }
+        .snapshot-metrics {
+            display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px;
+        }
+        .sm-label { font-size: 11px; color: var(--text-tertiary); text-transform: uppercase; }
+        .sm-value { font-size: 18px; font-weight: 600; }
+        .snapshot-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+        .snapshot-table th {
+            text-align: left; font-weight: 500; font-size: 10px;
+            text-transform: uppercase; color: var(--text-tertiary);
+            padding: 4px 8px; border-bottom: 1px solid var(--border);
+        }
+        .snapshot-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+
+        /* Index page */
+        .report-list { list-style: none; }
+        .report-list li {
+            padding: 10px 0; border-bottom: 1px solid var(--border);
+        }
+        .report-list a {
+            color: var(--accent); text-decoration: none; font-weight: 500;
+        }
+        .report-list a:hover { text-decoration: underline; }
+        .report-list .date { font-family: var(--mono); font-size: 13px; }
+    </style>
+</head>
+<body>
+    
+<header class="report-header">
+    <div class="report-meta">
+        <span class="report-type">Daily Report</span>
+        <time datetime="2026-04-07">April 07, 2026</time>
+    </div>
+    <h1>Existing Meta Campaign</h1>
+    <p class="cycle-info">Generated 2026-04-08 01:49 UTC</p>
+</header>
+
+<!-- Tweet snapshot region -->
+<div class="tweet-snapshot">
+    <div class="snapshot-header">
+        <span>Existing Meta Campaign</span>
+        <time>April 07, 2026</time>
+    </div>
+    <div class="snapshot-metrics">
+        <div class="sm">
+            <div class="sm-label">Spend</div>
+            <div class="sm-value">$0.00</div>
+        </div>
+        <div class="sm">
+            <div class="sm-label">Hook Rate</div>
+            <div class="sm-value">0.0%</div>
+        </div>
+        <div class="sm">
+            <div class="sm-label">CTR</div>
+            <div class="sm-value">0.0%</div>
+        </div>
+        <div class="sm">
+            <div class="sm-label">ROAS</div>
+            <div class="sm-value">N/A</div>
+        </div>
+    </div>
+    
+    <table class="snapshot-table">
+        <thead>
+            <tr><th>Variant</th><th>Hook</th><th>CTR</th><th>Spend</th></tr>
+        </thead>
+        <tbody>
+            
+            <tr>
+                <td class="mono">V1</td>
+                <td>0.0%</td>
+                <td>0.0%</td>
+                <td>$0.00</td>
+            </tr>
+            
+            <tr>
+                <td class="mono">V2</td>
+                <td>0.0%</td>
+                <td>0.0%</td>
+                <td>$0.00</td>
+            </tr>
+            
+            <tr>
+                <td class="mono">V3</td>
+                <td>0.0%</td>
+                <td>0.0%</td>
+                <td>$0.00</td>
+            </tr>
+            
+            <tr>
+                <td class="mono">V4</td>
+                <td>0.0%</td>
+                <td>0.0%</td>
+                <td>$0.00</td>
+            </tr>
+            
+        </tbody>
+    </table>
+    
+</div>
+
+<!-- Section 1: Top-line metrics -->
+<section class="metric-cards">
+    <div class="mc">
+        <div class="mc-label">Impressions</div>
+        <div class="mc-value">0</div>
+    </div>
+    <div class="mc">
+        <div class="mc-label">Reach</div>
+        <div class="mc-value">0</div>
+    </div>
+    <div class="mc">
+        <div class="mc-label">Spend</div>
+        <div class="mc-value">$0.00</div>
+    </div>
+    <div class="mc">
+        <div class="mc-label">Hook Rate (3s)</div>
+        <div class="mc-value">0.0%</div>
+    </div>
+    <div class="mc">
+        <div class="mc-label">Hold Rate (15s)</div>
+        <div class="mc-value">0.0%</div>
+    </div>
+    <div class="mc">
+        <div class="mc-label">CTR</div>
+        <div class="mc-value">0.0%</div>
+    </div>
+    <div class="mc">
+        <div class="mc-label">CPM</div>
+        <div class="mc-value">$0.00</div>
+    </div>
+    <div class="mc">
+        <div class="mc-label">Purchases</div>
+        <div class="mc-value">0</div>
+    </div>
+    <div class="mc">
+        <div class="mc-label">ROAS</div>
+        <div class="mc-value">N/A</div>
+    </div>
+</section>
+
+<!-- Section 2: Creative quality — hook rate bars -->
+
+<section class="section">
+    <h2>Creative quality</h2>
+    <div class="hook-rate-list">
+        
+        <div class="hook-row low-hook">
+            <span class="variant-code">V1</span>
+            <div class="bar-container">
+                <div class="bar" style="width: 0%"></div>
+            </div>
+            <span class="hook-value">0.0%</span>
+            
+        </div>
+        
+        <div class="hook-row low-hook">
+            <span class="variant-code">V2</span>
+            <div class="bar-container">
+                <div class="bar" style="width: 0%"></div>
+            </div>
+            <span class="hook-value">0.0%</span>
+            
+        </div>
+        
+        <div class="hook-row low-hook">
+            <span class="variant-code">V3</span>
+            <div class="bar-container">
+                <div class="bar" style="width: 0%"></div>
+            </div>
+            <span class="hook-value">0.0%</span>
+            
+        </div>
+        
+        <div class="hook-row low-hook">
+            <span class="variant-code">V4</span>
+            <div class="bar-container">
+                <div class="bar" style="width: 0%"></div>
+            </div>
+            <span class="hook-value">0.0%</span>
+            
+        </div>
+        
+    </div>
+</section>
+
+
+<!-- Section 3: Funnel view -->
+
+<section class="section">
+    <h2>Conversion funnel</h2>
+    
+    
+    <div class="funnel-stage">
+        <span class="funnel-name">Impressions</span>
+        <span class="funnel-value">0</span>
+        <div class="funnel-bar-container">
+            <div class="funnel-bar" style="width: 0%"></div>
+        </div>
+        <span class="funnel-rate"></span>
+        <span class="funnel-cost"></span>
+    </div>
+    
+    <div class="funnel-stage">
+        <span class="funnel-name">Reach</span>
+        <span class="funnel-value">0</span>
+        <div class="funnel-bar-container">
+            <div class="funnel-bar" style="width: 0%"></div>
+        </div>
+        <span class="funnel-rate"></span>
+        <span class="funnel-cost"></span>
+    </div>
+    
+</section>
+
+
+<!-- Section 4: Variant leaderboard -->
+
+<section class="section">
+    <h2>Variant leaderboard</h2>
+    <p class="section-note">Sorted by best performance</p>
+    <table class="leaderboard">
+        <thead>
+            <tr>
+                <th>Variant</th>
+                <th>Status</th>
+                <th>Impr.</th>
+                <th>Hook</th>
+                <th>Hold</th>
+                <th>CTR</th>
+                <th>Spend</th>
+                
+            </tr>
+        </thead>
+        <tbody>
+            
+            <tr>
+                <td class="mono">V1</td>
+                <td><span class="status status-active">active</span></td>
+                <td class="mono">0</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">$0.00</td>
+                
+            </tr>
+            
+            <tr>
+                <td class="mono">V2</td>
+                <td><span class="status status-active">active</span></td>
+                <td class="mono">0</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">$0.00</td>
+                
+            </tr>
+            
+            <tr>
+                <td class="mono">V3</td>
+                <td><span class="status status-active">active</span></td>
+                <td class="mono">0</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">$0.00</td>
+                
+            </tr>
+            
+            <tr>
+                <td class="mono">V4</td>
+                <td><span class="status status-active">active</span></td>
+                <td class="mono">0</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">0.0%</td>
+                <td class="mono">$0.00</td>
+                
+            </tr>
+            
+        </tbody>
+    </table>
+</section>
+
+
+<!-- Section 5: Element insights -->
+
+<section class="section">
+    <h2>Element insights</h2>
+    <div class="dual-ranking">
+        <div class="ranking-col">
+            <h3>Attention ranking</h3>
+            <p class="ranking-subtitle">By average hook rate</p>
+            
+            <div class="element-row">
+                <span class="rank">#1</span>
+                <span class="slot">hero_style</span>
+                <span class="value-label" title="short_form_video">short_form_video</span>
+                <span class="metric">—</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#2</span>
+                <span class="slot">urgency</span>
+                <span class="value-label" title="stock_limited">stock_limited</span>
+                <span class="metric">—</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#3</span>
+                <span class="slot">subhead</span>
+                <span class="value-label" title="BIG NEWS! Our debut collection is coming! Be the first to get your hands on it.">BIG NEWS! Our debut...</span>
+                <span class="metric">—</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#4</span>
+                <span class="slot">audience</span>
+                <span class="value-label" title="broad">broad</span>
+                <span class="metric">—</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#5</span>
+                <span class="slot">cta_text</span>
+                <span class="value-label" title="Learn more">Learn more</span>
+                <span class="metric">—</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#6</span>
+                <span class="slot">headline</span>
+                <span class="value-label" title="Slice Society Co.">Slice Society Co.</span>
+                <span class="metric">—</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#7</span>
+                <span class="slot">cta_color</span>
+                <span class="value-label" title="blue">blue</span>
+                <span class="metric">—</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#8</span>
+                <span class="slot">social_proof</span>
+                <span class="value-label" title="none">none</span>
+                <span class="metric">—</span>
+            </div>
+            
+        </div>
+        <div class="ranking-col">
+            <h3>Efficiency ranking</h3>
+            <p class="ranking-subtitle">By CTR</p>
+            
+            <div class="element-row">
+                <span class="rank">#1</span>
+                <span class="slot">hero_style</span>
+                <span class="value-label" title="short_form_video">short_form_video</span>
+                <span class="metric">6.2%</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#2</span>
+                <span class="slot">urgency</span>
+                <span class="value-label" title="stock_limited">stock_limited</span>
+                <span class="metric">6.2%</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#3</span>
+                <span class="slot">subhead</span>
+                <span class="value-label" title="BIG NEWS! Our debut collection is coming! Be the first to get your hands on it.">BIG NEWS! Our debut...</span>
+                <span class="metric">6.1%</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#4</span>
+                <span class="slot">audience</span>
+                <span class="value-label" title="broad">broad</span>
+                <span class="metric">6.1%</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#5</span>
+                <span class="slot">cta_text</span>
+                <span class="value-label" title="Learn more">Learn more</span>
+                <span class="metric">6.1%</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#6</span>
+                <span class="slot">headline</span>
+                <span class="value-label" title="Slice Society Co.">Slice Society Co.</span>
+                <span class="metric">6.1%</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#7</span>
+                <span class="slot">cta_color</span>
+                <span class="value-label" title="blue">blue</span>
+                <span class="metric">6.1%</span>
+            </div>
+            
+            <div class="element-row">
+                <span class="rank">#8</span>
+                <span class="slot">social_proof</span>
+                <span class="value-label" title="none">none</span>
+                <span class="metric">6.1%</span>
+            </div>
+            
+        </div>
+    </div>
+</section>
+
+
+<!-- Section 6: Top interactions -->
+
+
+<footer class="report-footer">
+    <p>Generated by Ad Creative Agent &middot; <a href="https://esargent01.github.io/ad-analyzing-agent">View all reports</a></p>
+</footer>
+
+</body>
+</html>
