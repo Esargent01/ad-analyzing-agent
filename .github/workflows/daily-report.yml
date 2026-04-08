@@ -30,13 +30,10 @@ jobs:
           META_ACCESS_TOKEN: ${{ secrets.META_ACCESS_TOKEN }}
           META_AD_ACCOUNT_ID: ${{ secrets.META_AD_ACCOUNT_ID }}
 
-      - name: Send daily report and generate HTML
-        run: python -m src.main daily-report --campaign-id aa068b5d-19ec-4e48-95aa-7dc8a1764ae2 --send-email
+      - name: Generate daily HTML report
+        run: python -m src.main daily-report --campaign-id aa068b5d-19ec-4e48-95aa-7dc8a1764ae2 --no-send-email
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-          REPORT_EMAIL_TO: ${{ secrets.REPORT_EMAIL_TO }}
-          REPORT_EMAIL_FROM: ${{ secrets.REPORT_EMAIL_FROM }}
 
       - name: Commit and push HTML reports
         run: |
