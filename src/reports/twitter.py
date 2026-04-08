@@ -34,18 +34,10 @@ def post_snapshot(
         media = api_v1.media_upload(filename=str(image_path))
         logger.info("Media uploaded: media_id=%s", media.media_id)
 
-        # Post tweet via v2 client
-        client = tweepy.Client(
-            consumer_key=api_key,
-            consumer_secret=api_secret,
-            access_token=access_token,
-            access_token_secret=access_token_secret,
-        )
-        response = client.create_tweet(text=caption, media_ids=[media.media_id])
+        # Post tweet via v1.1 (avoids v2 Project requirement)
+        status = api_v1.update_status(status=caption, media_ids=[media.media_id])
 
-        tweet_id = response.data["id"]
-        # Construct URL — username isn't in the response, but the tweet is accessible by ID
-        tweet_url = f"https://x.com/i/status/{tweet_id}"
+        tweet_url = f"https://x.com/i/status/{status.id}"
         logger.info("Tweet posted: %s", tweet_url)
         return tweet_url
 
