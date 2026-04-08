@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     report_email_to: str = "team@company.com"
     report_email_from: str = "adagent@company.com"
 
+    # Report hosting
+    report_output_dir: str = "./public"
+    report_base_url: str = "https://esargent01.github.io/ad-analyzing-agent"
+
     # Application
     log_level: str = "INFO"
     cycle_schedule_cron: str = "0 6 * * *"

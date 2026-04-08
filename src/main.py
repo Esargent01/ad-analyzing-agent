@@ -631,6 +631,27 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
             )
             click.echo("\nSlack report sent.")
 
+        # Generate static HTML report
+        from src.reports.web import render_weekly_report as render_weekly_html, render_index
+
+        week_label = f"{week_start.isocalendar()[0]}-W{week_start.isocalendar()[1]:02d}"
+        html_path = render_weekly_html(report, campaign_name, week_label)
+        click.echo(f"\nWeb report: {html_path}")
+
+        # Update index
+        from pathlib import Path as _Path
+
+        public_dir = _Path(settings.report_output_dir)
+        daily_dates = sorted(
+            [p.stem for p in (public_dir / "daily").glob("*.html")] if (public_dir / "daily").exists() else [],
+            reverse=True,
+        )
+        weekly_labels = sorted(
+            [p.stem for p in (public_dir / "weekly").glob("*.html")],
+            reverse=True,
+        )
+        render_index(daily_dates, weekly_labels)
+
         await close_db()
 
     asyncio.run(_run())
@@ -1035,6 +1056,26 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
                     click.echo(f"\nEmail report sent to {settings.report_email_to}")
                 else:
                     click.echo("\nFailed to send email report. Check logs.")
+
+        # Generate static HTML report
+        from src.reports.web import render_daily_report as render_daily_html, render_index
+
+        html_path = render_daily_html(report, campaign_name, report_day)
+        click.echo(f"\nWeb report: {html_path}")
+
+        # Update index with all existing reports
+        from pathlib import Path as _Path
+
+        public_dir = _Path(settings.report_output_dir)
+        daily_dates = sorted(
+            [p.stem for p in (public_dir / "daily").glob("*.html")],
+            reverse=True,
+        )
+        weekly_labels = sorted(
+            [p.stem for p in (public_dir / "weekly").glob("*.html")] if (public_dir / "weekly").exists() else [],
+            reverse=True,
+        )
+        render_index(daily_dates, weekly_labels)
 
         await close_db()
 
