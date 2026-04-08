@@ -632,46 +632,11 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
             click.echo("\nSlack report sent.")
 
         # Generate static HTML report
-        from src.reports.web import render_weekly_report as render_weekly_html, render_index, capture_snapshot
+        from src.reports.web import render_weekly_report as render_weekly_html, render_index
 
         week_label = f"{week_start.isocalendar()[0]}-W{week_start.isocalendar()[1]:02d}"
         html_path = render_weekly_html(report, campaign_name, week_label)
         click.echo(f"\nWeb report: {html_path}")
-
-        # Capture tweet snapshot image
-        try:
-            png_path = capture_snapshot(html_path)
-            click.echo(f"Snapshot: {png_path}")
-        except Exception as e:
-            click.echo(f"\nSnapshot capture failed: {e}")
-            png_path = None
-
-        # Post to Twitter/X if configured
-        if png_path and settings.twitter_api_key and settings.twitter_api_key != "":
-            from src.reports.twitter import post_snapshot, build_weekly_caption
-
-            report_url = f"{settings.report_base_url}/weekly/{week_label}.html"
-            roas_str = f"{float(avg_roas):.1f}x" if avg_roas else "N/A"
-            caption = build_weekly_caption(
-                campaign_name=campaign_name,
-                week_label=week_label,
-                spend=f"${float(total_spend):,.2f}",
-                purchases=total_purchases,
-                roas=roas_str,
-                report_url=report_url,
-            )
-            tweet_url = post_snapshot(
-                image_path=png_path,
-                caption=caption,
-                api_key=settings.twitter_api_key,
-                api_secret=settings.twitter_api_secret,
-                access_token=settings.twitter_access_token,
-                access_token_secret=settings.twitter_access_token_secret,
-            )
-            if tweet_url:
-                click.echo(f"Tweet posted: {tweet_url}")
-            else:
-                click.echo("\nFailed to post tweet. Check logs.")
 
         # Update index
         from pathlib import Path as _Path
@@ -1093,44 +1058,10 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
                     click.echo("\nFailed to send email report. Check logs.")
 
         # Generate static HTML report
-        from src.reports.web import render_daily_report as render_daily_html, render_index, capture_snapshot
+        from src.reports.web import render_daily_report as render_daily_html, render_index
 
         html_path = render_daily_html(report, campaign_name, report_day)
         click.echo(f"\nWeb report: {html_path}")
-
-        # Capture tweet snapshot image
-        try:
-            png_path = capture_snapshot(html_path)
-            click.echo(f"Snapshot: {png_path}")
-        except Exception as e:
-            click.echo(f"\nSnapshot capture failed: {e}")
-            png_path = None
-
-        # Post to Twitter/X if configured
-        if png_path and settings.twitter_api_key and settings.twitter_api_key != "":
-            from src.reports.twitter import post_snapshot, build_daily_caption
-
-            report_url = f"{settings.report_base_url}/daily/{report_day.isoformat()}.html"
-            caption = build_daily_caption(
-                campaign_name=campaign_name,
-                report_date=report_day.strftime("%B %d, %Y"),
-                spend=f"${float(total_spend):,.2f}",
-                hook_rate=f"{float(avg_hook_rate) * 100:.1f}%",
-                ctr=f"{float(avg_ctr) * 100:.1f}%",
-                report_url=report_url,
-            )
-            tweet_url = post_snapshot(
-                image_path=png_path,
-                caption=caption,
-                api_key=settings.twitter_api_key,
-                api_secret=settings.twitter_api_secret,
-                access_token=settings.twitter_access_token,
-                access_token_secret=settings.twitter_access_token_secret,
-            )
-            if tweet_url:
-                click.echo(f"Tweet posted: {tweet_url}")
-            else:
-                click.echo("\nFailed to post tweet. Check logs.")
 
         # Update index with all existing reports
         from pathlib import Path as _Path
