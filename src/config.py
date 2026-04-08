@@ -61,6 +61,12 @@ class Settings(BaseSettings):
     report_output_dir: str = "./public"
     report_base_url: str = "https://esargent01.github.io/ad-analyzing-agent"
 
+    # Twitter / X
+    twitter_api_key: str = ""
+    twitter_api_secret: str = ""
+    twitter_access_token: str = ""
+    twitter_access_token_secret: str = ""
+
     # Application
     log_level: str = "INFO"
     cycle_schedule_cron: str = "0 6 * * *"

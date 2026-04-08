@@ -195,3 +195,36 @@ def render_index(daily_dates: list[str], weekly_labels: list[str]) -> Path:
 
     logger.info("Report index written to %s", out_path)
     return out_path
+
+
+def capture_snapshot(html_path: Path) -> Path:
+    """Capture a screenshot of the .tweet-snapshot region from an HTML report.
+
+    Uses Playwright to render the page headlessly and clip to the snapshot element.
+    Returns the path to the generated PNG file.
+    """
+    from playwright.sync_api import sync_playwright
+
+    png_path = html_path.with_suffix(".png")
+    file_url = f"file://{html_path.resolve()}"
+
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page(
+            viewport={"width": 800, "height": 600},
+            color_scheme="dark",
+        )
+        page.goto(file_url, wait_until="networkidle")
+
+        snapshot_el = page.query_selector(".tweet-snapshot")
+        if snapshot_el:
+            snapshot_el.screenshot(path=str(png_path))
+            logger.info("Snapshot captured: %s", png_path)
+        else:
+            # Fallback: screenshot the full page above the fold
+            page.screenshot(path=str(png_path), clip={"x": 0, "y": 0, "width": 800, "height": 600})
+            logger.warning("No .tweet-snapshot element found, captured full page fallback")
+
+        browser.close()
+
+    return png_path
