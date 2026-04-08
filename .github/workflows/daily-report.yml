@@ -23,7 +23,7 @@ jobs:
         run: pip install -e ".[dev]"
 
       - name: Import latest metrics from Meta
-        run: python -m src.main import-meta-ads --campaign-id aa068b5d-19ec-4e48-95aa-7dc8a1764ae2
+        run: python -m src.main import-meta-ads --campaign-id aa068b5d-19ec-4e48-95aa-7dc8a1764ae2 --refresh-metrics
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           META_APP_ID: ${{ secrets.META_APP_ID }}
