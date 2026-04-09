@@ -1678,6 +1678,67 @@ def dashboard(host: str, port: int) -> None:
     uvicorn.run(app, host=host, port=port, log_level="info")
 
 
+@cli.command("grant-access")
+@click.option("--email", required=True, help="User email address.")
+@click.option(
+    "--campaign-id",
+    required=True,
+    help="Campaign UUID to grant the user access to.",
+)
+def grant_access(email: str, campaign_id: str) -> None:
+    """Provision dashboard access for a user.
+
+    Creates the user row if it doesn't exist (idempotent) and inserts a
+    ``user_campaigns`` entry so the user can see the given campaign in
+    the dashboard API.
+
+    Example::
+
+        python -m src.main grant-access --email me@company.com --campaign-id <uuid>
+    """
+
+    async def _run() -> None:
+        from src.db.engine import close_db, get_session, init_db
+        from src.db.queries import (
+            create_user,
+            get_campaign,
+            get_user_by_email,
+            grant_user_campaign_access,
+        )
+
+        try:
+            campaign_uuid = UUID(campaign_id)
+        except ValueError:
+            click.echo(f"Error: {campaign_id!r} is not a valid UUID.")
+            return
+
+        await init_db()
+        try:
+            async with get_session() as session:
+                campaign = await get_campaign(session, campaign_uuid)
+                if campaign is None:
+                    click.echo(f"Error: Campaign {campaign_id} not found.")
+                    return
+
+                user = await get_user_by_email(session, email)
+                if user is None:
+                    user = await create_user(session, email)
+                    click.echo(f"Created user {user.email} ({user.id}).")
+                else:
+                    click.echo(f"Found existing user {user.email} ({user.id}).")
+
+                await grant_user_campaign_access(
+                    session, user_id=user.id, campaign_id=campaign_uuid
+                )
+                click.echo(
+                    f"Granted {user.email} access to campaign {campaign.name!r}."
+                )
+        finally:
+            await close_db()
+
+    asyncio.run(_run())
+
+
 def main() -> None:
     """Package entry point."""
     cli()

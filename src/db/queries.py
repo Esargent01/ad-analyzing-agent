@@ -25,6 +25,8 @@ from src.db.tables import (
     GenePoolEntry,
     Metric,
     TestCycle,
+    User,
+    UserCampaign,
     Variant,
     VariantStatus,
 )
@@ -770,3 +772,111 @@ async def expire_stale_proposals(
 
     await session.flush()
     return len(stale_items)
+
+
+# ---------------------------------------------------------------------------
+# Dashboard users (Phase 2 auth)
+# ---------------------------------------------------------------------------
+
+
+def _normalize_email(email: str) -> str:
+    """Lowercase and strip an email for consistent lookups."""
+    return email.strip().lower()
+
+
+async def get_user_by_email(
+    session: AsyncSession, email: str
+) -> User | None:
+    """Look up an active user by email. Case-insensitive."""
+    stmt = select(User).where(
+        User.email == _normalize_email(email),
+        User.is_active.is_(True),
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def get_user(session: AsyncSession, user_id: UUID) -> User | None:
+    """Return an active user by ID, or None."""
+    stmt = select(User).where(User.id == user_id, User.is_active.is_(True))
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def create_user(session: AsyncSession, email: str) -> User:
+    """Create a new dashboard user. Raises IntegrityError on duplicate email."""
+    user = User(email=_normalize_email(email))
+    session.add(user)
+    await session.flush()
+    return user
+
+
+async def touch_last_login(session: AsyncSession, user_id: UUID) -> None:
+    """Bump ``last_login_at`` to now for the given user."""
+    stmt = (
+        update(User)
+        .where(User.id == user_id)
+        .values(last_login_at=func.now())
+    )
+    await session.execute(stmt)
+    await session.flush()
+
+
+async def get_user_campaigns(
+    session: AsyncSession, user_id: UUID
+) -> list[Campaign]:
+    """Return all campaigns the given user has access to, ordered by name."""
+    stmt = (
+        select(Campaign)
+        .join(UserCampaign, UserCampaign.campaign_id == Campaign.id)
+        .where(UserCampaign.user_id == user_id)
+        .order_by(Campaign.name)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def grant_user_campaign_access(
+    session: AsyncSession,
+    user_id: UUID,
+    campaign_id: UUID,
+) -> UserCampaign:
+    """Grant a user access to a campaign (idempotent).
+
+    Uses an ``ON CONFLICT DO NOTHING`` upsert so re-running the CLI with
+    an already-granted pair is a no-op. Returns the (existing or newly
+    created) row.
+    """
+    stmt = (
+        pg_insert(UserCampaign)
+        .values(user_id=user_id, campaign_id=campaign_id)
+        .on_conflict_do_nothing(index_elements=["user_id", "campaign_id"])
+    )
+    await session.execute(stmt)
+    await session.flush()
+
+    fetch = select(UserCampaign).where(
+        UserCampaign.user_id == user_id,
+        UserCampaign.campaign_id == campaign_id,
+    )
+    result = await session.execute(fetch)
+    return result.scalar_one()
+
+
+async def revoke_user_campaign_access(
+    session: AsyncSession,
+    user_id: UUID,
+    campaign_id: UUID,
+) -> bool:
+    """Remove a user's access to a campaign. Returns False if it didn't exist."""
+    stmt = select(UserCampaign).where(
+        UserCampaign.user_id == user_id,
+        UserCampaign.campaign_id == campaign_id,
+    )
+    result = await session.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row is None:
+        return False
+    await session.delete(row)
+    await session.flush()
+    return True

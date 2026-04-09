@@ -73,6 +73,26 @@ class Settings(BaseSettings):
     review_token_ttl_days: int = 7
     proposal_ttl_days: int = 14
 
+    # Dashboard auth (Phase 2)
+    # NOTE: rotate auth_session_secret in production; signing key for both
+    # magic-link tokens and session cookies.
+    auth_session_secret: str = "dev-auth-secret-change-me-in-production"
+    auth_magic_link_ttl_minutes: int = 15
+    auth_session_ttl_days: int = 30
+
+    # Frontend / CORS
+    # Comma-separated list of allowed origins (e.g.
+    # "http://localhost:5173,https://app.example.com").
+    frontend_origins: str = ""
+    # Public URL of the frontend — used to build the magic-link landing URL.
+    frontend_base_url: str = "http://localhost:5173"
+
+    # Cookie scoping. Leave ``cookie_domain`` empty on ``*.vercel.app`` /
+    # ``*.fly.dev`` — public suffixes reject ``Domain=`` cookies. On a custom
+    # domain set e.g. ``.example.com``.
+    cookie_domain: str = ""
+    cookie_secure: bool = True
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

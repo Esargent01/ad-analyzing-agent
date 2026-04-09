@@ -442,6 +442,65 @@ class CycleAction(Base):
         return f"<CycleAction action={self.action.value} variant={self.variant_id}>"
 
 
+class User(Base):
+    """A dashboard user authenticated via email magic link.
+
+    Users are provisioned manually (via the ``grant-access`` CLI) — there
+    is no self-serve sign-up. ``last_login_at`` is refreshed every time
+    the user verifies a magic link.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True), primary_key=True, server_default="uuid_generate_v4()"
+    )
+    email: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default="now()"
+    )
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default="true"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("email", name="uq_users_email"),
+        Index("idx_users_email", "email"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<User email={self.email!r}>"
+
+
+class UserCampaign(Base):
+    """Join table controlling which campaigns a user can access."""
+
+    __tablename__ = "user_campaigns"
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    campaign_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("campaigns.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    granted_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default="now()"
+    )
+
+    __table_args__ = (
+        Index("idx_user_campaigns_user", "user_id"),
+        Index("idx_user_campaigns_campaign", "campaign_id"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<UserCampaign user={self.user_id} campaign={self.campaign_id}>"
+
+
 class ApprovalQueueItem(Base):
     __tablename__ = "approval_queue"
 
