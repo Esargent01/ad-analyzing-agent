@@ -252,7 +252,12 @@ class Metric(Base):
     conversions: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     spend: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False, server_default="0")
 
-    # Generated columns (read-only, computed by the database)
+    # Generated columns (read-only, computed by the database).
+    # NOTE: the live ``metrics`` hypertable does NOT have a ``cpa`` column —
+    # the effective "cost per acquisition" metric is ``cost_per_purchase``.
+    # Historically the ORM declared ``cpa`` here, which broke any query that
+    # triggered a full ORM load of the row (e.g. ``selectin`` eager loading
+    # from variants). Keep this model aligned with the real schema.
     ctr: Mapped[Decimal] = mapped_column(
         Numeric(8, 5),
         Computed("CASE WHEN impressions > 0 THEN clicks::NUMERIC / impressions ELSE 0 END"),
@@ -260,10 +265,6 @@ class Metric(Base):
     cpc: Mapped[Decimal] = mapped_column(
         Numeric(10, 4),
         Computed("CASE WHEN clicks > 0 THEN spend / clicks ELSE 0 END"),
-    )
-    cpa: Mapped[Decimal] = mapped_column(
-        Numeric(10, 4),
-        Computed("CASE WHEN conversions > 0 THEN spend / conversions ELSE 0 END"),
     )
 
     # Relationships

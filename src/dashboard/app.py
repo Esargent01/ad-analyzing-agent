@@ -629,7 +629,7 @@ async def api_magic_link(
     if user is not None:
         settings = get_settings()
         token = create_magic_link_token(user.email)
-        link = f"{settings.frontend_base_url.rstrip('/')}/auth/verify?token={token}"
+        link = f"{settings.api_base_url.rstrip('/')}/api/auth/verify?token={token}"
         try:
             await send_magic_link(user.email, link)
         except Exception as exc:  # noqa: BLE001 — delivery failure shouldn't leak

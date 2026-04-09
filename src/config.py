@@ -84,8 +84,14 @@ class Settings(BaseSettings):
     # Comma-separated list of allowed origins (e.g.
     # "http://localhost:5173,https://app.example.com").
     frontend_origins: str = ""
-    # Public URL of the frontend — used to build the magic-link landing URL.
+    # Public URL of the frontend — used for post-verify redirects to
+    # ``/dashboard`` and ``/sign-in?error=...``.
     frontend_base_url: str = "http://localhost:5173"
+    # Public URL of the backend — used to build the magic-link target
+    # (``{api_base_url}/api/auth/verify?token=...``). The backend needs
+    # its own external URL because the verify endpoint must be reached
+    # before any frontend JavaScript runs (the link lives in an email).
+    api_base_url: str = "http://localhost:8000"
 
     # Cookie scoping. Leave ``cookie_domain`` empty on ``*.vercel.app`` /
     # ``*.fly.dev`` — public suffixes reject ``Domain=`` cookies. On a custom
