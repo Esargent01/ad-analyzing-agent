@@ -6,7 +6,7 @@ SQLAlchemy's select() construct. No raw SQL.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from uuid import UUID
 
@@ -734,3 +734,39 @@ async def reject_variant(
 
     await session.flush()
     return item
+
+
+async def expire_stale_proposals(
+    session: AsyncSession,
+    campaign_id: UUID,
+    ttl_days: int = 14,
+) -> int:
+    """Auto-reject pending approval queue items older than ttl_days.
+
+    Called at the start of the weekly flow to prevent stale proposals
+    (with out-of-date hypotheses) from piling up. Returns the count of
+    items that were expired.
+    """
+    cutoff = datetime.now(timezone.utc) - timedelta(days=ttl_days)
+    stmt = (
+        select(ApprovalQueueItem)
+        .where(ApprovalQueueItem.campaign_id == campaign_id)
+        .where(ApprovalQueueItem.approved.is_(None))
+        .where(ApprovalQueueItem.submitted_at < cutoff)
+    )
+    result = await session.execute(stmt)
+    stale_items = list(result.scalars().all())
+
+    for item in stale_items:
+        item.approved = False
+        item.reviewed_at = func.now()
+        item.reviewer = "system"
+        item.rejection_reason = "expired_no_review"
+
+        variant = await session.get(Variant, item.variant_id)
+        if variant is not None:
+            variant.status = VariantStatus.retired
+            variant.retired_at = func.now()
+
+    await session.flush()
+    return len(stale_items)

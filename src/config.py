@@ -68,6 +68,11 @@ class Settings(BaseSettings):
     min_impressions: int = Field(default=1000)
     confidence_threshold: float = Field(default=0.95)
 
+    # Weekly review flow
+    review_token_secret: str = "dev-secret-change-me-in-production"
+    review_token_ttl_days: int = 7
+    proposal_ttl_days: int = 14
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

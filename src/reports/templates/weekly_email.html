@@ -199,6 +199,75 @@
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
         {% endif %}
 
+        <!-- Section 3.5: Next week's experiments -->
+        {% if proposed_variants or generation_paused or (expired_count and expired_count > 0) %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding-bottom: 6px;">
+            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Next week&rsquo;s experiments</span>
+            {% if proposed_variants %}
+            <span style="font-size: 13px; color: #999999; font-family: Arial, Helvetica, sans-serif;">&middot; {{ proposed_variants|length }} proposed</span>
+            {% endif %}
+        </td></tr>
+        {% if expired_count and expired_count > 0 %}
+        <tr><td style="padding-bottom: 4px;">
+            <span style="font-size: 12px; color: #999999; font-family: Arial, Helvetica, sans-serif;">{{ expired_count }} older proposal{{ "s" if expired_count != 1 else "" }} expired without review and were auto-rejected.</span>
+        </td></tr>
+        {% endif %}
+        {% if generation_paused %}
+        <tr><td style="padding-bottom: 4px;">
+            {% if proposed_variants %}
+            <span style="font-size: 12px; color: #B07C1A; font-family: Arial, Helvetica, sans-serif;">&#9888; New variant generation paused &mdash; clear the review queue to resume.</span>
+            {% else %}
+            <span style="font-size: 12px; color: #B07C1A; font-family: Arial, Helvetica, sans-serif;">&#9888; New variant generation paused &mdash; your active variants are at capacity. Retire a variant to make room for new experiments.</span>
+            {% endif %}
+        </td></tr>
+        {% endif %}
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 8px;">
+        {% for pv in proposed_variants %}
+        <tr><td style="padding: 10px 0; border-bottom: 1px solid #e5e5e5;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="font-size: 13px; font-family: Arial, Helvetica, sans-serif;">
+                    <span style="color: #534AB7; font-weight: 500;">{{ pv.variant_code }}</span>
+                    <span style="color: #999999;"> &middot; </span>
+                    <span style="color: #1a1a1a;">{{ pv.genome_summary }}</span>
+                </td>
+                <td align="right" style="font-family: Arial, Helvetica, sans-serif;">
+                    {% if pv.classification == "expiring_soon" %}
+                    <span style="display: inline-block; background-color: #FFF4D6; color: #B07C1A; font-size: 10px; padding: 2px 8px; border-radius: 10px;">Expires in {{ pv.days_until_expiry }} day{{ "s" if pv.days_until_expiry != 1 else "" }}</span>
+                    {% else %}
+                    <span style="display: inline-block; background-color: #EDF4EC; color: #2B6B30; font-size: 10px; padding: 2px 8px; border-radius: 10px;">New</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% if pv.hypothesis %}
+            <tr><td colspan="2" style="padding-top: 4px; font-size: 12px; color: #6b6b6b; font-family: Arial, Helvetica, sans-serif;">
+                {{ pv.hypothesis }}
+            </td></tr>
+            {% endif %}
+            </table>
+        </td></tr>
+        {% endfor %}
+        </table>
+
+        {% if review_url %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-top: 14px;">
+        <tr><td align="center" style="padding: 14px 0;">
+            <table role="presentation" cellpadding="0" cellspacing="0">
+            <tr><td style="background-color: #534AB7; border-radius: 6px;">
+                <a href="{{ review_url }}" style="display: inline-block; padding: 12px 28px; color: #ffffff; font-size: 14px; font-weight: 500; text-decoration: none; font-family: Arial, Helvetica, sans-serif;">Review &amp; approve &rarr;</a>
+            </td></tr>
+            </table>
+        </td></tr>
+        </table>
+        {% endif %}
+
+        <!-- Spacer -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 24px;"></td></tr></table>
+        {% endif %}
+
         <!-- Section 4: Variant leaderboard -->
         {% if variants %}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">

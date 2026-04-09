@@ -70,9 +70,31 @@ def cli() -> None:
 
 @cli.command()
 @click.option("--campaign-id", required=True, type=str, help="Campaign UUID to optimize.")
-@click.option("--no-generate", is_flag=True, default=False, help="Skip generate and deploy phases (metrics-only cycle).")
-def run_cycle(campaign_id: str, no_generate: bool) -> None:
-    """Run a single optimization cycle for a campaign."""
+@click.option(
+    "--generate",
+    "with_generate",
+    is_flag=True,
+    default=False,
+    help="Also generate new variants in this cycle (off by default — generation happens in the weekly flow).",
+)
+@click.option(
+    "--no-generate",
+    "legacy_no_generate",
+    is_flag=True,
+    default=False,
+    hidden=True,
+    help="Deprecated: monitoring-only is now the default. Retained for backward compatibility.",
+)
+def run_cycle(campaign_id: str, with_generate: bool, legacy_no_generate: bool) -> None:
+    """Run a single optimization cycle for a campaign.
+
+    By default this is monitoring-only: metrics are polled, element
+    performance is updated, and approved variants are deployed. New
+    variant generation happens in the weekly flow (``weekly-report``).
+
+    Pass ``--generate`` to run the legacy full cycle including LLM
+    generation.
+    """
 
     async def _run() -> None:
         from sqlalchemy import text as sa_text
@@ -103,7 +125,10 @@ def run_cycle(campaign_id: str, no_generate: bool) -> None:
             session_factory=session_factory,
             settings=settings,
         )
-        report = await orchestrator.run_cycle(UUID(campaign_id), skip_generate=no_generate)
+        # Monitoring-only by default; --generate flips it back on.
+        # --no-generate is still accepted as a no-op for backward compatibility.
+        skip_generate = not with_generate or legacy_no_generate
+        report = await orchestrator.run_cycle(UUID(campaign_id), skip_generate=skip_generate)
         click.echo(f"Cycle #{report.cycle_number} complete: {report.summary_text}")
         if report.errors:
             for phase, err in report.errors.items():
@@ -226,9 +251,11 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
 
         from sqlalchemy import text as sa_text
 
+        from src.dashboard.tokens import create_review_token
         from src.db.engine import close_db, get_session, init_db
         from src.models.analysis import ElementInsight, InteractionInsight
         from src.models.reports import FunnelStage, VariantSummary, WeeklyReport
+        from src.services.weekly import load_proposed_variants, run_weekly_generation
 
         settings = get_settings()
         await init_db()
@@ -245,6 +272,31 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                 await close_db()
                 return
             campaign_name = str(campaign_result[0])
+
+            # Weekly generation pass: expire stale proposals, generate new ones
+            click.echo("Running weekly generation pass...")
+            try:
+                expired_count, generation_paused = await run_weekly_generation(
+                    session, UUID(campaign_id)
+                )
+                if expired_count:
+                    click.echo(
+                        f"  Expired {expired_count} stale proposal(s) (>14 days old)"
+                    )
+                if generation_paused:
+                    click.echo(
+                        "  Generation paused — approval queue at capacity"
+                    )
+            except Exception as exc:  # noqa: BLE001 — surface but don't abort report
+                click.echo(f"  Warning: generation pass failed: {exc}")
+                expired_count = 0
+                generation_paused = False
+
+            # Load all pending proposals (fresh + carried over) for the report
+            proposed_variants = await load_proposed_variants(
+                session, UUID(campaign_id)
+            )
+            click.echo(f"  {len(proposed_variants)} proposal(s) pending review")
 
             # Previous full week: Monday through Sunday
             today = date.today()
@@ -270,9 +322,10 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
             cycles = cycles_row.fetchall()
 
             if not cycles:
-                click.echo(f"No cycles found for week {week_start} to {week_end} for campaign {campaign_id}.")
-                await close_db()
-                return
+                click.echo(
+                    f"No monitoring cycles found for week {week_start} to {week_end}. "
+                    f"Report will still include proposed variants."
+                )
 
             # Aggregate full-funnel metrics for the previous week
             metrics_row = await session.execute(
@@ -517,9 +570,17 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                 for r in interactions
             ]
 
-            total_launched = sum(c[2] or 0 for c in cycles)
-            total_paused = sum(c[3] or 0 for c in cycles)
+            total_launched = sum(c[2] or 0 for c in cycles) if cycles else 0
+            total_paused = sum(c[3] or 0 for c in cycles) if cycles else 0
             total_retired = 0
+
+            # Signed review token for the weekly email CTA
+            review_token = create_review_token(UUID(campaign_id))
+            review_url = (
+                f"{settings.report_base_url.rstrip('/')}/review/{review_token}"
+                if proposed_variants
+                else None
+            )
 
             # Build the WeeklyReport
             report = WeeklyReport(
@@ -554,10 +615,14 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                 all_variants=all_variants,
                 top_elements=top_elements,
                 top_interactions=top_interactions,
-                cycles_run=len(cycles),
+                cycles_run=len(cycles) if cycles else 0,
                 variants_launched=total_launched,
                 variants_retired=total_retired,
                 summary_text="Weekly optimization summary for " + campaign_name,
+                proposed_variants=proposed_variants,
+                expired_count=expired_count,
+                generation_paused=generation_paused,
+                review_url=review_url,
             )
 
         # Print to console
@@ -599,6 +664,16 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                 roas_str = f" ROAS {el.avg_roas:.2f}x" if el.avg_roas else ""
                 click.echo(f"  {el.slot_name}: {el.slot_value} — CTR {el.avg_ctr:.2%}{roas_str} ({el.variants_tested} variants)")
 
+        if proposed_variants:
+            click.echo(f"\nNext week's experiments ({len(proposed_variants)} proposed):")
+            for pv in proposed_variants:
+                badge = f" [expires in {pv.days_until_expiry}d]" if pv.classification == "expiring_soon" else ""
+                click.echo(f"  {pv.variant_code}: {pv.genome_summary}{badge}")
+                if pv.hypothesis:
+                    click.echo(f"    Hypothesis: {pv.hypothesis}")
+            if review_url:
+                click.echo(f"\n  Review link: {review_url}")
+
         week_label = f"{week_start.isocalendar()[0]}-W{week_start.isocalendar()[1]:02d}"
 
         # Send email if requested (v2 redesigned template)
@@ -618,6 +693,7 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                     campaign_name=campaign_name,
                     week_label=week_label,
                     base_url=settings.report_base_url,
+                    review_url=review_url,
                 )
                 if success:
                     click.echo(f"\nEmail report sent to {settings.report_email_to}")

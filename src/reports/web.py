@@ -222,6 +222,11 @@ def render_weekly_report(report: WeeklyReport, campaign_name: str, week_label: s
         elements_by_hook=elements_by_hook,
         # Interactions
         interactions=report.top_interactions,
+        # Proposed variants (weekly review flow)
+        proposed_variants=report.proposed_variants,
+        expired_count=report.expired_count,
+        generation_paused=report.generation_paused,
+        review_url=report.review_url,
     )
 
     out_dir = _output_dir() / "weekly"

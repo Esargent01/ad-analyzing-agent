@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Review proposed variants — {{ campaign.name }}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        :root { --pico-font-size: 15px; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 500; }
+        .badge-expiring { background: #FFF4D6; color: #B07C1A; }
+        .badge-new { background: #EDF4EC; color: #2B6B30; }
+        .pill { display: inline-flex; gap: 4px; background: var(--pico-card-background-color); border-radius: 6px; padding: 3px 10px; margin: 0 4px 4px 0; font-size: 12px; }
+        .pill-slot { opacity: 0.6; }
+        .pill-value { font-weight: 500; }
+        .proposal { border: 1px solid var(--pico-muted-border-color); border-radius: 8px; padding: 16px; margin-bottom: 14px; transition: opacity 0.2s; }
+        .proposal.removed { opacity: 0.4; pointer-events: none; }
+        .proposal-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+        .variant-code { font-family: monospace; font-weight: 600; color: #534AB7; }
+        .hypothesis { font-size: 13px; opacity: 0.75; margin: 8px 0; font-style: italic; }
+        .actions { display: flex; gap: 8px; margin-top: 12px; }
+        .actions button { font-size: 13px; padding: 6px 14px; margin: 0; }
+        .btn-approve { background: #1D9E75; border-color: #1D9E75; }
+        .btn-reject { background: transparent; color: #D85A30; border: 1px solid #D85A30; }
+        .toast { position: fixed; top: 20px; right: 20px; padding: 12px 18px; border-radius: 8px; font-size: 13px; z-index: 1000; display: none; }
+        .toast.success { background: #EAF3DE; color: #27500A; border: 1px solid #1D9E75; }
+        .toast.error { background: #FDE8E1; color: #7A1B06; border: 1px solid #D85A30; }
+        .toast.visible { display: block; }
+        .empty-state { text-align: center; padding: 40px 20px; opacity: 0.6; }
+        .section-divider { margin: 2rem 0 1rem 0; padding-top: 1rem; border-top: 1px solid var(--pico-muted-border-color); }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header style="margin-bottom: 1.5rem;">
+            <h1 style="margin-bottom: 4px;">Review proposed variants</h1>
+            <p style="opacity: 0.6; margin: 0;">{{ campaign.name }}</p>
+        </header>
+
+        <div id="toast" class="toast"></div>
+
+        <section>
+            <h2>Pending proposals</h2>
+
+            {% if proposed_variants %}
+            <div id="proposals">
+                {% for pv in proposed_variants %}
+                <div class="proposal" id="proposal-{{ pv.approval_id }}">
+                    <div class="proposal-header">
+                        <div>
+                            <span class="variant-code">{{ pv.variant_code }}</span>
+                            <span style="opacity: 0.5;"> &middot; </span>
+                            <span>{{ pv.genome_summary }}</span>
+                        </div>
+                        {% if pv.classification == "expiring_soon" %}
+                        <span class="badge badge-expiring">Expires in {{ pv.days_until_expiry }} day{{ "s" if pv.days_until_expiry != 1 else "" }}</span>
+                        {% else %}
+                        <span class="badge badge-new">New</span>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        {% for slot, value in pv.genome.items() %}
+                        <span class="pill"><span class="pill-slot">{{ slot }}:</span> <span class="pill-value">{{ value }}</span></span>
+                        {% endfor %}
+                    </div>
+
+                    {% if pv.hypothesis %}
+                    <div class="hypothesis">&ldquo;{{ pv.hypothesis }}&rdquo;</div>
+                    {% endif %}
+
+                    <div class="actions">
+                        <button type="button" class="btn-approve" onclick="handleAction('{{ pv.approval_id }}', 'approve')">Approve</button>
+                        <button type="button" class="btn-reject" onclick="handleAction('{{ pv.approval_id }}', 'reject')">Reject</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <p>No pending proposals right now.</p>
+                <p style="font-size: 13px;">The next weekly report will bring fresh variants to review.</p>
+            </div>
+            {% endif %}
+        </section>
+
+        <section class="section-divider">
+            <h2>Suggest your own copy</h2>
+            <p style="font-size: 13px; opacity: 0.75;">
+                Add your own headline, subhead, or CTA to the gene pool. The next weekly generator
+                will use it when proposing new variants.
+            </p>
+
+            <form id="suggest-form" onsubmit="return handleSuggest(event)">
+                <label for="slot_name">Slot</label>
+                <select id="slot_name" name="slot_name" required>
+                    {% for slot in allowed_suggestion_slots %}
+                    <option value="{{ slot }}">{{ slot }}</option>
+                    {% endfor %}
+                </select>
+
+                <label for="slot_value">Your copy</label>
+                <input type="text" id="slot_value" name="slot_value" maxlength="500" required placeholder="e.g., Limited time: 40% off everything">
+
+                <label for="description">Notes (optional)</label>
+                <input type="text" id="description" name="description" maxlength="500" placeholder="What is this trying to do?">
+
+                <button type="submit">Add to gene pool</button>
+            </form>
+        </section>
+
+        <footer style="margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--pico-muted-border-color); font-size: 12px; opacity: 0.6;">
+            <p>Ad Creative Agent &middot; This link expires after 7 days.</p>
+        </footer>
+    </main>
+
+    <script>
+        const TOKEN = {{ token | tojson }};
+
+        function showToast(message, type) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = 'toast visible ' + type;
+            setTimeout(function() { toast.className = 'toast'; }, 3000);
+        }
+
+        async function handleAction(approvalId, action) {
+            const formData = new FormData();
+            formData.append('token', TOKEN);
+            if (action === 'reject') {
+                formData.append('reason', 'user_rejected');
+            }
+
+            try {
+                const response = await fetch('/api/approvals/' + approvalId + '/' + action, {
+                    method: 'POST',
+                    body: formData,
+                });
+                if (!response.ok) {
+                    const data = await response.json().catch(function() { return {}; });
+                    showToast(data.detail || ('Failed to ' + action), 'error');
+                    return;
+                }
+                const row = document.getElementById('proposal-' + approvalId);
+                if (row) { row.classList.add('removed'); }
+                showToast(action === 'approve' ? 'Approved' : 'Rejected', 'success');
+            } catch (err) {
+                showToast('Network error: ' + err.message, 'error');
+            }
+        }
+
+        async function handleSuggest(event) {
+            event.preventDefault();
+            const form = document.getElementById('suggest-form');
+            const formData = new FormData(form);
+            formData.append('token', TOKEN);
+
+            try {
+                const response = await fetch('/api/gene-pool/suggest', {
+                    method: 'POST',
+                    body: formData,
+                });
+                const data = await response.json().catch(function() { return {}; });
+                if (!response.ok) {
+                    showToast(data.detail || 'Failed to add suggestion', 'error');
+                    return false;
+                }
+                showToast('Added to gene pool — will be used next week', 'success');
+                form.reset();
+            } catch (err) {
+                showToast('Network error: ' + err.message, 'error');
+            }
+            return false;
+        }
+    </script>
+</body>
+</html>

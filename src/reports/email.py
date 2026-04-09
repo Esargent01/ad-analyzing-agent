@@ -206,10 +206,15 @@ class EmailReporter:
         campaign_name: str,
         week_label: str,
         base_url: str = "",
+        review_url: str | None = None,
     ) -> bool:
         """Send a weekly report email using the redesigned template. Returns True on success."""
         html_content = self._render_weekly_email_html(
-            report, campaign_name=campaign_name, week_label=week_label, base_url=base_url,
+            report,
+            campaign_name=campaign_name,
+            week_label=week_label,
+            base_url=base_url,
+            review_url=review_url,
         )
 
         subject = (
@@ -318,6 +323,7 @@ class EmailReporter:
         campaign_name: str,
         week_label: str,
         base_url: str = "",
+        review_url: str | None = None,
     ) -> str:
         """Render the weekly email HTML from the redesigned template."""
         template = self._jinja_env.get_template("weekly_email.html")
@@ -361,6 +367,11 @@ class EmailReporter:
             elements_by_hook=elements_by_hook,
             # Interactions
             interactions=report.top_interactions,
+            # Proposed variants (weekly review flow)
+            proposed_variants=report.proposed_variants,
+            expired_count=report.expired_count,
+            generation_paused=report.generation_paused,
+            review_url=review_url or report.review_url,
         )
 
     def _render_html(self, report: WeeklyReport, report_type: str = "Weekly") -> str:

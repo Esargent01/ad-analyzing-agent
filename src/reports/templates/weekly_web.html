@@ -115,6 +115,64 @@
 </section>
 {% endif %}
 
+<!-- Section 3.5: Next week's experiments -->
+{% if proposed_variants or generation_paused or (expired_count and expired_count > 0) %}
+<section class="section">
+    <h2>
+        Next week&rsquo;s experiments
+        {% if proposed_variants %}
+        <span style="font-size: 12px; font-weight: 400; color: var(--text-tertiary);">&middot; {{ proposed_variants|length }} proposed</span>
+        {% endif %}
+    </h2>
+    {% if expired_count and expired_count > 0 %}
+    <p style="font-size: 12px; color: var(--text-tertiary); margin-bottom: 6px;">
+        {{ expired_count }} older proposal{{ "s" if expired_count != 1 else "" }} expired without review and were auto-rejected.
+    </p>
+    {% endif %}
+    {% if generation_paused %}
+    <p style="font-size: 12px; color: var(--amber); margin-bottom: 6px;">
+        {% if proposed_variants %}
+        &#9888; New variant generation paused &mdash; clear the review queue to resume.
+        {% else %}
+        &#9888; New variant generation paused &mdash; your active variants are at capacity. Retire a variant to make room for new experiments.
+        {% endif %}
+    </p>
+    {% endif %}
+
+    <div style="margin-top: 8px;">
+        {% for pv in proposed_variants %}
+        <div style="padding: 12px 0; border-bottom: 0.5px solid var(--border); display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px;">
+                <div style="font-size: 13px;">
+                    <span class="mono" style="font-family: var(--font-mono); color: var(--accent); font-weight: 500;">{{ pv.variant_code }}</span>
+                    <span style="color: var(--text-tertiary);"> &middot; </span>
+                    <span style="color: var(--text);">{{ pv.genome_summary }}</span>
+                </div>
+                {% if pv.classification == "expiring_soon" %}
+                <span style="display: inline-block; background-color: #FFF4D6; color: #B07C1A; font-size: 10px; padding: 2px 8px; border-radius: 10px; white-space: nowrap;">
+                    Expires in {{ pv.days_until_expiry }} day{{ "s" if pv.days_until_expiry != 1 else "" }}
+                </span>
+                {% else %}
+                <span style="display: inline-block; background-color: #EDF4EC; color: #2B6B30; font-size: 10px; padding: 2px 8px; border-radius: 10px; white-space: nowrap;">New</span>
+                {% endif %}
+            </div>
+            {% if pv.hypothesis %}
+            <div style="font-size: 12px; color: var(--text-secondary);">{{ pv.hypothesis }}</div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    {% if review_url %}
+    <div style="text-align: center; padding: 18px 0 4px 0;">
+        <a href="{{ review_url }}" style="display: inline-block; background: var(--accent); color: #ffffff; padding: 12px 28px; border-radius: 6px; font-size: 14px; font-weight: 500; text-decoration: none;">
+            Review &amp; approve &rarr;
+        </a>
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
 <!-- Section 4: Variant leaderboard -->
 {% if variants %}
 <section class="section">

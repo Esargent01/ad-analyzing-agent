@@ -228,6 +228,22 @@ class FunnelStage(BaseModel):
     cost_per: Decimal | None = None  # cost per this event
 
 
+class ProposedVariant(BaseModel):
+    """A variant queued for user approval, shown in the weekly report."""
+
+    model_config = ConfigDict(strict=False)
+
+    approval_id: UUID
+    variant_id: UUID
+    variant_code: str
+    genome: dict[str, str]
+    genome_summary: str  # e.g., "urgency headline + retargeting audience"
+    hypothesis: str | None
+    submitted_at: datetime
+    classification: str  # "new" (this week) or "expiring_soon" (>7 days old)
+    days_until_expiry: int  # for expiring_soon badges
+
+
 class WeeklyReport(BaseModel):
     """Aggregated weekly report sent via email."""
 
@@ -280,3 +296,9 @@ class WeeklyReport(BaseModel):
     variants_launched: int
     variants_retired: int
     summary_text: str
+
+    # Proposed variants awaiting user review (weekly feedback loop)
+    proposed_variants: list[ProposedVariant] = []
+    expired_count: int = 0  # proposals auto-rejected this week due to TTL
+    generation_paused: bool = False  # True if queue at capacity
+    review_url: str | None = None  # tokenized link to review page
