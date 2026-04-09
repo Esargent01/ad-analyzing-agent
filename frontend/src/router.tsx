@@ -2,15 +2,13 @@ import { createBrowserRouter, Navigate } from "react-router-dom";
 
 import { AuthedLayout } from "@/routes/_layout";
 import { CampaignDetailRoute } from "@/routes/campaign-detail";
+import { DailyReportDetailRoute } from "@/routes/daily-report-detail";
 import { DashboardRoute } from "@/routes/dashboard";
 import { MagicLinkSentRoute } from "@/routes/magic-link-sent";
-import {
-  DailyReportDetailStub,
-  WeeklyReportDetailStub,
-} from "@/routes/report-detail-stub";
 import { ReportsDailyListRoute } from "@/routes/reports-daily-list";
 import { ReportsWeeklyListRoute } from "@/routes/reports-weekly-list";
 import { SignInRoute } from "@/routes/sign-in";
+import { WeeklyReportDetailRoute } from "@/routes/weekly-report-detail";
 
 /**
  * Explicit route table — no file-based routing, no loaders. TanStack
@@ -46,7 +44,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "/campaigns/:campaignId/reports/daily/:reportDate",
-        element: <DailyReportDetailStub />,
+        element: <DailyReportDetailRoute />,
       },
       {
         path: "/campaigns/:campaignId/reports/weekly",
@@ -54,7 +52,7 @@ export const router = createBrowserRouter([
       },
       {
         path: "/campaigns/:campaignId/reports/weekly/:weekStart",
-        element: <WeeklyReportDetailStub />,
+        element: <WeeklyReportDetailRoute />,
       },
     ],
   },

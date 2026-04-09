@@ -10,10 +10,12 @@ import { useMutation, useQuery, type UseQueryOptions } from "@tanstack/react-que
 import { api, ApiError } from "@/lib/api/client";
 import type {
   DailyDatesResponse,
+  DailyReport,
   ExperimentsResponse,
   MagicLinkRequest,
   MeResponse,
   WeeklyIndexResponse,
+  WeeklyReport,
 } from "@/lib/api/types";
 
 // ---------------------------------------------------------------------------
@@ -24,8 +26,12 @@ export const qk = {
   me: ["me"] as const,
   dailyDates: (campaignId: string) =>
     ["campaigns", campaignId, "reports", "daily"] as const,
+  dailyReport: (campaignId: string, reportDate: string) =>
+    ["campaigns", campaignId, "reports", "daily", reportDate] as const,
   weeklyIndex: (campaignId: string) =>
     ["campaigns", campaignId, "reports", "weekly"] as const,
+  weeklyReport: (campaignId: string, weekStart: string) =>
+    ["campaigns", campaignId, "reports", "weekly", weekStart] as const,
   experiments: (campaignId: string) =>
     ["campaigns", campaignId, "experiments"] as const,
 };
@@ -103,6 +109,48 @@ export function useWeeklyIndex(campaignId: string | undefined) {
         { signal },
       ),
     enabled: Boolean(campaignId),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Individual report detail fetches
+// ---------------------------------------------------------------------------
+
+export function useDailyReport(
+  campaignId: string | undefined,
+  reportDate: string | undefined,
+) {
+  const enabled = Boolean(campaignId && reportDate);
+  return useQuery<DailyReport, ApiError>({
+    queryKey:
+      campaignId && reportDate
+        ? qk.dailyReport(campaignId, reportDate)
+        : ["daily-report-disabled"],
+    queryFn: ({ signal }) =>
+      api.get<DailyReport>(
+        `/api/campaigns/${campaignId}/reports/daily/${reportDate}`,
+        { signal },
+      ),
+    enabled,
+  });
+}
+
+export function useWeeklyReport(
+  campaignId: string | undefined,
+  weekStart: string | undefined,
+) {
+  const enabled = Boolean(campaignId && weekStart);
+  return useQuery<WeeklyReport, ApiError>({
+    queryKey:
+      campaignId && weekStart
+        ? qk.weeklyReport(campaignId, weekStart)
+        : ["weekly-report-disabled"],
+    queryFn: ({ signal }) =>
+      api.get<WeeklyReport>(
+        `/api/campaigns/${campaignId}/reports/weekly/${weekStart}`,
+        { signal },
+      ),
+    enabled,
   });
 }
 

@@ -68,3 +68,230 @@ export interface ExperimentsResponse {
   gene_pool_by_slot: Record<string, GenePoolEntry[]>;
   allowed_suggestion_slots: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Report detail shapes
+//
+// Decimal fields arrive from the backend as JSON strings by default
+// (Pydantic v2 Decimal → string). Every formatter in `lib/format.ts`
+// coerces through `Number()` so `string | number | null` here is safe.
+// ---------------------------------------------------------------------------
+
+type Num = number | string | null;
+
+// --- Daily report ----------------------------------------------------------
+
+export interface VariantReport {
+  variant_id: string;
+  variant_code: string;
+  genome: Record<string, string>;
+  genome_summary: string;
+  hypothesis: string | null;
+  /** "winner" | "steady" | "new" | "fatigue" | "paused" */
+  status: string;
+  days_active: number;
+
+  // Primary
+  spend: Num;
+  purchases: number;
+  purchase_value: Num;
+  cost_per_purchase: Num;
+  roas: Num;
+
+  // Diagnostic
+  impressions: number;
+  reach: number;
+  video_views_3s: number;
+  video_views_15s: number;
+  link_clicks: number;
+  landing_page_views: number;
+  add_to_carts: number;
+
+  // Computed rates (0-100 scale)
+  hook_rate_pct: number;
+  hold_rate_pct: number;
+  ctr_pct: number;
+  atc_rate_pct: number;
+  checkout_rate_pct: number;
+  frequency: number;
+}
+
+export interface ReportFunnelStage {
+  label: string;
+  count: number;
+  rate_pct: number;
+  rate_label: string;
+  dropoff_pct: number;
+  bar_color: string;
+}
+
+export interface Diagnostic {
+  text: string;
+  /** "good" | "warning" | "bad" */
+  severity: string;
+}
+
+export interface FatigueAlert {
+  variant_code: string;
+  reason: string;
+  recommendation: string;
+}
+
+export interface ReportCycleAction {
+  action_type: string;
+  variant_code: string;
+  details: string | null;
+}
+
+export interface NextCyclePreview {
+  hypothesis: string;
+  genome_summary: string;
+}
+
+export interface DailyReport {
+  campaign_name: string;
+  campaign_id: string;
+  cycle_number: number;
+  report_date: string; // ISO YYYY-MM-DD
+  day_number: number;
+
+  total_spend: Num;
+  total_purchases: number;
+  avg_cost_per_purchase: Num;
+  avg_roas: Num;
+  avg_hook_rate_pct: number;
+
+  prev_spend: Num;
+  prev_purchases: number | null;
+  prev_avg_cpa: Num;
+  prev_avg_roas: Num;
+
+  variants: VariantReport[];
+
+  best_variant: VariantReport | null;
+  best_variant_funnel: ReportFunnelStage[];
+  best_variant_diagnostics: Diagnostic[];
+  best_variant_projection: string | null;
+
+  fatigue_alerts: FatigueAlert[];
+  actions: ReportCycleAction[];
+  next_cycle: NextCyclePreview[];
+
+  winners: VariantReport[];
+}
+
+// --- Weekly report ---------------------------------------------------------
+
+export interface VariantSummary {
+  variant_id: string;
+  variant_code: string;
+  status: string;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  spend: Num;
+  ctr: Num;
+  cpa: Num;
+
+  reach: number;
+  video_views_3s: number;
+  video_views_15s: number;
+  thruplays: number;
+  link_clicks: number;
+  landing_page_views: number;
+  add_to_carts: number;
+  purchases: number;
+  purchase_value: Num;
+  hook_rate: Num;
+  hold_rate: Num;
+  cost_per_purchase: Num;
+  roas: Num;
+}
+
+export interface FunnelStage {
+  stage_name: string;
+  value: number;
+  rate: Num;
+  cost_per: Num;
+}
+
+export interface ElementInsight {
+  slot_name: string;
+  slot_value: string;
+  variants_tested: number;
+  avg_ctr: Num;
+  avg_cpa: Num;
+  best_ctr: Num;
+  worst_ctr: Num;
+  total_impressions: number;
+  total_conversions: number;
+  confidence: Num;
+
+  avg_hook_rate: Num;
+  avg_roas: Num;
+  best_hook_rate: Num;
+  best_cpa: Num;
+  total_purchases: number;
+}
+
+export interface InteractionInsight {
+  slot_a_name: string;
+  slot_a_value: string;
+  slot_b_name: string;
+  slot_b_value: string;
+  variants_tested: number;
+  combined_avg_ctr: Num;
+  solo_a_avg_ctr: Num;
+  solo_b_avg_ctr: Num;
+  interaction_lift: Num;
+  confidence: Num;
+}
+
+export interface WeeklyReport {
+  campaign_id: string;
+  campaign_name: string;
+  week_start: string;
+  week_end: string;
+
+  total_spend: Num;
+  total_impressions: number;
+  total_clicks: number;
+  total_conversions: number;
+  avg_ctr: Num;
+  avg_cpa: Num;
+
+  total_reach: number;
+  total_video_views_3s: number;
+  total_video_views_15s: number;
+  total_thruplays: number;
+  total_link_clicks: number;
+  total_landing_page_views: number;
+  total_add_to_carts: number;
+  total_purchases: number;
+  total_purchase_value: Num;
+  avg_hook_rate: Num;
+  avg_hold_rate: Num;
+  avg_cpm: Num;
+  avg_frequency: Num;
+  avg_roas: Num;
+  avg_cost_per_purchase: Num;
+
+  funnel_stages: FunnelStage[];
+
+  best_variant: VariantSummary | null;
+  worst_variant: VariantSummary | null;
+  all_variants: VariantSummary[];
+
+  top_elements: ElementInsight[];
+  top_interactions: InteractionInsight[];
+
+  cycles_run: number;
+  variants_launched: number;
+  variants_retired: number;
+  summary_text: string;
+
+  proposed_variants: ProposedVariant[];
+  expired_count: number;
+  generation_paused: boolean;
+  review_url: string | null;
+}
