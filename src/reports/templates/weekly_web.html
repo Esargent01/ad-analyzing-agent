@@ -1,83 +1,49 @@
 {% extends "components/base.html" %}
 
-{% block title %}Weekly Report — {{ week_label }}{% endblock %}
-{% block og_title %}{{ campaign_name }} Weekly Report — {{ week_label }}{% endblock %}
+{% block title %}Weekly Report — Week {{ week_label }}{% endblock %}
+{% block og_title %}{{ campaign_name }} Weekly Report — Week {{ week_label }}{% endblock %}
 {% block og_description %}Week {{ week_label }}: Spend {{ total_spend|currency }}, {{ total_purchases }} purchases, ROAS {% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}{% endblock %}
 
 {% block content %}
+<!-- Section 1: Header -->
 <header class="report-header">
     <div class="report-meta">
-        <span class="report-type">Weekly Report</span>
+        <span class="report-type">Weekly report</span>
         <time>{{ week_start }} to {{ week_end }}</time>
     </div>
     <h1>{{ campaign_name }}</h1>
-    <p class="cycle-info">{{ cycles_run }} cycles &middot; {{ variants_launched }} launched &middot; {{ variants_retired }} retired &middot; Generated {{ generated_at }} UTC</p>
+    <p class="cycle-info">Week {{ week_label }} &middot; {{ week_start }} to {{ week_end }}</p>
+    <p class="cycle-info">{{ cycles_run }} cycles &middot; {{ variants_launched }} launched &middot; {{ variants_retired }} retired</p>
 </header>
 
-<!-- Tweet snapshot region -->
-<div class="tweet-snapshot">
-    <div class="snapshot-header">
-        <span>{{ campaign_name }} &middot; {{ week_label }}</span>
-        <time>{{ week_start }} to {{ week_end }}</time>
-    </div>
-    <div class="snapshot-metrics">
-        <div class="sm">
-            <div class="sm-label">Spend</div>
-            <div class="sm-value">{{ total_spend|currency }}</div>
-        </div>
-        <div class="sm">
-            <div class="sm-label">Purchases</div>
-            <div class="sm-value">{{ total_purchases }}</div>
-        </div>
-        <div class="sm">
-            <div class="sm-label">ROAS</div>
-            <div class="sm-value">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</div>
-        </div>
-        <div class="sm">
-            <div class="sm-label">Hook Rate</div>
-            <div class="sm-value">{{ avg_hook_rate|pct }}</div>
-        </div>
-    </div>
-    {% if variants %}
-    <table class="snapshot-table">
-        <thead>
-            <tr><th>Variant</th><th>Hook</th><th>CTR</th><th>Spend</th><th>Purch.</th></tr>
-        </thead>
-        <tbody>
-            {% for v in variants[:5] %}
-            <tr>
-                <td class="mono">{{ v.variant_code }}</td>
-                <td>{{ v.hook_rate|pct }}</td>
-                <td>{{ v.ctr|pct }}</td>
-                <td>{{ v.spend|currency }}</td>
-                <td>{{ v.purchases }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    {% endif %}
-</div>
-
-<!-- Top-line metrics -->
+<!-- Section 2: Top-line metric cards — Row 1: Purchase metrics -->
 <section class="metric-cards">
     <div class="mc">
-        <div class="mc-label">Total Spend</div>
+        <div class="mc-label">Spend</div>
         <div class="mc-value">{{ total_spend|currency }}</div>
     </div>
     <div class="mc">
-        <div class="mc-label">Impressions</div>
-        <div class="mc-value">{{ total_impressions|intcomma }}</div>
+        <div class="mc-label">Purchases</div>
+        <div class="mc-value">{{ total_purchases|intcomma }}</div>
     </div>
     <div class="mc">
-        <div class="mc-label">Reach</div>
-        <div class="mc-value">{{ total_reach|intcomma }}</div>
+        <div class="mc-label">CPA</div>
+        <div class="mc-value">{% if avg_cost_per_purchase %}{{ avg_cost_per_purchase|currency }}{% else %}N/A{% endif %}</div>
     </div>
     <div class="mc">
-        <div class="mc-label">Hook Rate (3s)</div>
+        <div class="mc-label">ROAS</div>
+        <div class="mc-value">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</div>
+    </div>
+</section>
+
+<!-- Row 2: Engagement metrics -->
+<section class="metric-cards">
+    <div class="mc">
+        <div class="mc-label">Hook Rate</div>
         <div class="mc-value">{{ avg_hook_rate|pct }}</div>
     </div>
     <div class="mc">
-        <div class="mc-label">Hold Rate (15s)</div>
+        <div class="mc-label">Hold Rate</div>
         <div class="mc-value">{{ avg_hold_rate|pct }}</div>
     </div>
     <div class="mc">
@@ -88,77 +54,97 @@
         <div class="mc-label">CPM</div>
         <div class="mc-value">{{ avg_cpm|currency }}</div>
     </div>
+</section>
+
+<!-- Row 3: Volume metrics -->
+<section class="metric-cards">
     <div class="mc">
-        <div class="mc-label">Frequency</div>
-        <div class="mc-value">{{ avg_frequency|onedecimal }}</div>
+        <div class="mc-label">Impressions</div>
+        <div class="mc-value">{{ total_impressions|intcomma }}</div>
     </div>
     <div class="mc">
-        <div class="mc-label">Purchases</div>
-        <div class="mc-value">{{ total_purchases }}</div>
+        <div class="mc-label">Reach</div>
+        <div class="mc-value">{{ total_reach|intcomma }}</div>
     </div>
     <div class="mc">
         <div class="mc-label">Revenue</div>
         <div class="mc-value">{{ total_purchase_value|currency }}</div>
     </div>
     <div class="mc">
-        <div class="mc-label">ROAS</div>
-        <div class="mc-value">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</div>
-    </div>
-    <div class="mc">
-        <div class="mc-label">Cost/Purchase</div>
-        <div class="mc-value">{% if avg_cost_per_purchase %}{{ avg_cost_per_purchase|currency }}{% else %}N/A{% endif %}</div>
+        <div class="mc-label">Frequency</div>
+        <div class="mc-value">{{ avg_frequency|onedecimal }}</div>
     </div>
 </section>
 
-<!-- Funnel -->
+<!-- Section 3: Full funnel breakdown -->
 {% if funnel_stages %}
 <section class="section">
     <h2>Full funnel breakdown</h2>
     {% set max_value = funnel_stages[0].value if funnel_stages else 1 %}
-    {% for stage in funnel_stages %}
-    <div class="funnel-stage">
-        <span class="funnel-name">{{ stage.stage_name }}</span>
-        <span class="funnel-value">{{ stage.value|intcomma }}</span>
-        <div class="funnel-bar-container">
-            <div class="funnel-bar" style="width: {{ (stage.value / max_value * 100)|int if max_value > 0 else 0 }}%"></div>
+    <div class="funnel">
+        {% for stage in funnel_stages %}
+        {% set bar_width = (stage.value / max_value * 100)|round(1) if max_value > 0 else 0 %}
+        {% set bar_width = [bar_width, 5]|max %}
+        {% if stage.stage_name == 'Impressions' %}
+            {% set bar_color = '#534AB7' %}
+        {% elif stage.stage_name == 'Video views (3s)' %}
+            {% set bar_color = '#7F77DD' %}
+        {% elif stage.stage_name == 'Video views (15s)' %}
+            {% set bar_color = '#378ADD' %}
+        {% elif stage.stage_name == 'Link clicks' %}
+            {% set bar_color = '#1D9E75' %}
+        {% elif stage.stage_name == 'Landing page views' %}
+            {% set bar_color = '#4DAA57' %}
+        {% elif stage.stage_name == 'Add to carts' %}
+            {% set bar_color = '#639922' %}
+        {% elif stage.stage_name == 'Purchases' %}
+            {% set bar_color = '#27500A' %}
+        {% else %}
+            {% set bar_color = '#534AB7' %}
+        {% endif %}
+        <div class="funnel-step">
+            <span class="funnel-label">{{ stage.stage_name }}</span>
+            <div class="funnel-bar" style="width: {{ bar_width }}%; background: {{ bar_color }};">{{ stage.value|intcomma }}</div>
+            <span class="funnel-val">
+                {% if stage.rate %}{{ stage.rate|pct }}{% endif %}
+                {% if stage.cost_per %} &middot; {{ stage.cost_per|currency }}/ea{% endif %}
+            </span>
         </div>
-        <span class="funnel-rate">{% if stage.rate %}{{ stage.rate|pct }}{% endif %}</span>
-        <span class="funnel-cost">{% if stage.cost_per %}{{ stage.cost_per|currency }}{% endif %}</span>
+        {% endfor %}
     </div>
-    {% endfor %}
 </section>
 {% endif %}
 
-<!-- Variant leaderboard -->
+<!-- Section 4: Variant leaderboard -->
 {% if variants %}
 <section class="section">
     <h2>Variant leaderboard</h2>
-    <table class="leaderboard">
+    <table class="variant-table">
         <thead>
             <tr>
                 <th>Variant</th>
                 <th>Status</th>
-                <th>Impr.</th>
                 <th>Hook</th>
                 <th>Hold</th>
                 <th>CTR</th>
+                <th>CPA</th>
+                <th>ROAS</th>
                 <th>Spend</th>
                 <th>Purch.</th>
-                <th>ROAS</th>
             </tr>
         </thead>
         <tbody>
             {% for v in variants %}
             <tr>
                 <td class="mono">{{ v.variant_code }}</td>
-                <td><span class="status status-{{ v.status }}">{{ v.status }}</span></td>
-                <td class="mono">{{ v.impressions|intcomma }}</td>
-                <td class="mono">{{ v.hook_rate|pct }}</td>
-                <td class="mono">{{ v.hold_rate|pct }}</td>
-                <td class="mono">{{ v.ctr|pct }}</td>
-                <td class="mono">{{ v.spend|currency }}</td>
-                <td class="mono">{{ v.purchases }}</td>
-                <td class="mono">{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}—{% endif %}</td>
+                <td><span class="status-pill status-{{ v.status }}">{{ v.status }}</span></td>
+                <td>{{ v.hook_rate|pct }}</td>
+                <td>{{ v.hold_rate|pct }}</td>
+                <td>{{ v.ctr|pct }}</td>
+                <td>{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
+                <td>{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
+                <td>{{ v.spend|currency }}</td>
+                <td>{{ v.purchases|intcomma }}</td>
             </tr>
             {% endfor %}
         </tbody>
@@ -166,26 +152,26 @@
 </section>
 {% endif %}
 
-<!-- Element insights -->
+<!-- Section 5: Element performance -->
 {% if elements %}
 <section class="section">
     <h2>Element performance</h2>
     <div class="dual-ranking">
         <div class="ranking-col">
             <h3>Attention ranking</h3>
-            <p class="ranking-subtitle">By average hook rate</p>
+            <p style="font-size: 11px; color: var(--text-tertiary); margin-bottom: 8px;">By average hook rate</p>
             {% for e in elements_by_hook[:8] %}
             <div class="element-row">
                 <span class="rank">#{{ loop.index }}</span>
                 <span class="slot">{{ e.slot_name }}</span>
                 <span class="value-label" title="{{ e.slot_value }}">{{ e.slot_value|truncate(30) }}</span>
-                <span class="metric">{% if e.avg_hook_rate %}{{ e.avg_hook_rate|pct }}{% else %}—{% endif %}</span>
+                <span class="metric">{% if e.avg_hook_rate %}{{ e.avg_hook_rate|pct }}{% else %}&mdash;{% endif %}</span>
             </div>
             {% endfor %}
         </div>
         <div class="ranking-col">
             <h3>Efficiency ranking</h3>
-            <p class="ranking-subtitle">By CTR</p>
+            <p style="font-size: 11px; color: var(--text-tertiary); margin-bottom: 8px;">By CTR</p>
             {% for e in elements[:8] %}
             <div class="element-row">
                 <span class="rank">#{{ loop.index }}</span>
@@ -199,7 +185,7 @@
 </section>
 {% endif %}
 
-<!-- Interactions -->
+<!-- Section 6: Top element interactions -->
 {% if interactions %}
 <section class="section">
     <h2>Top element interactions</h2>
@@ -210,12 +196,99 @@
             + <strong>{{ i.slot_b_name }}</strong>: {{ i.slot_b_value|truncate(25) }}
         </div>
         <span class="interaction-lift {% if i.interaction_lift and i.interaction_lift|float > 0 %}lift-positive{% else %}lift-negative{% endif %}">
-            {% if i.interaction_lift %}{{ i.interaction_lift|signpct }}{% else %}—{% endif %}
+            {% if i.interaction_lift %}{{ i.interaction_lift|signpct }}{% else %}&mdash;{% endif %}
+        </span>
+        <span style="font-size: 11px; color: var(--text-tertiary); margin-left: 8px;">
+            {{ i.combined_avg_ctr|pct }} CTR &middot; {{ i.variants_tested }} variant{{ 's' if i.variants_tested != 1 }}
         </span>
     </div>
     {% endfor %}
 </section>
 {% endif %}
+
+<!-- Section 7: Budget & efficiency summary -->
+<section class="section">
+    <h2>Budget &amp; efficiency summary</h2>
+    <table class="variant-table">
+        <tbody>
+            <tr>
+                <td style="color: var(--text-secondary);">Total Spend</td>
+                <td style="text-align: right; font-weight: 500;">{{ total_spend|currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-secondary);">Total Revenue</td>
+                <td style="text-align: right; font-weight: 500;">{{ total_purchase_value|currency }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-secondary);">Net Return</td>
+                {% set net_return = total_purchase_value - total_spend %}
+                <td style="text-align: right; font-weight: 500; color: {% if net_return >= 0 %}var(--green){% else %}var(--red){% endif %};">
+                    {{ net_return|currency }}
+                </td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-secondary);">CPA</td>
+                <td style="text-align: right; font-weight: 500;">{% if avg_cost_per_purchase %}{{ avg_cost_per_purchase|currency }}{% else %}N/A{% endif %}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-secondary);">ROAS</td>
+                <td style="text-align: right; font-weight: 500;">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-secondary);">Variants Launched</td>
+                <td style="text-align: right; font-weight: 500;">{{ variants_launched }}</td>
+            </tr>
+            <tr>
+                <td style="color: var(--text-secondary);">Variants Retired</td>
+                <td style="text-align: right; font-weight: 500;">{{ variants_retired }}</td>
+            </tr>
+        </tbody>
+    </table>
+</section>
+
+<!-- Section 8: Tweet snapshot -->
+<div class="tweet-snapshot">
+    <div class="snapshot-header">
+        <span>{{ campaign_name }}</span>
+        <time>Week {{ week_label }}</time>
+    </div>
+    <div class="snapshot-metrics">
+        <div>
+            <div class="sm-label">Spend</div>
+            <div class="sm-value">{{ total_spend|currency }}</div>
+        </div>
+        <div>
+            <div class="sm-label">Purchases</div>
+            <div class="sm-value">{{ total_purchases|intcomma }}</div>
+        </div>
+        <div>
+            <div class="sm-label">ROAS</div>
+            <div class="sm-value">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</div>
+        </div>
+        <div>
+            <div class="sm-label">Hook Rate</div>
+            <div class="sm-value">{{ avg_hook_rate|pct }}</div>
+        </div>
+    </div>
+    {% if variants %}
+    <table class="snapshot-table">
+        <thead>
+            <tr><th>Variant</th><th>Hook</th><th>CPA</th><th>ROAS</th><th>Spend</th></tr>
+        </thead>
+        <tbody>
+            {% for v in variants[:5] %}
+            <tr>
+                <td class="mono">{{ v.variant_code }}</td>
+                <td>{{ v.hook_rate|pct }}</td>
+                <td>{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
+                <td>{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
+                <td>{{ v.spend|currency }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
 
 <!-- Share on X -->
 <section class="section share-section">
@@ -223,21 +296,23 @@
     <div class="tweet-preview" id="tweet-preview">{{ campaign_name }} — Week {{ week_label }}
 
 Spend: {{ total_spend|currency }}
-Purchases: {{ total_purchases }}
+Purchases: {{ total_purchases|intcomma }}
 ROAS: {% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}
+Hook Rate: {{ avg_hook_rate|pct }}
 
 Full report: {{ base_url }}/weekly/{{ week_label }}.html</div>
     <button class="copy-btn" onclick="copyTweet()">Copy to clipboard</button>
     <span class="copy-feedback" id="copy-feedback"></span>
 </section>
 
+<!-- Section 9: Footer -->
 <footer class="report-footer">
     <p>Generated by Ad Creative Agent &middot; <a href="{{ base_url }}">View all reports</a></p>
 </footer>
 
 <script>
 function copyTweet() {
-    const text = document.getElementById('tweet-preview').textContent;
+    var text = document.getElementById('tweet-preview').textContent;
     navigator.clipboard.writeText(text).then(function() {
         var fb = document.getElementById('copy-feedback');
         fb.textContent = 'Copied!';

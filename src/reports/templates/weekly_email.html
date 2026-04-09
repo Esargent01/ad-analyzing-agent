@@ -1,0 +1,399 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Weekly Report — {{ week_label }}</title>
+</head>
+<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8;">
+<tr><td align="center" style="padding: 20px 0;">
+    <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px;">
+    <tr><td style="padding: 32px 28px;">
+
+        <!-- Section 1: Header -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td>
+            <span style="display: inline-block; background-color: #534AB7; color: #ffffff; font-size: 11px; padding: 2px 10px; border-radius: 12px; font-family: Arial, Helvetica, sans-serif;">Weekly report</span>
+        </td></tr>
+        <tr><td style="padding-top: 10px;">
+            <span style="font-size: 20px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">{{ campaign_name }}</span>
+        </td></tr>
+        <tr><td style="padding-top: 4px;">
+            <span style="font-size: 13px; color: #6b6b6b; font-family: Arial, Helvetica, sans-serif;">Week {{ week_label }} &middot; {{ week_start }} to {{ week_end }}</span>
+        </td></tr>
+        <tr><td style="padding-top: 4px;">
+            <span style="font-size: 13px; color: #999999; font-family: Arial, Helvetica, sans-serif;">{{ cycles_run }} cycles &middot; {{ variants_launched }} launched &middot; {{ variants_retired }} retired</span>
+        </td></tr>
+        </table>
+
+        <!-- Spacer -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 24px;"></td></tr></table>
+
+        <!-- Section 2: Top-line metric cards — Row 1 -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <!-- Spend -->
+            <td width="25%" style="padding: 0 4px 8px 0;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Spend</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ total_spend|currency }}</p>
+                </td></tr>
+                </table>
+            </td>
+            <!-- Purchases -->
+            <td width="25%" style="padding: 0 4px 8px;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Purchases</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ total_purchases|intcomma }}</p>
+                </td></tr>
+                </table>
+            </td>
+            <!-- CPA -->
+            <td width="25%" style="padding: 0 4px 8px;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Avg. CPA</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{% if avg_cost_per_purchase %}{{ avg_cost_per_purchase|currency }}{% else %}N/A{% endif %}</p>
+                </td></tr>
+                </table>
+            </td>
+            <!-- ROAS -->
+            <td width="25%" style="padding: 0 0 8px 4px;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">ROAS</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</p>
+                </td></tr>
+                </table>
+            </td>
+        </tr>
+        </table>
+
+        <!-- Row 2 -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <!-- Hook Rate -->
+            <td width="25%" style="padding: 0 4px 8px 0;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Hook Rate</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ "{:.1%}".format(avg_hook_rate) }}</p>
+                </td></tr>
+                </table>
+            </td>
+            <!-- Hold Rate -->
+            <td width="25%" style="padding: 0 4px 8px;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Hold Rate</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ "{:.1%}".format(avg_hold_rate) }}</p>
+                </td></tr>
+                </table>
+            </td>
+            <!-- CTR -->
+            <td width="25%" style="padding: 0 4px 8px;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">CTR</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ "{:.1%}".format(avg_ctr) }}</p>
+                </td></tr>
+                </table>
+            </td>
+            <!-- CPM -->
+            <td width="25%" style="padding: 0 0 8px 4px;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">CPM</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ avg_cpm|currency }}</p>
+                </td></tr>
+                </table>
+            </td>
+        </tr>
+        </table>
+
+        <!-- Row 3 -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <!-- Impressions -->
+            <td width="25%" style="padding: 0 4px 0 0;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Impressions</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ total_impressions|intcomma }}</p>
+                </td></tr>
+                </table>
+            </td>
+            <!-- Reach -->
+            <td width="25%" style="padding: 0 4px;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Reach</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ total_reach|intcomma }}</p>
+                </td></tr>
+                </table>
+            </td>
+            <!-- Revenue -->
+            <td width="25%" style="padding: 0 4px;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Revenue</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ total_purchase_value|currency }}</p>
+                </td></tr>
+                </table>
+            </td>
+            <!-- Frequency -->
+            <td width="25%" style="padding: 0 0 0 4px;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Frequency</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ avg_frequency|onedecimal }}</p>
+                </td></tr>
+                </table>
+            </td>
+        </tr>
+        </table>
+
+        <!-- Spacer -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
+
+        <!-- Section 3: Full funnel breakdown -->
+        {% if funnel_stages %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding-bottom: 10px;">
+            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Full funnel breakdown</span>
+        </td></tr>
+        </table>
+
+        {% set max_value = funnel_stages[0].value if funnel_stages else 1 %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        {% for stage in funnel_stages %}
+            {% set bar_color = "#534AB7" %}
+            {% if stage.stage_name == "Impressions" %}{% set bar_color = "#534AB7" %}
+            {% elif stage.stage_name == "Video views (3s)" %}{% set bar_color = "#7F77DD" %}
+            {% elif stage.stage_name == "Video views (15s)" %}{% set bar_color = "#378ADD" %}
+            {% elif stage.stage_name == "Link clicks" %}{% set bar_color = "#1D9E75" %}
+            {% elif stage.stage_name == "Landing page views" %}{% set bar_color = "#4DAA57" %}
+            {% elif stage.stage_name == "Add to carts" %}{% set bar_color = "#639922" %}
+            {% elif stage.stage_name == "Purchases" %}{% set bar_color = "#27500A" %}
+            {% endif %}
+            {% set bar_w = (stage.value / max_value * 400)|int if max_value > 0 else 0 %}
+            {% if bar_w < 30 %}{% set bar_w = 30 %}{% endif %}
+            {% if bar_w > 400 %}{% set bar_w = 400 %}{% endif %}
+            <tr>
+                <td width="110" align="right" style="padding: 3px 8px 3px 0; font-size: 12px; color: #6b6b6b; font-family: Arial, Helvetica, sans-serif; vertical-align: middle;">{{ stage.stage_name }}</td>
+                <td style="padding: 3px 0; vertical-align: middle;">
+                    <table role="presentation" cellpadding="0" cellspacing="0">
+                    <tr><td style="background-color: {{ bar_color }}; border-radius: 4px; padding: 6px 10px; color: #ffffff; font-size: 12px; font-weight: 500; font-family: Arial, Helvetica, sans-serif; width: {{ bar_w }}px;">{{ stage.value|intcomma }}</td></tr>
+                    </table>
+                </td>
+                <td style="padding: 3px 0 3px 8px; font-size: 11px; color: #6b6b6b; font-family: Arial, Helvetica, sans-serif; vertical-align: middle; white-space: nowrap;">{% if stage.rate is not none %}{{ "{:.1%}".format(stage.rate) }}{% endif %}{% if stage.cost_per is not none %} &middot; {{ stage.cost_per|currency }}/ea{% endif %}</td>
+            </tr>
+        {% endfor %}
+        </table>
+
+        <!-- Spacer -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
+        {% endif %}
+
+        <!-- Section 4: Variant leaderboard -->
+        {% if variants %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding-bottom: 10px;">
+            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Variant leaderboard</span>
+        </td></tr>
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 12px; font-family: Arial, Helvetica, sans-serif;">
+        <tr>
+            <td style="padding: 6px 6px 6px 0; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;">Variant</td>
+            <td style="padding: 6px 6px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;">Status</td>
+            <td style="padding: 6px 6px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;" align="right">Hook</td>
+            <td style="padding: 6px 6px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;" align="right">Hold</td>
+            <td style="padding: 6px 6px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;" align="right">CTR</td>
+            <td style="padding: 6px 6px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;" align="right">CPA</td>
+            <td style="padding: 6px 6px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;" align="right">ROAS</td>
+            <td style="padding: 6px 0 6px 6px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;" align="right">Spend</td>
+        </tr>
+        {% for v in variants %}
+        <tr>
+            <td style="padding: 6px 6px 6px 0; color: #1a1a1a; border-bottom: 1px solid #e5e5e5; font-family: 'Courier New', Courier, monospace; font-size: 12px;">{{ v.variant_code }}</td>
+            <td style="padding: 6px 6px; border-bottom: 1px solid #e5e5e5;">
+                {% if v.status == 'winner' %}
+                <span style="display: inline-block; background-color: #EAF3DE; color: #27500A; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ v.status }}</span>
+                {% elif v.status == 'steady' %}
+                <span style="display: inline-block; background-color: #E6F1FB; color: #0C447C; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ v.status }}</span>
+                {% elif v.status == 'new' %}
+                <span style="display: inline-block; background-color: #EEEDFE; color: #3C3489; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ v.status }}</span>
+                {% elif v.status == 'fatigue' or v.status == 'paused' %}
+                <span style="display: inline-block; background-color: #FAEEDA; color: #633806; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ v.status }}</span>
+                {% else %}
+                <span style="display: inline-block; background-color: #f7f7f8; color: #6b6b6b; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ v.status }}</span>
+                {% endif %}
+            </td>
+            <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e5e5e5; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{{ "{:.1%}".format(v.hook_rate) }}</td>
+            <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e5e5e5; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{{ "{:.1%}".format(v.hold_rate) }}</td>
+            <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e5e5e5; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{{ "{:.1%}".format(v.ctr) }}</td>
+            <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e5e5e5; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
+            <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e5e5e5; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
+            <td style="padding: 6px 0 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e5e5e5; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{{ v.spend|currency }}</td>
+        </tr>
+        {% endfor %}
+        </table>
+
+        <!-- Spacer -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
+        {% endif %}
+
+        <!-- Section 5: Element performance -->
+        {% if elements %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding-bottom: 10px;">
+            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Element performance</span>
+        </td></tr>
+        </table>
+
+        <!-- Attention ranking -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding-bottom: 6px;">
+            <span style="font-size: 14px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Attention ranking</span>
+            <span style="font-size: 12px; color: #999999; font-family: Arial, Helvetica, sans-serif; padding-left: 6px;">By average hook rate</span>
+        </td></tr>
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 12px; font-family: Arial, Helvetica, sans-serif;">
+        {% for e in elements|sort(attribute='avg_hook_rate', reverse=true) %}
+        {% if loop.index <= 8 %}
+        <tr>
+            <td width="30" style="padding: 4px 6px 4px 0; color: #999999; font-size: 12px; font-family: Arial, Helvetica, sans-serif; border-bottom: 1px solid #e5e5e5;" align="right">#{{ loop.index }}</td>
+            <td width="80" style="padding: 4px 6px; color: #999999; font-size: 11px; font-family: Arial, Helvetica, sans-serif; border-bottom: 1px solid #e5e5e5;">{{ e.slot_name }}</td>
+            <td style="padding: 4px 6px; color: #1a1a1a; font-size: 12px; font-family: Arial, Helvetica, sans-serif; border-bottom: 1px solid #e5e5e5;">{{ e.slot_value|truncate(40) }}</td>
+            <td width="60" style="padding: 4px 0 4px 6px; color: #1a1a1a; font-size: 12px; font-weight: 500; font-family: 'Courier New', Courier, monospace; border-bottom: 1px solid #e5e5e5;" align="right">{% if e.avg_hook_rate %}{{ "{:.1%}".format(e.avg_hook_rate) }}{% else %}&mdash;{% endif %}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+        </table>
+
+        <!-- Spacer -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 16px;"></td></tr></table>
+
+        <!-- Efficiency ranking -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding-bottom: 6px;">
+            <span style="font-size: 14px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Efficiency ranking</span>
+            <span style="font-size: 12px; color: #999999; font-family: Arial, Helvetica, sans-serif; padding-left: 6px;">By CTR</span>
+        </td></tr>
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 12px; font-family: Arial, Helvetica, sans-serif;">
+        {% for e in elements|sort(attribute='avg_ctr', reverse=true) %}
+        {% if loop.index <= 8 %}
+        <tr>
+            <td width="30" style="padding: 4px 6px 4px 0; color: #999999; font-size: 12px; font-family: Arial, Helvetica, sans-serif; border-bottom: 1px solid #e5e5e5;" align="right">#{{ loop.index }}</td>
+            <td width="80" style="padding: 4px 6px; color: #999999; font-size: 11px; font-family: Arial, Helvetica, sans-serif; border-bottom: 1px solid #e5e5e5;">{{ e.slot_name }}</td>
+            <td style="padding: 4px 6px; color: #1a1a1a; font-size: 12px; font-family: Arial, Helvetica, sans-serif; border-bottom: 1px solid #e5e5e5;">{{ e.slot_value|truncate(40) }}</td>
+            <td width="60" style="padding: 4px 0 4px 6px; color: #1a1a1a; font-size: 12px; font-weight: 500; font-family: 'Courier New', Courier, monospace; border-bottom: 1px solid #e5e5e5;" align="right">{{ "{:.1%}".format(e.avg_ctr) }}</td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+        </table>
+
+        <!-- Spacer -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
+        {% endif %}
+
+        <!-- Section 6: Top element interactions -->
+        {% if interactions %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding-bottom: 10px;">
+            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Top element interactions</span>
+        </td></tr>
+        </table>
+
+        {% for i in interactions[:5] %}
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px; margin-bottom: 6px;">
+        <tr><td style="padding: 12px 14px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+                <td style="font-size: 12px; font-family: Arial, Helvetica, sans-serif; color: #1a1a1a;">
+                    <span style="font-weight: 600;">{{ i.slot_a_name }}</span><span style="color: #6b6b6b;">=</span>{{ i.slot_a_value|truncate(25) }}
+                    <span style="color: #999999; padding: 0 4px;">+</span>
+                    <span style="font-weight: 600;">{{ i.slot_b_name }}</span><span style="color: #6b6b6b;">=</span>{{ i.slot_b_value|truncate(25) }}
+                </td>
+                <td align="right" style="font-size: 14px; font-weight: 600; font-family: Arial, Helvetica, sans-serif; white-space: nowrap; color: {% if i.interaction_lift and i.interaction_lift > 0 %}#1D9E75{% else %}#D85A30{% endif %};">
+                    {% if i.interaction_lift %}{% if i.interaction_lift > 0 %}+{% endif %}{{ "{:.1%}".format(i.interaction_lift) }}{% else %}&mdash;{% endif %}
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2" style="padding-top: 4px; font-size: 11px; color: #999999; font-family: Arial, Helvetica, sans-serif;">
+                    Combined CTR: {{ "{:.1%}".format(i.combined_avg_ctr) }} &middot; {{ i.variants_tested }} variant{{ "s" if i.variants_tested != 1 else "" }} tested
+                </td>
+            </tr>
+            </table>
+        </td></tr>
+        </table>
+        {% endfor %}
+
+        <!-- Spacer -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
+        {% endif %}
+
+        <!-- Section 7: Budget & efficiency summary -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding-bottom: 10px;">
+            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Budget &amp; efficiency summary</span>
+        </td></tr>
+        </table>
+
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 13px; font-family: Arial, Helvetica, sans-serif;">
+        <tr>
+            <td style="padding: 8px 8px 8px 0; color: #6b6b6b; border-bottom: 1px solid #e5e5e5;">Total Spend</td>
+            <td style="padding: 8px 0 8px 8px; color: #1a1a1a; font-weight: 500; border-bottom: 1px solid #e5e5e5;" align="right">{{ total_spend|currency }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 8px 8px 0; color: #6b6b6b; border-bottom: 1px solid #e5e5e5;">Revenue</td>
+            <td style="padding: 8px 0 8px 8px; color: #1a1a1a; font-weight: 500; border-bottom: 1px solid #e5e5e5;" align="right">{{ total_purchase_value|currency }}</td>
+        </tr>
+        <tr>
+            {% set net_return = total_purchase_value - total_spend %}
+            <td style="padding: 8px 8px 8px 0; color: #6b6b6b; border-bottom: 1px solid #e5e5e5;">Net Return</td>
+            <td style="padding: 8px 0 8px 8px; font-weight: 500; border-bottom: 1px solid #e5e5e5; color: {% if net_return >= 0 %}#1D9E75{% else %}#D85A30{% endif %};" align="right">{% if net_return >= 0 %}+{% endif %}{{ net_return|currency }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 8px 8px 0; color: #6b6b6b; border-bottom: 1px solid #e5e5e5;">CPA</td>
+            <td style="padding: 8px 0 8px 8px; color: #1a1a1a; font-weight: 500; border-bottom: 1px solid #e5e5e5;" align="right">{% if avg_cost_per_purchase %}{{ avg_cost_per_purchase|currency }}{% else %}N/A{% endif %}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 8px 8px 0; color: #6b6b6b; border-bottom: 1px solid #e5e5e5;">ROAS</td>
+            <td style="padding: 8px 0 8px 8px; color: #1a1a1a; font-weight: 500; border-bottom: 1px solid #e5e5e5;" align="right">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 8px 8px 0; color: #6b6b6b; border-bottom: 1px solid #e5e5e5;">Variants Launched</td>
+            <td style="padding: 8px 0 8px 8px; color: #1a1a1a; font-weight: 500; border-bottom: 1px solid #e5e5e5;" align="right">{{ variants_launched }}</td>
+        </tr>
+        <tr>
+            <td style="padding: 8px 8px 8px 0; color: #6b6b6b;">Variants Retired</td>
+            <td style="padding: 8px 0 8px 8px; color: #1a1a1a; font-weight: 500;" align="right">{{ variants_retired }}</td>
+        </tr>
+        </table>
+
+        <!-- Spacer -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
+
+        <!-- Section 8: Footer -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+        <tr><td style="padding-top: 16px; border-top: 1px solid #e5e5e5;">
+            <p style="font-size: 12px; color: #999999; margin: 0; font-family: Arial, Helvetica, sans-serif;">Generated by Ad Creative Agent &middot; {{ generated_at }} UTC &middot; <a href="{{ base_url }}" style="color: #534AB7; text-decoration: none;">View all reports</a></p>
+        </td></tr>
+        </table>
+
+    </td></tr>
+    </table>
+</td></tr>
+</table>
+
+</body>
+</html>

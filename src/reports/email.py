@@ -34,6 +34,17 @@ def _format_one_decimal(value: object) -> str:
     return f"{v:.1f}"
 
 
+def _format_pct(value: object) -> str:
+    """Format a 0-1 decimal as a percentage string."""
+    v = float(value) if value is not None else 0.0
+    return f"{v * 100:.1f}%" if v < 1 else f"{v:.1f}%"
+
+
+def _format_signed_pct(value: object) -> str:
+    v = float(value) if value is not None else 0.0
+    return f"{v:+.0%}"
+
+
 class EmailReporter:
     """Renders and sends HTML email reports via SendGrid."""
 
@@ -48,6 +59,8 @@ class EmailReporter:
         self._jinja_env.filters["currency"] = _format_currency
         self._jinja_env.filters["intcomma"] = _format_intcomma
         self._jinja_env.filters["onedecimal"] = _format_one_decimal
+        self._jinja_env.filters["pct"] = _format_pct
+        self._jinja_env.filters["signpct"] = _format_signed_pct
 
     # ------------------------------------------------------------------
     # Public API
@@ -187,6 +200,74 @@ class EmailReporter:
             logger.error("SendGrid request failed: %s", exc)
             return False
 
+    async def send_weekly_report_v2(
+        self,
+        report: WeeklyReport,
+        campaign_name: str,
+        week_label: str,
+        base_url: str = "",
+    ) -> bool:
+        """Send a weekly report email using the redesigned template. Returns True on success."""
+        html_content = self._render_weekly_email_html(
+            report, campaign_name=campaign_name, week_label=week_label, base_url=base_url,
+        )
+
+        subject = (
+            f"Weekly Ad Report: {campaign_name} "
+            f"(Week {week_label})"
+        )
+
+        payload: dict[str, object] = {
+            "personalizations": [
+                {
+                    "to": [{"email": self._to_email}],
+                    "subject": subject,
+                },
+            ],
+            "from": {"email": self._from_email},
+            "content": [
+                {"type": "text/html", "value": html_content},
+            ],
+        }
+
+        headers: dict[str, str] = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    _SENDGRID_API_URL,
+                    json=payload,
+                    headers=headers,
+                )
+                if response.status_code in (200, 202):
+                    logger.info(
+                        "Weekly report email (v2) sent to %s (campaign %s, week %s).",
+                        self._to_email,
+                        campaign_name,
+                        week_label,
+                    )
+                    return True
+
+                logger.error(
+                    "SendGrid API returned HTTP %d: %s",
+                    response.status_code,
+                    response.text[:500],
+                )
+                return False
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "SendGrid API returned HTTP %d: %s",
+                exc.response.status_code,
+                exc.response.text,
+            )
+            return False
+        except httpx.RequestError as exc:
+            logger.error("SendGrid request failed: %s", exc)
+            return False
+
     # ------------------------------------------------------------------
     # Template rendering
     # ------------------------------------------------------------------
@@ -231,8 +312,59 @@ class EmailReporter:
             winners=report.winners,
         )
 
+    def _render_weekly_email_html(
+        self,
+        report: WeeklyReport,
+        campaign_name: str,
+        week_label: str,
+        base_url: str = "",
+    ) -> str:
+        """Render the weekly email HTML from the redesigned template."""
+        template = self._jinja_env.get_template("weekly_email.html")
+
+        elements_by_hook = sorted(
+            report.top_elements,
+            key=lambda e: float(e.avg_hook_rate) if e.avg_hook_rate else 0,
+            reverse=True,
+        )
+
+        return template.render(
+            campaign_name=campaign_name,
+            week_label=week_label,
+            week_start=report.week_start.isoformat(),
+            week_end=report.week_end.isoformat(),
+            generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+            base_url=base_url,
+            # Activity
+            cycles_run=report.cycles_run,
+            variants_launched=report.variants_launched,
+            variants_retired=report.variants_retired,
+            # Metrics
+            total_impressions=report.total_impressions,
+            total_reach=report.total_reach,
+            total_spend=report.total_spend,
+            total_purchases=report.total_purchases,
+            total_purchase_value=report.total_purchase_value,
+            avg_hook_rate=report.avg_hook_rate,
+            avg_hold_rate=report.avg_hold_rate,
+            avg_ctr=report.avg_ctr,
+            avg_cpm=report.avg_cpm,
+            avg_frequency=report.avg_frequency,
+            avg_roas=report.avg_roas,
+            avg_cost_per_purchase=report.avg_cost_per_purchase,
+            # Funnel
+            funnel_stages=report.funnel_stages,
+            # Variants
+            variants=report.all_variants,
+            # Elements
+            elements=report.top_elements,
+            elements_by_hook=elements_by_hook,
+            # Interactions
+            interactions=report.top_interactions,
+        )
+
     def _render_html(self, report: WeeklyReport, report_type: str = "Weekly") -> str:
-        """Render the report HTML from the Jinja2 template.
+        """Render the report HTML from the Jinja2 template (legacy).
 
         Passes flat template variables as specified by the template contract.
         """
