@@ -2,17 +2,222 @@
 
 {% block title %}Daily Report — {{ report_date }}{% endblock %}
 {% block og_title %}{{ campaign_name }} Daily Report — {{ report_date }}{% endblock %}
-{% block og_description %}Hook rate {{ avg_hook_rate|pct }}, CTR {{ avg_ctr|pct }}, Spend {{ total_spend|currency }}{% endblock %}
+{% block og_description %}CPA {{ avg_cost_per_purchase|currency }}, ROAS {{ avg_roas|onedecimal }}x, Spend {{ total_spend|currency }}{% endblock %}
 
 {% block content %}
+<!-- Section 1: Header -->
 <header class="report-header">
     <div class="report-meta">
-        <span class="report-type">Daily Report</span>
+        <span class="report-type">Daily report</span>
         <time datetime="{{ report_date }}">{{ report_date_fmt }}</time>
     </div>
     <h1>{{ campaign_name }}</h1>
-    <p class="cycle-info">Generated {{ generated_at }} UTC</p>
+    <p class="cycle-info">Day {{ day_number }} &middot; {{ report_date_fmt }} &middot; Cycle {{ cycle_number }}</p>
 </header>
+
+<!-- Section 2: Top-line metric cards -->
+<section class="metric-cards">
+    <div class="mc">
+        <div class="mc-label">Spend</div>
+        <div class="mc-value">{{ total_spend|currency }}</div>
+        {% if prev_spend is not none and prev_spend %}
+        {% set spend_delta = ((total_spend - prev_spend) / prev_spend * 100)|round(1) %}
+        <div class="mc-trend mc-trend-flat">&rarr; {{ spend_delta|onedecimal }}%</div>
+        {% endif %}
+    </div>
+    <div class="mc">
+        <div class="mc-label">Purchases</div>
+        <div class="mc-value">{{ total_purchases|intcomma }}</div>
+        {% if prev_purchases is not none and prev_purchases %}
+        {% set purch_delta = ((total_purchases - prev_purchases) / prev_purchases * 100)|round(1) %}
+        <div class="mc-trend {% if purch_delta > 0 %}mc-trend-up{% elif purch_delta < 0 %}mc-trend-down{% else %}mc-trend-flat{% endif %}">
+            {% if purch_delta > 0 %}&uarr;{% elif purch_delta < 0 %}&darr;{% else %}&rarr;{% endif %} {{ purch_delta|onedecimal }}%
+        </div>
+        {% endif %}
+    </div>
+    <div class="mc">
+        <div class="mc-label">Avg. CPA</div>
+        <div class="mc-value">{{ avg_cost_per_purchase|currency }}</div>
+        {% if prev_avg_cpa is not none and prev_avg_cpa %}
+        {% set cpa_delta = ((avg_cost_per_purchase - prev_avg_cpa) / prev_avg_cpa * 100)|round(1) %}
+        {# CPA is inverted: decrease = green (good), increase = red (bad) #}
+        <div class="mc-trend {% if cpa_delta < 0 %}mc-trend-up{% elif cpa_delta > 0 %}mc-trend-down{% else %}mc-trend-flat{% endif %}">
+            {% if cpa_delta < 0 %}&uarr;{% elif cpa_delta > 0 %}&darr;{% else %}&rarr;{% endif %} {{ cpa_delta|onedecimal }}%
+        </div>
+        {% endif %}
+    </div>
+    <div class="mc">
+        <div class="mc-label">ROAS</div>
+        <div class="mc-value">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</div>
+        {% if prev_avg_roas is not none and prev_avg_roas and avg_roas %}
+        {% set roas_delta = ((avg_roas - prev_avg_roas) / prev_avg_roas * 100)|round(1) %}
+        <div class="mc-trend {% if roas_delta > 0 %}mc-trend-up{% elif roas_delta < 0 %}mc-trend-down{% else %}mc-trend-flat{% endif %}">
+            {% if roas_delta > 0 %}&uarr;{% elif roas_delta < 0 %}&darr;{% else %}&rarr;{% endif %} {{ roas_delta|onedecimal }}%
+        </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- Section 3: Best performing ad spotlight -->
+{% if best_variant %}
+<section class="spotlight section">
+    <div class="spotlight-header">
+        <span class="spotlight-header-title">{{ best_variant.variant_code }} &middot; {{ best_variant.genome_summary }}</span>
+        <span class="spotlight-badge">Best CPA today</span>
+    </div>
+    {% if best_variant.hypothesis %}
+    <div class="spotlight-hypothesis">{{ best_variant.hypothesis }}</div>
+    {% endif %}
+    <div class="spotlight-tiles">
+        <div class="tile">
+            <div class="tile-label">Cost per purchase</div>
+            <div class="tile-value">{{ best_variant.cost_per_purchase|currency }}</div>
+            {% if best_variant.cost_per_purchase %}
+            <div class="tile-benchmark">target: &lt; ${{ (best_variant.cost_per_purchase * 1.2)|round(0)|int }}</div>
+            {% endif %}
+        </div>
+        <div class="tile">
+            <div class="tile-label">ROAS</div>
+            <div class="tile-value">{% if best_variant.roas %}{{ best_variant.roas|onedecimal }}x{% else %}N/A{% endif %}</div>
+        </div>
+        <div class="tile">
+            <div class="tile-label">Purchases</div>
+            <div class="tile-value">{{ best_variant.purchases|intcomma }}</div>
+        </div>
+        <div class="tile">
+            <div class="tile-label">Hook rate</div>
+            <div class="tile-value">{% if best_variant.hook_rate_pct is not none %}{{ best_variant.hook_rate_pct|round(1) }}%{% else %}N/A{% endif %}</div>
+            <div class="tile-benchmark">benchmark 30%</div>
+        </div>
+        <div class="tile">
+            <div class="tile-label">Hold rate</div>
+            <div class="tile-value">{% if best_variant.hold_rate_pct is not none %}{{ best_variant.hold_rate_pct|round(1) }}%{% else %}N/A{% endif %}</div>
+            <div class="tile-benchmark">benchmark 25%</div>
+        </div>
+        <div class="tile">
+            <div class="tile-label">CTR</div>
+            <div class="tile-value">{% if best_variant.ctr_pct is not none %}{{ best_variant.ctr_pct|round(1) }}%{% else %}N/A{% endif %}</div>
+            <div class="tile-benchmark">benchmark 1.5%</div>
+        </div>
+    </div>
+
+    <!-- Funnel visualization -->
+    {% if best_variant_funnel %}
+    {% set max_impressions = best_variant_funnel[0].count if best_variant_funnel else 1 %}
+    <div class="funnel" style="margin-top: 14px;">
+        {% for stage in best_variant_funnel %}
+        <div class="funnel-step">
+            <span class="funnel-label">{{ stage.label }}</span>
+            {% set bar_width = (stage.count / max_impressions * 100)|round(1) if max_impressions > 0 else 0 %}
+            {% set bar_width = [bar_width, 5]|max %}
+            <div class="funnel-bar" style="width: {{ bar_width }}%; background: {{ stage.bar_color }};">{{ stage.count|intcomma }}</div>
+            <span class="funnel-val">{% if stage.rate_pct is not none %}{{ stage.rate_pct|round(1) }}% {{ stage.rate_label }}{% endif %}</span>
+        </div>
+        {% if stage.dropoff_pct is not none and not loop.last %}
+        <div class="funnel-dropoff">&darr; {{ stage.dropoff_pct|round(0)|int }}% didn't {{ best_variant_funnel[loop.index].label|lower }}</div>
+        {% endif %}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Diagnostics -->
+    {% if best_variant_diagnostics %}
+    <div class="diagnostics">
+        <div class="diag-title">Diagnostics</div>
+        {% for d in best_variant_diagnostics %}
+        <div class="diag-line diag-{{ d.severity }}">{{ d.text }}</div>
+        {% endfor %}
+        {% if best_variant_projection %}
+        <div class="diag-projection">{{ best_variant_projection }}</div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Creative DNA pills -->
+    {% if best_variant.genome %}
+    <div class="genome-pills">
+        {% for slot, value in best_variant.genome.items() %}
+        <span class="pill">
+            <span class="pill-slot">{{ slot }}:</span>
+            <span class="pill-value">{{ value }}</span>
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
+<!-- Section 4: Other active variants -->
+{% if variants %}
+<section class="section">
+    <h2>Other active variants</h2>
+    <table class="variant-table">
+        <thead>
+            <tr>
+                <th>Variant</th>
+                <th>Hook</th>
+                <th>CTR</th>
+                <th>CPA</th>
+                <th>ROAS</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for v in variants|sort(attribute='cost_per_purchase') %}
+            <tr>
+                <td class="mono">{{ v.variant_code }}</td>
+                <td>{% if v.hook_rate_pct is not none %}{{ v.hook_rate_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>
+                <td>{% if v.ctr_pct is not none %}{{ v.ctr_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>
+                <td>{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
+                <td>{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
+                <td><span class="status-pill status-{{ v.status }}">{{ v.status }}</span></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endif %}
+
+<!-- Section 5: Fatigue alerts -->
+{% if fatigue_alerts %}
+<section class="section">
+    <h2>Fatigue alerts</h2>
+    {% for alert in fatigue_alerts %}
+    <div class="alert-row">
+        <strong>{{ alert.variant_code }}</strong>
+        <span>{{ alert.reason }}</span>
+        <span style="color: var(--text-secondary);">{{ alert.recommendation }}</span>
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
+
+<!-- Section 6: Actions taken -->
+{% if actions %}
+<section class="section">
+    <h2>Actions taken</h2>
+    {% for action in actions %}
+    <div class="action-row">
+        <span class="action-badge action-{{ action.action_type }}">{{ action.action_type }}</span>
+        <strong>{{ action.variant_code }}</strong>
+        <span>{{ action.details }}</span>
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
+
+<!-- Section 7: Next cycle preview -->
+{% if next_cycle %}
+<section class="section">
+    <h2>Next cycle preview</h2>
+    {% for preview in next_cycle %}
+    <div style="padding: 6px 0; border-bottom: 0.5px solid var(--border); font-size: 13px;">
+        <div style="font-weight: 500;">{{ preview.hypothesis }}</div>
+        <div style="font-size: 12px; color: var(--text-secondary);">{{ preview.genome_summary }}</div>
+    </div>
+    {% endfor %}
+</section>
+{% endif %}
 
 <!-- Tweet snapshot region -->
 <div class="tweet-snapshot">
@@ -21,19 +226,19 @@
         <time>{{ report_date_fmt }}</time>
     </div>
     <div class="snapshot-metrics">
-        <div class="sm">
+        <div>
             <div class="sm-label">Spend</div>
             <div class="sm-value">{{ total_spend|currency }}</div>
         </div>
-        <div class="sm">
-            <div class="sm-label">Hook Rate</div>
-            <div class="sm-value">{{ avg_hook_rate|pct }}</div>
+        <div>
+            <div class="sm-label">Purchases</div>
+            <div class="sm-value">{{ total_purchases|intcomma }}</div>
         </div>
-        <div class="sm">
-            <div class="sm-label">CTR</div>
-            <div class="sm-value">{{ avg_ctr|pct }}</div>
+        <div>
+            <div class="sm-label">CPA</div>
+            <div class="sm-value">{{ avg_cost_per_purchase|currency }}</div>
         </div>
-        <div class="sm">
+        <div>
             <div class="sm-label">ROAS</div>
             <div class="sm-value">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</div>
         </div>
@@ -41,191 +246,23 @@
     {% if variants %}
     <table class="snapshot-table">
         <thead>
-            <tr><th>Variant</th><th>Hook</th><th>CTR</th><th>Spend</th></tr>
+            <tr><th>Variant</th><th>Hook</th><th>CPA</th><th>ROAS</th></tr>
         </thead>
         <tbody>
-            {% for v in variants[:5] %}
+            {% for v in variants|sort(attribute='cost_per_purchase')%}
+            {% if loop.index <= 5 %}
             <tr>
                 <td class="mono">{{ v.variant_code }}</td>
-                <td>{{ v.hook_rate|pct }}</td>
-                <td>{{ v.ctr|pct }}</td>
-                <td>{{ v.spend|currency }}</td>
+                <td>{% if v.hook_rate_pct is not none %}{{ v.hook_rate_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>
+                <td>{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
+                <td>{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
             </tr>
+            {% endif %}
             {% endfor %}
         </tbody>
     </table>
     {% endif %}
 </div>
-
-<!-- Section 1: Top-line metrics -->
-<section class="metric-cards">
-    <div class="mc">
-        <div class="mc-label">Impressions</div>
-        <div class="mc-value">{{ total_impressions|intcomma }}</div>
-    </div>
-    <div class="mc">
-        <div class="mc-label">Reach</div>
-        <div class="mc-value">{{ total_reach|intcomma }}</div>
-    </div>
-    <div class="mc">
-        <div class="mc-label">Spend</div>
-        <div class="mc-value">{{ total_spend|currency }}</div>
-    </div>
-    <div class="mc">
-        <div class="mc-label">Hook Rate (3s)</div>
-        <div class="mc-value">{{ avg_hook_rate|pct }}</div>
-    </div>
-    <div class="mc">
-        <div class="mc-label">Hold Rate (15s)</div>
-        <div class="mc-value">{{ avg_hold_rate|pct }}</div>
-    </div>
-    <div class="mc">
-        <div class="mc-label">CTR</div>
-        <div class="mc-value">{{ avg_ctr|pct }}</div>
-    </div>
-    <div class="mc">
-        <div class="mc-label">CPM</div>
-        <div class="mc-value">{{ avg_cpm|currency }}</div>
-    </div>
-    <div class="mc">
-        <div class="mc-label">Purchases</div>
-        <div class="mc-value">{{ total_purchases }}</div>
-    </div>
-    <div class="mc">
-        <div class="mc-label">ROAS</div>
-        <div class="mc-value">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</div>
-    </div>
-</section>
-
-<!-- Section 2: Creative quality — hook rate bars -->
-{% if variants %}
-<section class="section">
-    <h2>Creative quality</h2>
-    <div class="hook-rate-list">
-        {% for v in variants|sort(attribute='hook_rate', reverse=True) %}
-        <div class="hook-row {% if v.hook_rate|float < 0.25 %}low-hook{% endif %}">
-            <span class="variant-code">{{ v.variant_code }}</span>
-            <div class="bar-container">
-                <div class="bar" style="width: {{ [(v.hook_rate|float * 200)|int, 100]|min }}%"></div>
-            </div>
-            <span class="hook-value">{{ v.hook_rate|pct }}</span>
-            {% if v.hook_rate|float < 0.25 and v.impressions > 100 %}
-            <span class="flag">Low hook</span>
-            {% endif %}
-        </div>
-        {% endfor %}
-    </div>
-</section>
-{% endif %}
-
-<!-- Section 3: Funnel view -->
-{% if funnel_stages %}
-<section class="section">
-    <h2>Conversion funnel</h2>
-    {% set max_value = funnel_stages[0].value if funnel_stages else 1 %}
-    {% for stage in funnel_stages %}
-    <div class="funnel-stage">
-        <span class="funnel-name">{{ stage.stage_name }}</span>
-        <span class="funnel-value">{{ stage.value|intcomma }}</span>
-        <div class="funnel-bar-container">
-            <div class="funnel-bar" style="width: {{ (stage.value / max_value * 100)|int if max_value > 0 else 0 }}%"></div>
-        </div>
-        <span class="funnel-rate">{% if stage.rate %}{{ stage.rate|pct }}{% endif %}</span>
-        <span class="funnel-cost">{% if stage.cost_per %}{{ stage.cost_per|currency }}{% endif %}</span>
-    </div>
-    {% endfor %}
-</section>
-{% endif %}
-
-<!-- Section 4: Variant leaderboard -->
-{% if variants %}
-<section class="section">
-    <h2>Variant leaderboard</h2>
-    <p class="section-note">Sorted by best performance</p>
-    <table class="leaderboard">
-        <thead>
-            <tr>
-                <th>Variant</th>
-                <th>Status</th>
-                <th>Impr.</th>
-                <th>Hook</th>
-                <th>Hold</th>
-                <th>CTR</th>
-                <th>Spend</th>
-                {% if has_purchases %}<th>Purch.</th><th>ROAS</th>{% endif %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for v in variants %}
-            <tr>
-                <td class="mono">{{ v.variant_code }}</td>
-                <td><span class="status status-{{ v.status }}">{{ v.status }}</span></td>
-                <td class="mono">{{ v.impressions|intcomma }}</td>
-                <td class="mono">{{ v.hook_rate|pct }}</td>
-                <td class="mono">{{ v.hold_rate|pct }}</td>
-                <td class="mono">{{ v.ctr|pct }}</td>
-                <td class="mono">{{ v.spend|currency }}</td>
-                {% if has_purchases %}
-                <td class="mono">{{ v.purchases }}</td>
-                <td class="mono">{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}—{% endif %}</td>
-                {% endif %}
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</section>
-{% endif %}
-
-<!-- Section 5: Element insights -->
-{% if elements %}
-<section class="section">
-    <h2>Element insights</h2>
-    <div class="dual-ranking">
-        <div class="ranking-col">
-            <h3>Attention ranking</h3>
-            <p class="ranking-subtitle">By average hook rate</p>
-            {% for e in elements_by_hook[:8] %}
-            <div class="element-row">
-                <span class="rank">#{{ loop.index }}</span>
-                <span class="slot">{{ e.slot_name }}</span>
-                <span class="value-label" title="{{ e.slot_value }}">{{ e.slot_value|truncate(30) }}</span>
-                <span class="metric">{% if e.avg_hook_rate %}{{ e.avg_hook_rate|pct }}{% else %}—{% endif %}</span>
-            </div>
-            {% endfor %}
-        </div>
-        <div class="ranking-col">
-            <h3>Efficiency ranking</h3>
-            <p class="ranking-subtitle">By CTR</p>
-            {% for e in elements[:8] %}
-            <div class="element-row">
-                <span class="rank">#{{ loop.index }}</span>
-                <span class="slot">{{ e.slot_name }}</span>
-                <span class="value-label" title="{{ e.slot_value }}">{{ e.slot_value|truncate(30) }}</span>
-                <span class="metric">{{ e.avg_ctr|pct }}</span>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-</section>
-{% endif %}
-
-<!-- Section 6: Top interactions -->
-{% if interactions %}
-<section class="section">
-    <h2>Element interactions</h2>
-    {% for i in interactions[:5] %}
-    <div class="interaction-row">
-        <div class="interaction-pair">
-            <strong>{{ i.slot_a_name }}</strong>: {{ i.slot_a_value|truncate(25) }}
-            + <strong>{{ i.slot_b_name }}</strong>: {{ i.slot_b_value|truncate(25) }}
-        </div>
-        <span class="interaction-lift {% if i.interaction_lift and i.interaction_lift|float > 0 %}lift-positive{% else %}lift-negative{% endif %}">
-            {% if i.interaction_lift %}{{ i.interaction_lift|signpct }}{% else %}—{% endif %}
-        </span>
-    </div>
-    {% endfor %}
-</section>
-{% endif %}
 
 <!-- Share on X -->
 <section class="section share-section">
@@ -233,8 +270,8 @@
     <div class="tweet-preview" id="tweet-preview">{{ campaign_name }} — {{ report_date_fmt }}
 
 Spend: {{ total_spend|currency }}
-Hook Rate: {{ avg_hook_rate|pct }}
-CTR: {{ avg_ctr|pct }}
+Purchases: {{ total_purchases|intcomma }}
+CPA: {{ avg_cost_per_purchase|currency }}
 ROAS: {% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}
 
 Full report: {{ base_url }}/daily/{{ report_date }}.html</div>
@@ -242,13 +279,14 @@ Full report: {{ base_url }}/daily/{{ report_date }}.html</div>
     <span class="copy-feedback" id="copy-feedback"></span>
 </section>
 
+<!-- Section 8: Footer -->
 <footer class="report-footer">
     <p>Generated by Ad Creative Agent &middot; <a href="{{ base_url }}">View all reports</a></p>
 </footer>
 
 <script>
 function copyTweet() {
-    const text = document.getElementById('tweet-preview').textContent;
+    var text = document.getElementById('tweet-preview').textContent;
     navigator.clipboard.writeText(text).then(function() {
         var fb = document.getElementById('copy-feedback');
         fb.textContent = 'Copied!';

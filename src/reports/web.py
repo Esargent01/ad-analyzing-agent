@@ -10,7 +10,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from src.config import get_settings
-from src.models.reports import WeeklyReport
+from src.models.reports import DailyReport, WeeklyReport
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,58 @@ def _format_one_decimal(value: object) -> str:
 def _output_dir() -> Path:
     settings = get_settings()
     return Path(settings.report_output_dir)
+
+
+def render_daily_report_v2(report: DailyReport) -> Path:
+    """Render the redesigned daily report with best-ad spotlight.
+
+    Uses the new DailyReport model and daily_web.html template.
+    Returns the path to the generated file.
+    """
+    settings = get_settings()
+    env = _get_jinja_env()
+    template = env.get_template("daily_web.html")
+
+    html = template.render(
+        # Header
+        campaign_name=report.campaign_name,
+        report_date=report.report_date.isoformat(),
+        report_date_fmt=report.report_date.strftime("%B %d, %Y"),
+        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+        base_url=settings.report_base_url,
+        day_number=report.day_number,
+        cycle_number=report.cycle_number,
+        # Top-line cards
+        total_spend=report.total_spend,
+        total_purchases=report.total_purchases,
+        avg_cost_per_purchase=report.avg_cost_per_purchase,
+        avg_roas=report.avg_roas,
+        # Previous day for trends
+        prev_spend=report.prev_spend,
+        prev_purchases=report.prev_purchases,
+        prev_avg_cpa=report.prev_avg_cpa,
+        prev_avg_roas=report.prev_avg_roas,
+        # Best ad spotlight
+        best_variant=report.best_variant,
+        best_variant_funnel=report.best_variant_funnel,
+        best_variant_diagnostics=report.best_variant_diagnostics,
+        best_variant_projection=report.best_variant_projection,
+        # Variants table
+        variants=report.variants,
+        # Alerts and actions
+        fatigue_alerts=report.fatigue_alerts,
+        actions=report.actions,
+        next_cycle=report.next_cycle,
+        winners=report.winners,
+    )
+
+    out_dir = _output_dir() / "daily"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{report.report_date.isoformat()}.html"
+    out_path.write_text(html, encoding="utf-8")
+
+    logger.info("Daily web report (v2) written to %s", out_path)
+    return out_path
 
 
 def render_daily_report(report: WeeklyReport, campaign_name: str, report_date: date) -> Path:

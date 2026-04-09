@@ -11,6 +11,147 @@ from pydantic import BaseModel, ConfigDict
 from src.models.analysis import ElementInsight, InteractionInsight
 
 
+# ---------------------------------------------------------------------------
+# New daily-report models (v2)
+# ---------------------------------------------------------------------------
+
+
+class VariantReport(BaseModel):
+    """Per-variant data for the daily report."""
+
+    model_config = ConfigDict(strict=False)  # Allow float/Decimal flexibility
+
+    variant_id: UUID
+    variant_code: str
+    genome: dict[str, str]
+    genome_summary: str  # e.g., "urgency headline + green CTA"
+    hypothesis: str | None
+    status: str  # "winner", "steady", "new", "fatigue", "paused"
+    days_active: int
+
+    # Primary
+    spend: Decimal
+    purchases: int
+    purchase_value: Decimal
+    cost_per_purchase: float | None  # None if 0 purchases
+    roas: float | None
+
+    # Diagnostic
+    impressions: int
+    reach: int
+    video_views_3s: int
+    video_views_15s: int
+    link_clicks: int
+    landing_page_views: int
+    add_to_carts: int
+
+    # Computed rates (0-100 scale)
+    hook_rate_pct: float
+    hold_rate_pct: float
+    ctr_pct: float
+    atc_rate_pct: float  # add_to_carts / link_clicks * 100
+    checkout_rate_pct: float  # purchases / add_to_carts * 100
+    frequency: float
+
+
+class ReportFunnelStage(BaseModel):
+    """Single stage in the funnel visualization."""
+
+    model_config = ConfigDict(strict=False)
+
+    label: str
+    count: int
+    rate_pct: float  # rate from previous stage
+    rate_label: str  # e.g., "hook rate", "CTR"
+    dropoff_pct: float  # % lost between previous stage and this one
+    bar_color: str
+
+
+class Diagnostic(BaseModel):
+    """Single diagnostic observation."""
+
+    model_config = ConfigDict(strict=False)
+
+    text: str
+    severity: str  # "good", "warning", "bad"
+
+
+class FatigueAlert(BaseModel):
+    """Fatigue warning for a variant."""
+
+    model_config = ConfigDict(strict=False)
+
+    variant_code: str
+    reason: str
+    recommendation: str
+
+
+class ReportCycleAction(BaseModel):
+    """Action taken by the system this cycle (for report display)."""
+
+    model_config = ConfigDict(strict=False)
+
+    action_type: str  # launch, pause, increase_budget, etc.
+    variant_code: str
+    details: str | None
+
+
+class NextCyclePreview(BaseModel):
+    """Planned action for next cycle."""
+
+    model_config = ConfigDict(strict=False)
+
+    hypothesis: str
+    genome_summary: str
+
+
+class DailyReport(BaseModel):
+    """Complete daily report data for template rendering."""
+
+    model_config = ConfigDict(strict=False)
+
+    campaign_name: str
+    campaign_id: UUID
+    cycle_number: int
+    report_date: date
+    day_number: int  # day since campaign start
+
+    # Top-line aggregates
+    total_spend: Decimal
+    total_purchases: int
+    avg_cost_per_purchase: float | None
+    avg_roas: float | None
+    avg_hook_rate_pct: float
+
+    # Vs previous day
+    prev_spend: Decimal | None = None
+    prev_purchases: int | None = None
+    prev_avg_cpa: float | None = None
+    prev_avg_roas: float | None = None
+
+    # All active variants sorted by CPA
+    variants: list[VariantReport]
+
+    # Best ad (lowest CPA with >= 3 purchases)
+    best_variant: VariantReport | None = None
+    best_variant_funnel: list[ReportFunnelStage] = []
+    best_variant_diagnostics: list[Diagnostic] = []
+    best_variant_projection: str | None = None
+
+    # Alerts and actions
+    fatigue_alerts: list[FatigueAlert] = []
+    actions: list[ReportCycleAction] = []
+    next_cycle: list[NextCyclePreview] = []
+
+    # Winners declared this cycle
+    winners: list[VariantReport] = []
+
+
+# ---------------------------------------------------------------------------
+# Original models (kept for backward compatibility)
+# ---------------------------------------------------------------------------
+
+
 class VariantSummary(BaseModel):
     """Full-funnel variant summary used inside reports."""
 

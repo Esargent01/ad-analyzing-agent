@@ -1057,11 +1057,91 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
                 else:
                     click.echo("\nFailed to send email report. Check logs.")
 
-        # Generate static HTML report
-        from src.reports.web import render_daily_report as render_daily_html, render_index
+        # Generate v2 report with best-ad spotlight
+        from src.reports.web import render_index
 
-        html_path = render_daily_html(report, campaign_name, report_day)
-        click.echo(f"\nWeb report: {html_path}")
+        try:
+            from src.models.reports import DailyReport, VariantReport
+            from src.reports.builder import (
+                build_diagnostics,
+                build_funnel,
+                build_projection,
+                select_best_variant,
+            )
+            from src.reports.web import render_daily_report_v2
+
+            def _to_variant_report(vs: VariantSummary) -> VariantReport:
+                """Convert a legacy VariantSummary to the new VariantReport."""
+                imps = vs.impressions
+                vv3s = vs.video_views_3s
+                vv15s = vs.video_views_15s
+                lc = vs.link_clicks
+                atc = vs.add_to_carts
+                purch = vs.purchases
+                hr_pct = (vv3s / imps * 100) if imps > 0 else 0.0
+                hold_pct = (vv15s / vv3s * 100) if vv3s > 0 else 0.0
+                ctr_pct = (lc / imps * 100) if imps > 0 else 0.0
+                atc_pct = (atc / lc * 100) if lc > 0 else 0.0
+                checkout_pct = (purch / atc * 100) if atc > 0 else 0.0
+                freq = (imps / vs.reach) if vs.reach > 0 else 0.0
+                cpp = float(vs.cost_per_purchase) if vs.cost_per_purchase else None
+                roas_v = float(vs.roas) if vs.roas else None
+
+                return VariantReport(
+                    variant_id=vs.variant_id,
+                    variant_code=vs.variant_code,
+                    genome={},
+                    genome_summary=vs.variant_code,
+                    hypothesis=None,
+                    status=vs.status,
+                    days_active=1,
+                    spend=vs.spend,
+                    purchases=purch,
+                    purchase_value=vs.purchase_value,
+                    cost_per_purchase=cpp,
+                    roas=roas_v,
+                    impressions=imps,
+                    reach=vs.reach,
+                    video_views_3s=vv3s,
+                    video_views_15s=vv15s,
+                    link_clicks=lc,
+                    landing_page_views=vs.landing_page_views,
+                    add_to_carts=atc,
+                    hook_rate_pct=hr_pct,
+                    hold_rate_pct=hold_pct,
+                    ctr_pct=ctr_pct,
+                    atc_rate_pct=atc_pct,
+                    checkout_rate_pct=checkout_pct,
+                    frequency=freq,
+                )
+
+            v2_variants = [_to_variant_report(vs) for vs in all_variants]
+            best_v2 = select_best_variant(v2_variants)
+
+            v2_report = DailyReport(
+                campaign_name=campaign_name,
+                campaign_id=UUID(campaign_id),
+                cycle_number=len(cycles),
+                report_date=report_day,
+                day_number=1,
+                total_spend=total_spend,
+                total_purchases=total_purchases,
+                avg_cost_per_purchase=float(avg_cost_per_purchase) if avg_cost_per_purchase else None,
+                avg_roas=float(avg_roas) if avg_roas else None,
+                avg_hook_rate_pct=float(avg_hook_rate) * 100 if avg_hook_rate else 0.0,
+                variants=sorted(v2_variants, key=lambda v: (v.cost_per_purchase or 9999, -(v.roas or 0))),
+                best_variant=best_v2,
+                best_variant_funnel=build_funnel(best_v2) if best_v2 else [],
+                best_variant_diagnostics=build_diagnostics(best_v2) if best_v2 else [],
+                best_variant_projection=build_projection(best_v2) if best_v2 else None,
+            )
+
+            v2_path = render_daily_report_v2(v2_report)
+            click.echo(f"\nWeb report: {v2_path}")
+        except Exception as exc:
+            import traceback
+            click.echo(f"\nWarning: v2 report generation failed: {exc}")
+            traceback.print_exc()
 
         # Update index with all existing reports
         from pathlib import Path as _Path
