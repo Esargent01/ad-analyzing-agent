@@ -1,0 +1,27 @@
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+
+# Generated from openapi.json — treat as build output
+src/lib/api/types.generated.ts
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Test
+coverage

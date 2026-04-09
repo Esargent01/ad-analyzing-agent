@@ -1,0 +1,127 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens ported from `src/reports/templates/components/base.html`.
+ * Keeping the source of truth in sync ensures the dashboard matches the
+ * Jinja-rendered weekly/daily reports and emails.
+ */
+:root {
+  --bg: #ffffff;
+  --bg-secondary: #f7f7f8;
+  --text: #1a1a1a;
+  --text-secondary: #6b6b6b;
+  --text-tertiary: #999999;
+  --border: #e5e5e5;
+  --accent: #534ab7;
+  --green: #1d9e75;
+  --red: #d85a30;
+  --amber: #ba7517;
+  --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Cascadia Code", monospace;
+  --radius: 8px;
+  --radius-lg: 12px;
+
+  /* Status pill palettes (light mode) */
+  --pill-winner-bg: #eaf3de;
+  --pill-winner-fg: #27500a;
+  --pill-steady-bg: #e6f1fb;
+  --pill-steady-fg: #0c447c;
+  --pill-new-bg: #eeedfe;
+  --pill-new-fg: #3c3489;
+  --pill-fatigue-bg: #faeeda;
+  --pill-fatigue-fg: #633806;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161616;
+    --bg-secondary: #222222;
+    --text: #e5e5e5;
+    --text-secondary: #999999;
+    --text-tertiary: #666666;
+    --border: #333333;
+
+    --pill-winner-bg: #173404;
+    --pill-winner-fg: #c0dd97;
+    --pill-steady-bg: #0a2440;
+    --pill-steady-fg: #a7cff4;
+    --pill-new-bg: #1c1a3c;
+    --pill-new-fg: #b6b1eb;
+    --pill-fatigue-bg: #3a240a;
+    --pill-fatigue-fg: #e8c590;
+  }
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-stack);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    font-size: 16px;
+    line-height: 1.6;
+  }
+
+  h1 {
+    font-size: 20px;
+    font-weight: 500;
+  }
+  h2 {
+    font-size: 15px;
+    font-weight: 500;
+  }
+  h3 {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+  a:hover {
+    text-decoration: underline;
+  }
+}
+
+@layer components {
+  .label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-tertiary);
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .status-winner {
+    background: var(--pill-winner-bg);
+    color: var(--pill-winner-fg);
+  }
+  .status-steady {
+    background: var(--pill-steady-bg);
+    color: var(--pill-steady-fg);
+  }
+  .status-new {
+    background: var(--pill-new-bg);
+    color: var(--pill-new-fg);
+  }
+  .status-fatigue,
+  .status-paused {
+    background: var(--pill-fatigue-bg);
+    color: var(--pill-fatigue-fg);
+  }
+}

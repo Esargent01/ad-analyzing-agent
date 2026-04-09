@@ -1,0 +1,3000 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Ad Creative Agent Dashboard",
+    "description": "Read-only monitoring dashboard + authenticated JSON API",
+    "version": "0.1.0"
+  },
+  "paths": {
+    "/": {
+      "get": {
+        "summary": "Dashboard Index",
+        "description": "Main dashboard page.",
+        "operationId": "dashboard_index__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/campaign/{campaign_id}": {
+      "get": {
+        "summary": "Campaign Detail",
+        "description": "Campaign detail page.",
+        "operationId": "campaign_detail_campaign__campaign_id__get",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Campaign Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns": {
+      "get": {
+        "summary": "Api Campaigns",
+        "description": "List all active campaigns.",
+        "operationId": "api_campaigns_api_campaigns_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Api Campaigns Api Campaigns Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/variants": {
+      "get": {
+        "summary": "Api Variants",
+        "description": "List active variants for a campaign.",
+        "operationId": "api_variants_api_campaigns__campaign_id__variants_get",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Campaign Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Api Variants Api Campaigns  Campaign Id  Variants Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/elements": {
+      "get": {
+        "summary": "Api Elements",
+        "description": "Element performance rankings for a campaign.",
+        "operationId": "api_elements_api_campaigns__campaign_id__elements_get",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Campaign Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Api Elements Api Campaigns  Campaign Id  Elements Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/interactions": {
+      "get": {
+        "summary": "Api Interactions",
+        "description": "Top element interactions for a campaign.",
+        "operationId": "api_interactions_api_campaigns__campaign_id__interactions_get",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Campaign Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Api Interactions Api Campaigns  Campaign Id  Interactions Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/cycles": {
+      "get": {
+        "summary": "Api Cycles",
+        "description": "Recent optimization cycles for a campaign.",
+        "operationId": "api_cycles_api_campaigns__campaign_id__cycles_get",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Campaign Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Api Cycles Api Campaigns  Campaign Id  Cycles Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gene-pool": {
+      "get": {
+        "summary": "Api Gene Pool",
+        "description": "Gene pool entries, optionally filtered by slot.",
+        "operationId": "api_gene_pool_api_gene_pool_get",
+        "parameters": [
+          {
+            "name": "slot",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Slot"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Api Gene Pool Api Gene Pool Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/approvals": {
+      "get": {
+        "summary": "Api Approvals",
+        "description": "Pending approval queue items.",
+        "operationId": "api_approvals_api_approvals_get",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Campaign Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": true
+                  },
+                  "title": "Response Api Approvals Api Approvals Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/review/{token}": {
+      "get": {
+        "summary": "Review Page",
+        "description": "No-login review page for weekly proposed variants.\n\nVerifies the HMAC-signed token, loads pending proposals and the gene\npool, and renders the review UI.",
+        "operationId": "review_page_review__token__get",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/approvals/{approval_id}/approve": {
+      "post": {
+        "summary": "Api Approve",
+        "description": "Approve a pending variant. Verified by the review token.",
+        "operationId": "api_approve_api_approvals__approval_id__approve_post",
+        "parameters": [
+          {
+            "name": "approval_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Approval Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_api_approve_api_approvals__approval_id__approve_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/approvals/{approval_id}/reject": {
+      "post": {
+        "summary": "Api Reject",
+        "description": "Reject a pending variant. Verified by the review token.",
+        "operationId": "api_reject_api_approvals__approval_id__reject_post",
+        "parameters": [
+          {
+            "name": "approval_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Approval Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_api_reject_api_approvals__approval_id__reject_post"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/gene-pool/suggest": {
+      "post": {
+        "summary": "Api Suggest Gene Pool",
+        "description": "Accept a user creative suggestion and add it to the gene pool.\n\nSuggestions go in as active (user is a trusted authority on their\nown brand) with source='user_suggestion'. The next weekly generation\npass will pick them up automatically.",
+        "operationId": "api_suggest_gene_pool_api_gene_pool_suggest_post",
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_api_suggest_gene_pool_api_gene_pool_suggest_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/magic-link": {
+      "post": {
+        "summary": "Api Magic Link",
+        "description": "Email a sign-in link to ``body.email``.\n\nAlways returns 204 whether the email exists or not \u2014 this prevents\nuser enumeration. Dev mode logs the link to stdout instead of\nsending (see ``src/reports/auth_email.py``).",
+        "operationId": "api_magic_link_api_auth_magic_link_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MagicLinkRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/verify": {
+      "get": {
+        "summary": "Api Auth Verify",
+        "description": "Consume a magic-link token and redirect to the frontend dashboard.\n\nOn success sets the ``session_token`` + ``csrf_token`` cookies and\n302-redirects to ``<frontend_base_url>/dashboard``. On failure\nredirects to ``<frontend_base_url>/sign-in?error=invalid_link``.",
+        "operationId": "api_auth_verify_api_auth_verify_get",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Api Logout",
+        "description": "Clear the session + CSRF cookies. Requires a valid session.",
+        "operationId": "api_logout_api_auth_logout_post",
+        "parameters": [
+          {
+            "name": "x-csrf-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "csrf_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Csrf Token"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/me": {
+      "get": {
+        "summary": "Api Me",
+        "description": "Return the current user and the campaigns they can access.",
+        "operationId": "api_me_api_me_get",
+        "parameters": [
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/reports/daily": {
+      "get": {
+        "summary": "Api Daily Dates",
+        "description": "Return the list of dates that have a daily report available.\n\nA \"day with data\" is any day that has at least one metric row for a\nvariant in this campaign. We expose dates newest-first so the\nfrontend can render them as a sidebar list.",
+        "operationId": "api_daily_dates_api_campaigns__campaign_id__reports_daily_get",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyDatesResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/reports/daily/{report_date}": {
+      "get": {
+        "summary": "Api Daily Report",
+        "description": "Return a full daily report for ``report_date``.",
+        "operationId": "api_daily_report_api_campaigns__campaign_id__reports_daily__report_date__get",
+        "parameters": [
+          {
+            "name": "report_date",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Report Date"
+            }
+          },
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DailyReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/reports/weekly": {
+      "get": {
+        "summary": "Api Weekly Index",
+        "description": "Return all ISO weeks (Mon\u2013Sun) that have metric data for this campaign.",
+        "operationId": "api_weekly_index_api_campaigns__campaign_id__reports_weekly_get",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyIndexResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/reports/weekly/{week_start}": {
+      "get": {
+        "summary": "Api Weekly Report",
+        "description": "Return a full weekly report starting on ``week_start``.\n\n``week_start`` must be a Monday. We do not enforce it here \u2014 the\nservice just computes the Mon\u2013Sun window from the provided date.",
+        "operationId": "api_weekly_report_api_campaigns__campaign_id__reports_weekly__week_start__get",
+        "parameters": [
+          {
+            "name": "week_start",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date",
+              "title": "Week Start"
+            }
+          },
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyReport"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/experiments": {
+      "get": {
+        "summary": "Api Experiments",
+        "description": "Return pending proposals + the gene pool + allowed suggestion slots.",
+        "operationId": "api_experiments_api_campaigns__campaign_id__experiments_get",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExperimentsResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/experiments/{approval_id}/approve": {
+      "post": {
+        "summary": "Api Experiment Approve",
+        "description": "Approve a pending proposal for this campaign.",
+        "operationId": "api_experiment_approve_api_campaigns__campaign_id__experiments__approval_id__approve_post",
+        "parameters": [
+          {
+            "name": "approval_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Approval Id"
+            }
+          },
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "x-csrf-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "csrf_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Csrf Token"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApproveResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/experiments/{approval_id}/reject": {
+      "post": {
+        "summary": "Api Experiment Reject",
+        "description": "Reject a pending proposal for this campaign.",
+        "operationId": "api_experiment_reject_api_campaigns__campaign_id__experiments__approval_id__reject_post",
+        "parameters": [
+          {
+            "name": "approval_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Approval Id"
+            }
+          },
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "x-csrf-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "csrf_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Csrf Token"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RejectRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApproveResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/campaigns/{campaign_id}/experiments/suggest": {
+      "post": {
+        "summary": "Api Experiment Suggest",
+        "description": "Add a user-suggested creative element to the gene pool.",
+        "operationId": "api_experiment_suggest_api_campaigns__campaign_id__experiments_suggest_post",
+        "parameters": [
+          {
+            "name": "campaign_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid",
+              "title": "Campaign Id"
+            }
+          },
+          {
+            "name": "x-csrf-token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Csrf-Token"
+            }
+          },
+          {
+            "name": "csrf_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Csrf Token"
+            }
+          },
+          {
+            "name": "session_token",
+            "in": "cookie",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session Token"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SuggestRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuggestResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApproveResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Approval Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "approval_id"
+        ],
+        "title": "ApproveResponse"
+      },
+      "Body_api_approve_api_approvals__approval_id__approve_post": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "Body_api_approve_api_approvals__approval_id__approve_post"
+      },
+      "Body_api_reject_api_approvals__approval_id__reject_post": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": "user_rejected"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "Body_api_reject_api_approvals__approval_id__reject_post"
+      },
+      "Body_api_suggest_gene_pool_api_gene_pool_suggest_post": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          },
+          "slot_name": {
+            "type": "string",
+            "title": "Slot Name"
+          },
+          "slot_value": {
+            "type": "string",
+            "title": "Slot Value"
+          },
+          "description": {
+            "type": "string",
+            "title": "Description",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "token",
+          "slot_name",
+          "slot_value"
+        ],
+        "title": "Body_api_suggest_gene_pool_api_gene_pool_suggest_post"
+      },
+      "DailyDatesResponse": {
+        "properties": {
+          "dates": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Dates"
+          }
+        },
+        "type": "object",
+        "required": [
+          "dates"
+        ],
+        "title": "DailyDatesResponse"
+      },
+      "DailyReport": {
+        "properties": {
+          "campaign_name": {
+            "type": "string",
+            "title": "Campaign Name"
+          },
+          "campaign_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Campaign Id"
+          },
+          "cycle_number": {
+            "type": "integer",
+            "title": "Cycle Number"
+          },
+          "report_date": {
+            "type": "string",
+            "format": "date",
+            "title": "Report Date"
+          },
+          "day_number": {
+            "type": "integer",
+            "title": "Day Number"
+          },
+          "total_spend": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Spend"
+          },
+          "total_purchases": {
+            "type": "integer",
+            "title": "Total Purchases"
+          },
+          "avg_cost_per_purchase": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cost Per Purchase"
+          },
+          "avg_roas": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Roas"
+          },
+          "avg_hook_rate_pct": {
+            "type": "number",
+            "title": "Avg Hook Rate Pct"
+          },
+          "prev_spend": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Spend"
+          },
+          "prev_purchases": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Purchases"
+          },
+          "prev_avg_cpa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Avg Cpa"
+          },
+          "prev_avg_roas": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Avg Roas"
+          },
+          "variants": {
+            "items": {
+              "$ref": "#/components/schemas/VariantReport"
+            },
+            "type": "array",
+            "title": "Variants"
+          },
+          "best_variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VariantReport"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "best_variant_funnel": {
+            "items": {
+              "$ref": "#/components/schemas/ReportFunnelStage"
+            },
+            "type": "array",
+            "title": "Best Variant Funnel",
+            "default": []
+          },
+          "best_variant_diagnostics": {
+            "items": {
+              "$ref": "#/components/schemas/Diagnostic"
+            },
+            "type": "array",
+            "title": "Best Variant Diagnostics",
+            "default": []
+          },
+          "best_variant_projection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Variant Projection"
+          },
+          "fatigue_alerts": {
+            "items": {
+              "$ref": "#/components/schemas/FatigueAlert"
+            },
+            "type": "array",
+            "title": "Fatigue Alerts",
+            "default": []
+          },
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ReportCycleAction"
+            },
+            "type": "array",
+            "title": "Actions",
+            "default": []
+          },
+          "next_cycle": {
+            "items": {
+              "$ref": "#/components/schemas/NextCyclePreview"
+            },
+            "type": "array",
+            "title": "Next Cycle",
+            "default": []
+          },
+          "winners": {
+            "items": {
+              "$ref": "#/components/schemas/VariantReport"
+            },
+            "type": "array",
+            "title": "Winners",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "campaign_name",
+          "campaign_id",
+          "cycle_number",
+          "report_date",
+          "day_number",
+          "total_spend",
+          "total_purchases",
+          "avg_cost_per_purchase",
+          "avg_roas",
+          "avg_hook_rate_pct",
+          "variants"
+        ],
+        "title": "DailyReport",
+        "description": "Complete daily report data for template rendering."
+      },
+      "Diagnostic": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "severity": {
+            "type": "string",
+            "title": "Severity"
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "severity"
+        ],
+        "title": "Diagnostic",
+        "description": "Single diagnostic observation."
+      },
+      "ElementInsight": {
+        "properties": {
+          "slot_name": {
+            "type": "string",
+            "title": "Slot Name"
+          },
+          "slot_value": {
+            "type": "string",
+            "title": "Slot Value"
+          },
+          "variants_tested": {
+            "type": "integer",
+            "title": "Variants Tested"
+          },
+          "avg_ctr": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Avg Ctr"
+          },
+          "avg_cpa": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cpa"
+          },
+          "best_ctr": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Ctr"
+          },
+          "worst_ctr": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Worst Ctr"
+          },
+          "total_impressions": {
+            "type": "integer",
+            "title": "Total Impressions"
+          },
+          "total_conversions": {
+            "type": "integer",
+            "title": "Total Conversions"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          },
+          "avg_hook_rate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Hook Rate"
+          },
+          "avg_roas": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Roas"
+          },
+          "best_hook_rate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Hook Rate"
+          },
+          "best_cpa": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Cpa"
+          },
+          "total_purchases": {
+            "type": "integer",
+            "title": "Total Purchases",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "slot_name",
+          "slot_value",
+          "variants_tested",
+          "avg_ctr",
+          "avg_cpa",
+          "best_ctr",
+          "worst_ctr",
+          "total_impressions",
+          "total_conversions",
+          "confidence"
+        ],
+        "title": "ElementInsight",
+        "description": "Performance summary for a single gene pool element."
+      },
+      "ExperimentsResponse": {
+        "properties": {
+          "proposed_variants": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedVariant"
+            },
+            "type": "array",
+            "title": "Proposed Variants"
+          },
+          "gene_pool_by_slot": {
+            "additionalProperties": {
+              "items": {
+                "$ref": "#/components/schemas/GenePoolEntryOut"
+              },
+              "type": "array"
+            },
+            "type": "object",
+            "title": "Gene Pool By Slot"
+          },
+          "allowed_suggestion_slots": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Allowed Suggestion Slots"
+          }
+        },
+        "type": "object",
+        "required": [
+          "proposed_variants",
+          "gene_pool_by_slot",
+          "allowed_suggestion_slots"
+        ],
+        "title": "ExperimentsResponse"
+      },
+      "FatigueAlert": {
+        "properties": {
+          "variant_code": {
+            "type": "string",
+            "title": "Variant Code"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "recommendation": {
+            "type": "string",
+            "title": "Recommendation"
+          }
+        },
+        "type": "object",
+        "required": [
+          "variant_code",
+          "reason",
+          "recommendation"
+        ],
+        "title": "FatigueAlert",
+        "description": "Fatigue warning for a variant."
+      },
+      "FunnelStage": {
+        "properties": {
+          "stage_name": {
+            "type": "string",
+            "title": "Stage Name"
+          },
+          "value": {
+            "type": "integer",
+            "title": "Value"
+          },
+          "rate": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rate"
+          },
+          "cost_per": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stage_name",
+          "value"
+        ],
+        "title": "FunnelStage",
+        "description": "A single stage in the funnel comparison."
+      },
+      "GenePoolEntryOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "slot_name": {
+            "type": "string",
+            "title": "Slot Name"
+          },
+          "slot_value": {
+            "type": "string",
+            "title": "Slot Value"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "slot_name",
+          "slot_value",
+          "description",
+          "source"
+        ],
+        "title": "GenePoolEntryOut"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "InteractionInsight": {
+        "properties": {
+          "slot_a_name": {
+            "type": "string",
+            "title": "Slot A Name"
+          },
+          "slot_a_value": {
+            "type": "string",
+            "title": "Slot A Value"
+          },
+          "slot_b_name": {
+            "type": "string",
+            "title": "Slot B Name"
+          },
+          "slot_b_value": {
+            "type": "string",
+            "title": "Slot B Value"
+          },
+          "variants_tested": {
+            "type": "integer",
+            "title": "Variants Tested"
+          },
+          "combined_avg_ctr": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Combined Avg Ctr"
+          },
+          "solo_a_avg_ctr": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solo A Avg Ctr"
+          },
+          "solo_b_avg_ctr": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Solo B Avg Ctr"
+          },
+          "interaction_lift": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interaction Lift"
+          },
+          "confidence": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Confidence"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slot_a_name",
+          "slot_a_value",
+          "slot_b_name",
+          "slot_b_value",
+          "variants_tested",
+          "combined_avg_ctr",
+          "solo_a_avg_ctr",
+          "solo_b_avg_ctr",
+          "interaction_lift",
+          "confidence"
+        ],
+        "title": "InteractionInsight",
+        "description": "Performance summary for a pair of gene pool elements."
+      },
+      "MagicLinkRequest": {
+        "properties": {
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "email"
+        ],
+        "title": "MagicLinkRequest"
+      },
+      "MeResponse": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          },
+          "campaigns": {
+            "items": {
+              "$ref": "#/components/schemas/UserCampaignOut"
+            },
+            "type": "array",
+            "title": "Campaigns"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "email",
+          "campaigns"
+        ],
+        "title": "MeResponse"
+      },
+      "NextCyclePreview": {
+        "properties": {
+          "hypothesis": {
+            "type": "string",
+            "title": "Hypothesis"
+          },
+          "genome_summary": {
+            "type": "string",
+            "title": "Genome Summary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "hypothesis",
+          "genome_summary"
+        ],
+        "title": "NextCyclePreview",
+        "description": "Planned action for next cycle."
+      },
+      "ProposedVariant": {
+        "properties": {
+          "approval_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Approval Id"
+          },
+          "variant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Variant Id"
+          },
+          "variant_code": {
+            "type": "string",
+            "title": "Variant Code"
+          },
+          "genome": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Genome"
+          },
+          "genome_summary": {
+            "type": "string",
+            "title": "Genome Summary"
+          },
+          "hypothesis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypothesis"
+          },
+          "submitted_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Submitted At"
+          },
+          "classification": {
+            "type": "string",
+            "title": "Classification"
+          },
+          "days_until_expiry": {
+            "type": "integer",
+            "title": "Days Until Expiry"
+          }
+        },
+        "type": "object",
+        "required": [
+          "approval_id",
+          "variant_id",
+          "variant_code",
+          "genome",
+          "genome_summary",
+          "hypothesis",
+          "submitted_at",
+          "classification",
+          "days_until_expiry"
+        ],
+        "title": "ProposedVariant",
+        "description": "A variant queued for user approval, shown in the weekly report."
+      },
+      "RejectRequest": {
+        "properties": {
+          "reason": {
+            "type": "string",
+            "title": "Reason",
+            "default": "user_rejected"
+          }
+        },
+        "type": "object",
+        "title": "RejectRequest"
+      },
+      "ReportCycleAction": {
+        "properties": {
+          "action_type": {
+            "type": "string",
+            "title": "Action Type"
+          },
+          "variant_code": {
+            "type": "string",
+            "title": "Variant Code"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Details"
+          }
+        },
+        "type": "object",
+        "required": [
+          "action_type",
+          "variant_code",
+          "details"
+        ],
+        "title": "ReportCycleAction",
+        "description": "Action taken by the system this cycle (for report display)."
+      },
+      "ReportFunnelStage": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count"
+          },
+          "rate_pct": {
+            "type": "number",
+            "title": "Rate Pct"
+          },
+          "rate_label": {
+            "type": "string",
+            "title": "Rate Label"
+          },
+          "dropoff_pct": {
+            "type": "number",
+            "title": "Dropoff Pct"
+          },
+          "bar_color": {
+            "type": "string",
+            "title": "Bar Color"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "count",
+          "rate_pct",
+          "rate_label",
+          "dropoff_pct",
+          "bar_color"
+        ],
+        "title": "ReportFunnelStage",
+        "description": "Single stage in the funnel visualization."
+      },
+      "SuggestRequest": {
+        "properties": {
+          "slot_name": {
+            "type": "string",
+            "title": "Slot Name"
+          },
+          "slot_value": {
+            "type": "string",
+            "title": "Slot Value"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          }
+        },
+        "type": "object",
+        "required": [
+          "slot_name",
+          "slot_value"
+        ],
+        "title": "SuggestRequest"
+      },
+      "SuggestResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "slot_name": {
+            "type": "string",
+            "title": "Slot Name"
+          },
+          "slot_value": {
+            "type": "string",
+            "title": "Slot Value"
+          }
+        },
+        "type": "object",
+        "required": [
+          "status",
+          "slot_name",
+          "slot_value"
+        ],
+        "title": "SuggestResponse"
+      },
+      "UserCampaignOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "is_active": {
+            "type": "boolean",
+            "title": "Is Active"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "name",
+          "is_active"
+        ],
+        "title": "UserCampaignOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "VariantReport": {
+        "properties": {
+          "variant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Variant Id"
+          },
+          "variant_code": {
+            "type": "string",
+            "title": "Variant Code"
+          },
+          "genome": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Genome"
+          },
+          "genome_summary": {
+            "type": "string",
+            "title": "Genome Summary"
+          },
+          "hypothesis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hypothesis"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "days_active": {
+            "type": "integer",
+            "title": "Days Active"
+          },
+          "spend": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Spend"
+          },
+          "purchases": {
+            "type": "integer",
+            "title": "Purchases"
+          },
+          "purchase_value": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Purchase Value"
+          },
+          "cost_per_purchase": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Purchase"
+          },
+          "roas": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roas"
+          },
+          "impressions": {
+            "type": "integer",
+            "title": "Impressions"
+          },
+          "reach": {
+            "type": "integer",
+            "title": "Reach"
+          },
+          "video_views_3s": {
+            "type": "integer",
+            "title": "Video Views 3S"
+          },
+          "video_views_15s": {
+            "type": "integer",
+            "title": "Video Views 15S"
+          },
+          "link_clicks": {
+            "type": "integer",
+            "title": "Link Clicks"
+          },
+          "landing_page_views": {
+            "type": "integer",
+            "title": "Landing Page Views"
+          },
+          "add_to_carts": {
+            "type": "integer",
+            "title": "Add To Carts"
+          },
+          "hook_rate_pct": {
+            "type": "number",
+            "title": "Hook Rate Pct"
+          },
+          "hold_rate_pct": {
+            "type": "number",
+            "title": "Hold Rate Pct"
+          },
+          "ctr_pct": {
+            "type": "number",
+            "title": "Ctr Pct"
+          },
+          "atc_rate_pct": {
+            "type": "number",
+            "title": "Atc Rate Pct"
+          },
+          "checkout_rate_pct": {
+            "type": "number",
+            "title": "Checkout Rate Pct"
+          },
+          "frequency": {
+            "type": "number",
+            "title": "Frequency"
+          }
+        },
+        "type": "object",
+        "required": [
+          "variant_id",
+          "variant_code",
+          "genome",
+          "genome_summary",
+          "hypothesis",
+          "status",
+          "days_active",
+          "spend",
+          "purchases",
+          "purchase_value",
+          "cost_per_purchase",
+          "roas",
+          "impressions",
+          "reach",
+          "video_views_3s",
+          "video_views_15s",
+          "link_clicks",
+          "landing_page_views",
+          "add_to_carts",
+          "hook_rate_pct",
+          "hold_rate_pct",
+          "ctr_pct",
+          "atc_rate_pct",
+          "checkout_rate_pct",
+          "frequency"
+        ],
+        "title": "VariantReport",
+        "description": "Per-variant data for the daily report."
+      },
+      "VariantSummary": {
+        "properties": {
+          "variant_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Variant Id"
+          },
+          "variant_code": {
+            "type": "string",
+            "title": "Variant Code"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "impressions": {
+            "type": "integer",
+            "title": "Impressions"
+          },
+          "clicks": {
+            "type": "integer",
+            "title": "Clicks"
+          },
+          "conversions": {
+            "type": "integer",
+            "title": "Conversions"
+          },
+          "spend": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Spend"
+          },
+          "ctr": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Ctr"
+          },
+          "cpa": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpa"
+          },
+          "reach": {
+            "type": "integer",
+            "title": "Reach",
+            "default": 0
+          },
+          "video_views_3s": {
+            "type": "integer",
+            "title": "Video Views 3S",
+            "default": 0
+          },
+          "video_views_15s": {
+            "type": "integer",
+            "title": "Video Views 15S",
+            "default": 0
+          },
+          "thruplays": {
+            "type": "integer",
+            "title": "Thruplays",
+            "default": 0
+          },
+          "link_clicks": {
+            "type": "integer",
+            "title": "Link Clicks",
+            "default": 0
+          },
+          "landing_page_views": {
+            "type": "integer",
+            "title": "Landing Page Views",
+            "default": 0
+          },
+          "add_to_carts": {
+            "type": "integer",
+            "title": "Add To Carts",
+            "default": 0
+          },
+          "purchases": {
+            "type": "integer",
+            "title": "Purchases",
+            "default": 0
+          },
+          "purchase_value": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Purchase Value",
+            "default": "0"
+          },
+          "hook_rate": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Hook Rate",
+            "default": "0"
+          },
+          "hold_rate": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Hold Rate",
+            "default": "0"
+          },
+          "cost_per_purchase": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Purchase"
+          },
+          "roas": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "variant_id",
+          "variant_code",
+          "status",
+          "impressions",
+          "clicks",
+          "conversions",
+          "spend",
+          "ctr",
+          "cpa"
+        ],
+        "title": "VariantSummary",
+        "description": "Full-funnel variant summary used inside reports."
+      },
+      "WeekDescriptor": {
+        "properties": {
+          "week_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Week Start"
+          },
+          "week_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Week End"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "week_end",
+          "label"
+        ],
+        "title": "WeekDescriptor"
+      },
+      "WeeklyIndexResponse": {
+        "properties": {
+          "weeks": {
+            "items": {
+              "$ref": "#/components/schemas/WeekDescriptor"
+            },
+            "type": "array",
+            "title": "Weeks"
+          }
+        },
+        "type": "object",
+        "required": [
+          "weeks"
+        ],
+        "title": "WeeklyIndexResponse"
+      },
+      "WeeklyReport": {
+        "properties": {
+          "campaign_id": {
+            "type": "string",
+            "format": "uuid",
+            "title": "Campaign Id"
+          },
+          "campaign_name": {
+            "type": "string",
+            "title": "Campaign Name"
+          },
+          "week_start": {
+            "type": "string",
+            "format": "date",
+            "title": "Week Start"
+          },
+          "week_end": {
+            "type": "string",
+            "format": "date",
+            "title": "Week End"
+          },
+          "total_spend": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Spend"
+          },
+          "total_impressions": {
+            "type": "integer",
+            "title": "Total Impressions"
+          },
+          "total_clicks": {
+            "type": "integer",
+            "title": "Total Clicks"
+          },
+          "total_conversions": {
+            "type": "integer",
+            "title": "Total Conversions"
+          },
+          "avg_ctr": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Avg Ctr"
+          },
+          "avg_cpa": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cpa"
+          },
+          "total_reach": {
+            "type": "integer",
+            "title": "Total Reach",
+            "default": 0
+          },
+          "total_video_views_3s": {
+            "type": "integer",
+            "title": "Total Video Views 3S",
+            "default": 0
+          },
+          "total_video_views_15s": {
+            "type": "integer",
+            "title": "Total Video Views 15S",
+            "default": 0
+          },
+          "total_thruplays": {
+            "type": "integer",
+            "title": "Total Thruplays",
+            "default": 0
+          },
+          "total_link_clicks": {
+            "type": "integer",
+            "title": "Total Link Clicks",
+            "default": 0
+          },
+          "total_landing_page_views": {
+            "type": "integer",
+            "title": "Total Landing Page Views",
+            "default": 0
+          },
+          "total_add_to_carts": {
+            "type": "integer",
+            "title": "Total Add To Carts",
+            "default": 0
+          },
+          "total_purchases": {
+            "type": "integer",
+            "title": "Total Purchases",
+            "default": 0
+          },
+          "total_purchase_value": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Total Purchase Value",
+            "default": "0"
+          },
+          "avg_hook_rate": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Avg Hook Rate",
+            "default": "0"
+          },
+          "avg_hold_rate": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Avg Hold Rate",
+            "default": "0"
+          },
+          "avg_cpm": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Avg Cpm",
+            "default": "0"
+          },
+          "avg_frequency": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Avg Frequency",
+            "default": "0"
+          },
+          "avg_roas": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Roas"
+          },
+          "avg_cost_per_purchase": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cost Per Purchase"
+          },
+          "funnel_stages": {
+            "items": {
+              "$ref": "#/components/schemas/FunnelStage"
+            },
+            "type": "array",
+            "title": "Funnel Stages",
+            "default": []
+          },
+          "best_variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VariantSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "worst_variant": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VariantSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "all_variants": {
+            "items": {
+              "$ref": "#/components/schemas/VariantSummary"
+            },
+            "type": "array",
+            "title": "All Variants",
+            "default": []
+          },
+          "top_elements": {
+            "items": {
+              "$ref": "#/components/schemas/ElementInsight"
+            },
+            "type": "array",
+            "title": "Top Elements"
+          },
+          "top_interactions": {
+            "items": {
+              "$ref": "#/components/schemas/InteractionInsight"
+            },
+            "type": "array",
+            "title": "Top Interactions"
+          },
+          "cycles_run": {
+            "type": "integer",
+            "title": "Cycles Run"
+          },
+          "variants_launched": {
+            "type": "integer",
+            "title": "Variants Launched"
+          },
+          "variants_retired": {
+            "type": "integer",
+            "title": "Variants Retired"
+          },
+          "summary_text": {
+            "type": "string",
+            "title": "Summary Text"
+          },
+          "proposed_variants": {
+            "items": {
+              "$ref": "#/components/schemas/ProposedVariant"
+            },
+            "type": "array",
+            "title": "Proposed Variants",
+            "default": []
+          },
+          "expired_count": {
+            "type": "integer",
+            "title": "Expired Count",
+            "default": 0
+          },
+          "generation_paused": {
+            "type": "boolean",
+            "title": "Generation Paused",
+            "default": false
+          },
+          "review_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Url"
+          }
+        },
+        "type": "object",
+        "required": [
+          "campaign_id",
+          "campaign_name",
+          "week_start",
+          "week_end",
+          "total_spend",
+          "total_impressions",
+          "total_clicks",
+          "total_conversions",
+          "avg_ctr",
+          "avg_cpa",
+          "best_variant",
+          "worst_variant",
+          "top_elements",
+          "top_interactions",
+          "cycles_run",
+          "variants_launched",
+          "variants_retired",
+          "summary_text"
+        ],
+        "title": "WeeklyReport",
+        "description": "Aggregated weekly report sent via email."
+      }
+    }
+  }
+}
