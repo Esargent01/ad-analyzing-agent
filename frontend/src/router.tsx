@@ -4,6 +4,7 @@ import { AuthedLayout } from "@/routes/_layout";
 import { CampaignDetailRoute } from "@/routes/campaign-detail";
 import { DailyReportDetailRoute } from "@/routes/daily-report-detail";
 import { DashboardRoute } from "@/routes/dashboard";
+import { ExperimentsRoute } from "@/routes/experiments";
 import { MagicLinkSentRoute } from "@/routes/magic-link-sent";
 import { ReportsDailyListRoute } from "@/routes/reports-daily-list";
 import { ReportsWeeklyListRoute } from "@/routes/reports-weekly-list";
@@ -53,6 +54,10 @@ export const router = createBrowserRouter([
       {
         path: "/campaigns/:campaignId/reports/weekly/:weekStart",
         element: <WeeklyReportDetailRoute />,
+      },
+      {
+        path: "/campaigns/:campaignId/experiments",
+        element: <ExperimentsRoute />,
       },
     ],
   },

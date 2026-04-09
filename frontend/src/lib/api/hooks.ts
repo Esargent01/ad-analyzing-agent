@@ -5,15 +5,23 @@
  * new hooks get appended here; callers only ever import from this file.
  */
 
-import { useMutation, useQuery, type UseQueryOptions } from "@tanstack/react-query";
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseQueryOptions,
+} from "@tanstack/react-query";
 
 import { api, ApiError } from "@/lib/api/client";
 import type {
+  ApproveResponse,
   DailyDatesResponse,
   DailyReport,
   ExperimentsResponse,
   MagicLinkRequest,
   MeResponse,
+  SuggestRequest,
+  SuggestResponse,
   WeeklyIndexResponse,
   WeeklyReport,
 } from "@/lib/api/types";
@@ -167,5 +175,61 @@ export function useExperiments(campaignId: string | undefined) {
         { signal },
       ),
     enabled: Boolean(campaignId),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Experiment mutations
+// ---------------------------------------------------------------------------
+
+/**
+ * Approve a pending proposal. On success we invalidate the
+ * `experiments` query so the card fades out and the count drops.
+ */
+export function useApproveProposal(campaignId: string) {
+  const qc = useQueryClient();
+  return useMutation<ApproveResponse, ApiError, string>({
+    mutationFn: (approvalId) =>
+      api.post<ApproveResponse>(
+        `/api/campaigns/${campaignId}/experiments/${approvalId}/approve`,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.experiments(campaignId) });
+    },
+  });
+}
+
+export interface RejectProposalVars {
+  approvalId: string;
+  reason?: string;
+}
+
+export function useRejectProposal(campaignId: string) {
+  const qc = useQueryClient();
+  return useMutation<ApproveResponse, ApiError, RejectProposalVars>({
+    mutationFn: ({ approvalId, reason }) =>
+      api.post<ApproveResponse>(
+        `/api/campaigns/${campaignId}/experiments/${approvalId}/reject`,
+        { reason: reason ?? "user_rejected" },
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.experiments(campaignId) });
+    },
+  });
+}
+
+export function useSuggestGenome(campaignId: string) {
+  const qc = useQueryClient();
+  return useMutation<SuggestResponse, ApiError, SuggestRequest>({
+    mutationFn: (body) =>
+      api.post<SuggestResponse>(
+        `/api/campaigns/${campaignId}/experiments/suggest`,
+        body as unknown as Record<string, unknown>,
+      ),
+    onSuccess: () => {
+      // The gene pool is returned as part of the experiments response,
+      // so refetching the experiments query keeps everything in sync.
+      qc.invalidateQueries({ queryKey: qk.experiments(campaignId) });
+    },
   });
 }

@@ -69,6 +69,27 @@ export interface ExperimentsResponse {
   allowed_suggestion_slots: string[];
 }
 
+export interface ApproveResponse {
+  status: string;
+  approval_id: string;
+}
+
+export interface RejectRequest {
+  reason?: string;
+}
+
+export interface SuggestRequest {
+  slot_name: string;
+  slot_value: string;
+  description?: string;
+}
+
+export interface SuggestResponse {
+  status: string;
+  slot_name: string;
+  slot_value: string;
+}
+
 // ---------------------------------------------------------------------------
 // Report detail shapes
 //
