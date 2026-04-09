@@ -156,6 +156,15 @@
                 <span style="display: inline-block; background-color: #EDF4EC; color: #2B6B30; font-size: 10px; padding: 2px 8px; border-radius: 10px; white-space: nowrap;">New</span>
                 {% endif %}
             </div>
+            {% if pv.genome.media_asset %}
+            {% set media = pv.genome.media_asset %}
+            {% set ext = (media.rsplit('.', 1)[-1]|lower) if '.' in media else '' %}
+            {% set is_video = ext in ['mov', 'mp4', 'webm', 'avi', 'm4v', 'mkv'] %}
+            <div style="font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+                <span style="display: inline-block; background-color: {% if is_video %}#EEF0FF{% else %}#F1F5F9{% endif %}; color: {% if is_video %}#534AB7{% else %}#475569{% endif %}; font-size: 9px; font-weight: 600; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 3px; white-space: nowrap;">{{ "VIDEO" if is_video else "IMAGE" }}</span>
+                <span class="mono" style="font-family: var(--font-mono); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ media|truncate(70) }}</span>
+            </div>
+            {% endif %}
             {% if pv.hypothesis %}
             <div style="font-size: 12px; color: var(--text-secondary);">{{ pv.hypothesis }}</div>
             {% endif %}

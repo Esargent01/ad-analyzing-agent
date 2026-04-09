@@ -242,6 +242,15 @@
                     {% endif %}
                 </td>
             </tr>
+            {% if pv.genome.media_asset %}
+            {% set media = pv.genome.media_asset %}
+            {% set ext = (media.rsplit('.', 1)[-1]|lower) if '.' in media else '' %}
+            {% set is_video = ext in ['mov', 'mp4', 'webm', 'avi', 'm4v', 'mkv'] %}
+            <tr><td colspan="2" style="padding-top: 4px; font-size: 12px; color: #6b6b6b; font-family: Arial, Helvetica, sans-serif;">
+                <span style="display: inline-block; background-color: {% if is_video %}#EEF0FF{% else %}#F1F5F9{% endif %}; color: {% if is_video %}#534AB7{% else %}#475569{% endif %}; font-size: 9px; font-weight: 600; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 3px; margin-right: 6px;">{{ "VIDEO" if is_video else "IMAGE" }}</span>
+                <span style="font-family: Menlo, Consolas, monospace; color: #6b6b6b;">{{ media|truncate(60) }}</span>
+            </td></tr>
+            {% endif %}
             {% if pv.hypothesis %}
             <tr><td colspan="2" style="padding-top: 4px; font-size: 12px; color: #6b6b6b; font-family: Arial, Helvetica, sans-serif;">
                 {{ pv.hypothesis }}
