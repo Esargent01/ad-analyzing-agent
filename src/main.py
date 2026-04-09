@@ -247,37 +247,35 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
     """Generate and send a weekly report for a campaign."""
 
     async def _run() -> None:
-        from datetime import date, datetime, timedelta, timezone
-
-        from sqlalchemy import text as sa_text
-
         from src.dashboard.tokens import create_review_token
         from src.db.engine import close_db, get_session, init_db
-        from src.models.analysis import ElementInsight, InteractionInsight
-        from src.models.reports import FunnelStage, VariantSummary, WeeklyReport
-        from src.services.weekly import load_proposed_variants, run_weekly_generation
+        from src.services.reports import build_weekly_report, default_last_full_week
+        from src.services.weekly import run_weekly_generation
 
         settings = get_settings()
         await init_db()
 
+        week_start, week_end = default_last_full_week()
+        campaign_uuid = UUID(campaign_id)
+
         async with get_session() as session:
-            # Get campaign name
+            # Validate the campaign exists before running generation (matches prior behavior).
+            from sqlalchemy import text as sa_text
+
             campaign_row = await session.execute(
                 sa_text("SELECT name FROM campaigns WHERE id = :id"),
                 {"id": campaign_id},
             )
-            campaign_result = campaign_row.fetchone()
-            if not campaign_result:
+            if not campaign_row.fetchone():
                 click.echo(f"Error: Campaign {campaign_id} not found.")
                 await close_db()
                 return
-            campaign_name = str(campaign_result[0])
 
             # Weekly generation pass: expire stale proposals, generate new ones
             click.echo("Running weekly generation pass...")
             try:
                 expired_count, generation_paused = await run_weekly_generation(
-                    session, UUID(campaign_id)
+                    session, campaign_uuid
                 )
                 if expired_count:
                     click.echo(
@@ -292,365 +290,68 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                 expired_count = 0
                 generation_paused = False
 
-            # Load all pending proposals (fresh + carried over) for the report
-            proposed_variants = await load_proposed_variants(
-                session, UUID(campaign_id)
-            )
-            click.echo(f"  {len(proposed_variants)} proposal(s) pending review")
-
-            # Previous full week: Monday through Sunday
-            today = date.today()
-            # today.weekday(): Mon=0, Sun=6
-            # Previous Sunday = today - (weekday + 1)
-            week_end = today - timedelta(days=today.weekday() + 1)  # last Sunday
-            week_start = week_end - timedelta(days=6)               # Monday before that
-
-            week_start_ts = datetime(week_start.year, week_start.month, week_start.day, tzinfo=timezone.utc)
-            week_end_ts = datetime(week_end.year, week_end.month, week_end.day, tzinfo=timezone.utc) + timedelta(days=1)  # midnight after Sunday
-
-            cycles_row = await session.execute(
-                sa_text("""
-                    SELECT cycle_number, phase, variants_launched, variants_paused,
-                           variants_promoted, summary_text, started_at
-                    FROM test_cycles
-                    WHERE campaign_id = :id
-                      AND started_at >= :ws AND started_at < :we
-                    ORDER BY cycle_number DESC
-                """),
-                {"id": campaign_id, "ws": week_start_ts, "we": week_end_ts},
-            )
-            cycles = cycles_row.fetchall()
-
-            if not cycles:
-                click.echo(
-                    f"No monitoring cycles found for week {week_start} to {week_end}. "
-                    f"Report will still include proposed variants."
-                )
-
-            # Aggregate full-funnel metrics for the previous week
-            metrics_row = await session.execute(
-                sa_text("""
-                    SELECT COALESCE(SUM(m.impressions), 0),
-                           COALESCE(SUM(m.clicks), 0),
-                           COALESCE(SUM(m.conversions), 0),
-                           COALESCE(SUM(m.spend), 0),
-                           COALESCE(SUM(m.reach), 0),
-                           COALESCE(SUM(m.video_views_3s), 0),
-                           COALESCE(SUM(m.video_views_15s), 0),
-                           COALESCE(SUM(m.thruplays), 0),
-                           COALESCE(SUM(m.link_clicks), 0),
-                           COALESCE(SUM(m.landing_page_views), 0),
-                           COALESCE(SUM(m.add_to_carts), 0),
-                           COALESCE(SUM(m.purchases), 0),
-                           COALESCE(SUM(m.purchase_value), 0)
-                    FROM metrics m
-                    JOIN variants v ON v.id = m.variant_id
-                    WHERE v.campaign_id = :id
-                      AND m.recorded_at >= :ws AND m.recorded_at < :we
-                """),
-                {"id": campaign_id, "ws": week_start_ts, "we": week_end_ts},
-            )
-            m = metrics_row.fetchone()
-            total_impressions = int(m[0])
-            total_clicks = int(m[1])
-            total_conversions = int(m[2])
-            total_spend = Decimal(str(m[3]))
-            total_reach = int(m[4])
-            total_video_views_3s = int(m[5])
-            total_video_views_15s = int(m[6])
-            total_thruplays = int(m[7])
-            total_link_clicks = int(m[8])
-            total_landing_page_views = int(m[9])
-            total_add_to_carts = int(m[10])
-            total_purchases = int(m[11])
-            total_purchase_value = Decimal(str(m[12]))
-
-            # Derived aggregates
-            avg_ctr = Decimal(str(total_clicks / total_impressions)) if total_impressions > 0 else Decimal("0")
-            avg_cpa = Decimal(str(float(total_spend) / total_conversions)) if total_conversions > 0 else None
-            avg_hook_rate = Decimal(str(total_video_views_3s / total_impressions)) if total_impressions > 0 else Decimal("0")
-            avg_hold_rate = Decimal(str(total_video_views_15s / total_video_views_3s)) if total_video_views_3s > 0 else Decimal("0")
-            avg_cpm = Decimal(str((float(total_spend) / total_impressions) * 1000)) if total_impressions > 0 else Decimal("0")
-            avg_frequency = Decimal(str(total_impressions / total_reach)) if total_reach > 0 else Decimal("0")
-            avg_roas = Decimal(str(float(total_purchase_value) / float(total_spend))) if float(total_spend) > 0 and float(total_purchase_value) > 0 else None
-            avg_cost_per_purchase = Decimal(str(float(total_spend) / total_purchases)) if total_purchases > 0 else None
-
-            # Build funnel stages
-            spend_f = float(total_spend)
-            funnel_stages = [
-                FunnelStage(stage_name="Impressions", value=total_impressions, rate=None,
-                            cost_per=Decimal(str(round(spend_f / total_impressions * 1000, 2))) if total_impressions > 0 else None),
-                FunnelStage(stage_name="Reach", value=total_reach,
-                            rate=None, cost_per=Decimal(str(round(spend_f / total_reach * 1000, 2))) if total_reach > 0 else None),
-            ]
-            if total_video_views_3s > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Video Views (3s)", value=total_video_views_3s,
-                    rate=Decimal(str(round(total_video_views_3s / total_impressions, 4))) if total_impressions > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_video_views_3s, 2))) if total_video_views_3s > 0 else None,
-                ))
-            if total_video_views_15s > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Video Views (15s)", value=total_video_views_15s,
-                    rate=Decimal(str(round(total_video_views_15s / total_video_views_3s, 4))) if total_video_views_3s > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_video_views_15s, 2))) if total_video_views_15s > 0 else None,
-                ))
-            if total_link_clicks > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Link Clicks", value=total_link_clicks,
-                    rate=Decimal(str(round(total_link_clicks / total_impressions, 4))) if total_impressions > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_link_clicks, 2))),
-                ))
-            if total_landing_page_views > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Landing Page Views", value=total_landing_page_views,
-                    rate=Decimal(str(round(total_landing_page_views / total_link_clicks, 4))) if total_link_clicks > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_landing_page_views, 2))),
-                ))
-            if total_add_to_carts > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Add to Carts", value=total_add_to_carts,
-                    rate=Decimal(str(round(total_add_to_carts / total_landing_page_views, 4))) if total_landing_page_views > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_add_to_carts, 2))),
-                ))
-            if total_purchases > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Purchases", value=total_purchases,
-                    rate=Decimal(str(round(total_purchases / total_add_to_carts, 4))) if total_add_to_carts > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_purchases, 2))),
-                ))
-
-            # Variant leaderboard — full-funnel query
-            variant_row = await session.execute(
-                sa_text("""
-                    SELECT v.id, v.variant_code, v.status,
-                           COALESCE(m.impressions, 0), COALESCE(m.clicks, 0),
-                           COALESCE(m.conversions, 0), COALESCE(m.spend, 0),
-                           COALESCE(m.reach, 0), COALESCE(m.video_views_3s, 0),
-                           COALESCE(m.video_views_15s, 0), COALESCE(m.thruplays, 0),
-                           COALESCE(m.link_clicks, 0), COALESCE(m.landing_page_views, 0),
-                           COALESCE(m.add_to_carts, 0), COALESCE(m.purchases, 0),
-                           COALESCE(m.purchase_value, 0)
-                    FROM variants v
-                    LEFT JOIN LATERAL (
-                        SELECT SUM(impressions) AS impressions, SUM(clicks) AS clicks,
-                               SUM(conversions) AS conversions, SUM(spend) AS spend,
-                               SUM(reach) AS reach, SUM(video_views_3s) AS video_views_3s,
-                               SUM(video_views_15s) AS video_views_15s, SUM(thruplays) AS thruplays,
-                               SUM(link_clicks) AS link_clicks, SUM(landing_page_views) AS landing_page_views,
-                               SUM(add_to_carts) AS add_to_carts, SUM(purchases) AS purchases,
-                               SUM(purchase_value) AS purchase_value
-                        FROM metrics WHERE variant_id = v.id
-                          AND recorded_at >= :ws AND recorded_at < :we
-                    ) m ON TRUE
-                    WHERE v.campaign_id = :id AND v.status IN ('active', 'winner', 'paused')
-                    ORDER BY CASE WHEN COALESCE(m.purchases, 0) > 0 AND COALESCE(m.spend, 0) > 0
-                                  THEN COALESCE(m.purchase_value, 0)::NUMERIC / m.spend
-                                  WHEN COALESCE(m.impressions, 0) > 0
-                                  THEN COALESCE(m.clicks, 0)::NUMERIC / m.impressions
-                                  ELSE 0 END DESC
-                """),
-                {"id": campaign_id, "ws": week_start_ts, "we": week_end_ts},
-            )
-            variant_rows = variant_row.fetchall()
-
-            def _make_variant_summary(row) -> VariantSummary:
-                imps = int(row[3])
-                clicks = int(row[4])
-                convs = int(row[5])
-                spend = Decimal(str(row[6]))
-                reach = int(row[7])
-                vv3s = int(row[8])
-                vv15s = int(row[9])
-                thruplays = int(row[10])
-                lc = int(row[11])
-                lpv = int(row[12])
-                atc = int(row[13])
-                purch = int(row[14])
-                pv = Decimal(str(row[15]))
-
-                ctr = Decimal(str(clicks / imps)) if imps > 0 else Decimal("0")
-                cpa = Decimal(str(float(spend) / convs)) if convs > 0 else None
-                hr = Decimal(str(vv3s / imps)) if imps > 0 else Decimal("0")
-                hold = Decimal(str(vv15s / vv3s)) if vv3s > 0 else Decimal("0")
-                cpp = Decimal(str(float(spend) / purch)) if purch > 0 else None
-                roas = Decimal(str(float(pv) / float(spend))) if float(spend) > 0 and float(pv) > 0 else None
-
-                return VariantSummary(
-                    variant_id=row[0],
-                    variant_code=str(row[1]),
-                    status=str(row[2]),
-                    impressions=imps,
-                    clicks=clicks,
-                    conversions=convs,
-                    spend=spend,
-                    ctr=ctr,
-                    cpa=cpa,
-                    reach=reach,
-                    video_views_3s=vv3s,
-                    video_views_15s=vv15s,
-                    thruplays=thruplays,
-                    link_clicks=lc,
-                    landing_page_views=lpv,
-                    add_to_carts=atc,
-                    purchases=purch,
-                    purchase_value=pv,
-                    hook_rate=hr,
-                    hold_rate=hold,
-                    cost_per_purchase=cpp,
-                    roas=roas,
-                )
-
-            all_variants = [_make_variant_summary(r) for r in variant_rows]
-            best_variant = all_variants[0] if all_variants else None
-            worst_variant = all_variants[-1] if len(all_variants) > 1 else None
-
-            # Element rankings — include new funnel columns
-            rankings_row = await session.execute(
-                sa_text("""
-                    SELECT slot_name, slot_value, avg_ctr, avg_cpa, variants_tested,
-                           best_ctr, worst_ctr, total_impressions, total_conversions, confidence,
-                           avg_hook_rate, avg_roas, best_hook_rate, best_cpa, total_purchases
-                    FROM element_performance
-                    WHERE campaign_id = :id AND variants_tested >= 1
-                    ORDER BY avg_ctr DESC NULLS LAST
-                    LIMIT 20
-                """),
+            # Pre-compute review URL only if there will be proposals to review.
+            # The service loads proposals itself; peek at the count via a light query.
+            pending_row = await session.execute(
+                sa_text(
+                    "SELECT COUNT(*) FROM approval_queue "
+                    "WHERE campaign_id = :id AND approved IS NULL AND reviewed_at IS NULL"
+                ),
                 {"id": campaign_id},
             )
-            rankings = rankings_row.fetchall()
-            top_elements = [
-                ElementInsight(
-                    slot_name=str(r[0]),
-                    slot_value=str(r[1]),
-                    avg_ctr=Decimal(str(r[2] or 0)),
-                    avg_cpa=Decimal(str(r[3])) if r[3] else None,
-                    variants_tested=int(r[4]),
-                    best_ctr=Decimal(str(r[5])) if r[5] else None,
-                    worst_ctr=Decimal(str(r[6])) if r[6] else None,
-                    total_impressions=int(r[7]),
-                    total_conversions=int(r[8]),
-                    confidence=Decimal(str(r[9])) if r[9] else None,
-                    avg_hook_rate=Decimal(str(r[10])) if r[10] else None,
-                    avg_roas=Decimal(str(r[11])) if r[11] else None,
-                    best_hook_rate=Decimal(str(r[12])) if r[12] else None,
-                    best_cpa=Decimal(str(r[13])) if r[13] else None,
-                    total_purchases=int(r[14]) if r[14] else 0,
-                )
-                for r in rankings
-            ]
-
-            # Element interactions
-            interactions_row = await session.execute(
-                sa_text("""
-                    SELECT slot_a_name, slot_a_value, slot_b_name, slot_b_value,
-                           variants_tested, combined_avg_ctr, solo_a_avg_ctr,
-                           solo_b_avg_ctr, interaction_lift, confidence
-                    FROM element_interactions
-                    WHERE campaign_id = :id
-                    ORDER BY ABS(interaction_lift) DESC NULLS LAST
-                    LIMIT 10
-                """),
-                {"id": campaign_id},
-            )
-            interactions = interactions_row.fetchall()
-            top_interactions = [
-                InteractionInsight(
-                    slot_a_name=str(r[0]),
-                    slot_a_value=str(r[1]),
-                    slot_b_name=str(r[2]),
-                    slot_b_value=str(r[3]),
-                    variants_tested=int(r[4]),
-                    combined_avg_ctr=Decimal(str(r[5] or 0)),
-                    solo_a_avg_ctr=Decimal(str(r[6])) if r[6] else None,
-                    solo_b_avg_ctr=Decimal(str(r[7])) if r[7] else None,
-                    interaction_lift=Decimal(str(r[8])) if r[8] else None,
-                    confidence=Decimal(str(r[9])) if r[9] else None,
-                )
-                for r in interactions
-            ]
-
-            total_launched = sum(c[2] or 0 for c in cycles) if cycles else 0
-            total_paused = sum(c[3] or 0 for c in cycles) if cycles else 0
-            total_retired = 0
-
-            # Signed review token for the weekly email CTA
-            review_token = create_review_token(UUID(campaign_id))
+            pending_count = int(pending_row.scalar_one() or 0)
             review_url = (
-                f"{settings.report_base_url.rstrip('/')}/review/{review_token}"
-                if proposed_variants
+                f"{settings.report_base_url.rstrip('/')}/review/{create_review_token(campaign_uuid)}"
+                if pending_count > 0
                 else None
             )
 
-            # Build the WeeklyReport
-            report = WeeklyReport(
-                campaign_id=UUID(campaign_id),
-                campaign_name=campaign_name,
-                week_start=week_start,
+            report = await build_weekly_report(
+                session,
+                campaign_uuid,
+                week_start,
                 week_end=week_end,
-                total_spend=total_spend,
-                total_impressions=total_impressions,
-                total_clicks=total_clicks,
-                total_conversions=total_conversions,
-                avg_ctr=avg_ctr,
-                avg_cpa=avg_cpa,
-                total_reach=total_reach,
-                total_video_views_3s=total_video_views_3s,
-                total_video_views_15s=total_video_views_15s,
-                total_thruplays=total_thruplays,
-                total_link_clicks=total_link_clicks,
-                total_landing_page_views=total_landing_page_views,
-                total_add_to_carts=total_add_to_carts,
-                total_purchases=total_purchases,
-                total_purchase_value=total_purchase_value,
-                avg_hook_rate=avg_hook_rate,
-                avg_hold_rate=avg_hold_rate,
-                avg_cpm=avg_cpm,
-                avg_frequency=avg_frequency,
-                avg_roas=avg_roas,
-                avg_cost_per_purchase=avg_cost_per_purchase,
-                funnel_stages=funnel_stages,
-                best_variant=best_variant,
-                worst_variant=worst_variant,
-                all_variants=all_variants,
-                top_elements=top_elements,
-                top_interactions=top_interactions,
-                cycles_run=len(cycles) if cycles else 0,
-                variants_launched=total_launched,
-                variants_retired=total_retired,
-                summary_text="Weekly optimization summary for " + campaign_name,
-                proposed_variants=proposed_variants,
                 expired_count=expired_count,
                 generation_paused=generation_paused,
                 review_url=review_url,
+            )
+
+        campaign_name = report.campaign_name
+        click.echo(f"  {len(report.proposed_variants)} proposal(s) pending review")
+
+        if report.cycles_run == 0:
+            click.echo(
+                f"No monitoring cycles found for week {week_start} to {week_end}. "
+                f"Report will still include proposed variants."
             )
 
         # Print to console
         click.echo(f"\n{'='*60}")
         click.echo(f"WEEKLY REPORT — {campaign_name}")
         click.echo(f"{'='*60}")
-        click.echo(f"Period: {week_start} to {week_end}")
-        click.echo(f"Cycles completed: {len(cycles)}")
-        click.echo(f"Variants launched: {total_launched}")
-        click.echo(f"Variants paused: {total_paused}")
+        click.echo(f"Period: {report.week_start} to {report.week_end}")
+        click.echo(f"Cycles completed: {report.cycles_run}")
+        click.echo(f"Variants launched: {report.variants_launched}")
         click.echo(f"\nFull-Funnel Metrics:")
-        click.echo(f"  Impressions: {total_impressions:,}")
-        click.echo(f"  Reach: {total_reach:,}")
-        click.echo(f"  Video Views (3s): {total_video_views_3s:,}  Hook Rate: {avg_hook_rate:.1%}")
-        click.echo(f"  Video Views (15s): {total_video_views_15s:,}  Hold Rate: {avg_hold_rate:.1%}")
-        click.echo(f"  Link Clicks: {total_link_clicks:,}  CTR: {avg_ctr:.2%}")
-        click.echo(f"  Landing Page Views: {total_landing_page_views:,}")
-        click.echo(f"  Add to Carts: {total_add_to_carts:,}")
-        click.echo(f"  Purchases: {total_purchases:,}")
-        click.echo(f"  Revenue: ${total_purchase_value:,.2f}")
+        click.echo(f"  Impressions: {report.total_impressions:,}")
+        click.echo(f"  Reach: {report.total_reach:,}")
+        click.echo(f"  Video Views (3s): {report.total_video_views_3s:,}  Hook Rate: {report.avg_hook_rate:.1%}")
+        click.echo(f"  Video Views (15s): {report.total_video_views_15s:,}  Hold Rate: {report.avg_hold_rate:.1%}")
+        click.echo(f"  Link Clicks: {report.total_link_clicks:,}  CTR: {report.avg_ctr:.2%}")
+        click.echo(f"  Landing Page Views: {report.total_landing_page_views:,}")
+        click.echo(f"  Add to Carts: {report.total_add_to_carts:,}")
+        click.echo(f"  Purchases: {report.total_purchases:,}")
+        click.echo(f"  Revenue: ${report.total_purchase_value:,.2f}")
         click.echo(f"\nEfficiency:")
-        click.echo(f"  Spend: ${total_spend:,.2f}")
-        click.echo(f"  CPM: ${avg_cpm:,.2f}")
-        click.echo(f"  CPA: {'${:,.2f}'.format(avg_cpa) if avg_cpa else 'N/A'}")
-        click.echo(f"  Cost/Purchase: {'${:,.2f}'.format(avg_cost_per_purchase) if avg_cost_per_purchase else 'N/A'}")
-        click.echo(f"  ROAS: {'{:.2f}x'.format(avg_roas) if avg_roas else 'N/A'}")
-        click.echo(f"  Frequency: {avg_frequency:.1f}")
+        click.echo(f"  Spend: ${report.total_spend:,.2f}")
+        click.echo(f"  CPM: ${report.avg_cpm:,.2f}")
+        click.echo(f"  CPA: {'${:,.2f}'.format(report.avg_cpa) if report.avg_cpa else 'N/A'}")
+        click.echo(f"  Cost/Purchase: {'${:,.2f}'.format(report.avg_cost_per_purchase) if report.avg_cost_per_purchase else 'N/A'}")
+        click.echo(f"  ROAS: {'{:.2f}x'.format(report.avg_roas) if report.avg_roas else 'N/A'}")
+        click.echo(f"  Frequency: {report.avg_frequency:.1f}")
 
+        best_variant = report.best_variant
+        worst_variant = report.worst_variant
         if best_variant:
             roas_str = f"ROAS {best_variant.roas:.2f}x" if best_variant.roas else f"CTR {best_variant.ctr:.2%}"
             click.echo(f"\nBest: {best_variant.variant_code} — {roas_str}")
@@ -658,21 +359,21 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
             roas_str = f"ROAS {worst_variant.roas:.2f}x" if worst_variant.roas else f"CTR {worst_variant.ctr:.2%}"
             click.echo(f"Worst: {worst_variant.variant_code} — {roas_str}")
 
-        if top_elements:
+        if report.top_elements:
             click.echo(f"\nTop Elements:")
-            for el in top_elements[:10]:
+            for el in report.top_elements[:10]:
                 roas_str = f" ROAS {el.avg_roas:.2f}x" if el.avg_roas else ""
                 click.echo(f"  {el.slot_name}: {el.slot_value} — CTR {el.avg_ctr:.2%}{roas_str} ({el.variants_tested} variants)")
 
-        if proposed_variants:
-            click.echo(f"\nNext week's experiments ({len(proposed_variants)} proposed):")
-            for pv in proposed_variants:
+        if report.proposed_variants:
+            click.echo(f"\nNext week's experiments ({len(report.proposed_variants)} proposed):")
+            for pv in report.proposed_variants:
                 badge = f" [expires in {pv.days_until_expiry}d]" if pv.classification == "expiring_soon" else ""
                 click.echo(f"  {pv.variant_code}: {pv.genome_summary}{badge}")
                 if pv.hypothesis:
                     click.echo(f"    Hypothesis: {pv.hypothesis}")
-            if review_url:
-                click.echo(f"\n  Review link: {review_url}")
+            if report.review_url:
+                click.echo(f"\n  Review link: {report.review_url}")
 
         week_label = f"{week_start.isocalendar()[0]}-W{week_start.isocalendar()[1]:02d}"
 
@@ -693,7 +394,7 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                     campaign_name=campaign_name,
                     week_label=week_label,
                     base_url=settings.report_base_url,
-                    review_url=review_url,
+                    review_url=report.review_url,
                 )
                 if success:
                     click.echo(f"\nEmail report sent to {settings.report_email_to}")
@@ -705,7 +406,11 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
             from src.reports.slack import SlackReporter
 
             slack = SlackReporter(webhook_url=settings.slack_webhook_url)
-            summary = f"Weekly: {len(cycles)} cycles, {total_launched} launched, {total_paused} paused"
+            summary = (
+                f"Weekly: {report.cycles_run} cycles, "
+                f"{report.variants_launched} launched, "
+                f"{len(report.proposed_variants)} pending review"
+            )
             await slack.send_cycle_report(
                 campaign_name=campaign_name,
                 cycle_number=0,
@@ -750,13 +455,10 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
     """
 
     async def _run() -> None:
-        from datetime import date, datetime, timedelta, timezone
-
-        from sqlalchemy import text as sa_text
+        from datetime import date, timedelta
 
         from src.db.engine import close_db, get_session, init_db
-        from src.models.analysis import ElementInsight, InteractionInsight
-        from src.models.reports import FunnelStage, VariantSummary, WeeklyReport
+        from src.services.reports import build_daily_report
 
         settings = get_settings()
         await init_db()
@@ -767,498 +469,88 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
         else:
             report_day = date.today() - timedelta(days=1)
 
-        day_start = datetime(report_day.year, report_day.month, report_day.day, tzinfo=timezone.utc)
-        day_end = day_start + timedelta(days=1)
+        campaign_uuid = UUID(campaign_id)
 
+        v2_report = None
         async with get_session() as session:
-            # Get campaign name
-            campaign_row = await session.execute(
-                sa_text("SELECT name FROM campaigns WHERE id = :id"),
-                {"id": campaign_id},
-            )
-            campaign_result = campaign_row.fetchone()
-            if not campaign_result:
+            try:
+                v2_report = await build_daily_report(
+                    session, campaign_uuid, report_day
+                )
+            except LookupError:
                 click.echo(f"Error: Campaign {campaign_id} not found.")
                 await close_db()
                 return
-            campaign_name = str(campaign_result[0])
 
-            # Check for cycles on this day
-            cycles_row = await session.execute(
-                sa_text("""
-                    SELECT cycle_number, phase, variants_launched, variants_paused,
-                           variants_promoted, summary_text, started_at
-                    FROM test_cycles
-                    WHERE campaign_id = :id
-                      AND started_at >= :day_start AND started_at < :day_end
-                    ORDER BY cycle_number DESC
-                """),
-                {"id": campaign_id, "day_start": day_start, "day_end": day_end},
-            )
-            cycles = cycles_row.fetchall()
-
-            # Aggregate full-funnel metrics for the calendar day
-            metrics_row = await session.execute(
-                sa_text("""
-                    SELECT COALESCE(SUM(m.impressions), 0),
-                           COALESCE(SUM(m.clicks), 0),
-                           COALESCE(SUM(m.conversions), 0),
-                           COALESCE(SUM(m.spend), 0),
-                           COALESCE(SUM(m.reach), 0),
-                           COALESCE(SUM(m.video_views_3s), 0),
-                           COALESCE(SUM(m.video_views_15s), 0),
-                           COALESCE(SUM(m.thruplays), 0),
-                           COALESCE(SUM(m.link_clicks), 0),
-                           COALESCE(SUM(m.landing_page_views), 0),
-                           COALESCE(SUM(m.add_to_carts), 0),
-                           COALESCE(SUM(m.purchases), 0),
-                           COALESCE(SUM(m.purchase_value), 0)
-                    FROM metrics m
-                    JOIN variants v ON v.id = m.variant_id
-                    WHERE v.campaign_id = :id
-                      AND m.recorded_at >= :day_start AND m.recorded_at < :day_end
-                """),
-                {"id": campaign_id, "day_start": day_start, "day_end": day_end},
-            )
-            m = metrics_row.fetchone()
-            total_impressions = int(m[0])
-            total_clicks = int(m[1])
-            total_conversions = int(m[2])
-            total_spend = Decimal(str(m[3]))
-            total_reach = int(m[4])
-            total_video_views_3s = int(m[5])
-            total_video_views_15s = int(m[6])
-            total_thruplays = int(m[7])
-            total_link_clicks = int(m[8])
-            total_landing_page_views = int(m[9])
-            total_add_to_carts = int(m[10])
-            total_purchases = int(m[11])
-            total_purchase_value = Decimal(str(m[12]))
-
-            # Derived aggregates
-            avg_ctr = Decimal(str(total_clicks / total_impressions)) if total_impressions > 0 else Decimal("0")
-            avg_cpa = Decimal(str(float(total_spend) / total_conversions)) if total_conversions > 0 else None
-            avg_hook_rate = Decimal(str(total_video_views_3s / total_impressions)) if total_impressions > 0 else Decimal("0")
-            avg_hold_rate = Decimal(str(total_video_views_15s / total_video_views_3s)) if total_video_views_3s > 0 else Decimal("0")
-            avg_cpm = Decimal(str((float(total_spend) / total_impressions) * 1000)) if total_impressions > 0 else Decimal("0")
-            avg_frequency = Decimal(str(total_impressions / total_reach)) if total_reach > 0 else Decimal("0")
-            avg_roas = Decimal(str(float(total_purchase_value) / float(total_spend))) if float(total_spend) > 0 and float(total_purchase_value) > 0 else None
-            avg_cost_per_purchase = Decimal(str(float(total_spend) / total_purchases)) if total_purchases > 0 else None
-
-            # Build funnel stages
-            spend_f = float(total_spend)
-            funnel_stages = [
-                FunnelStage(stage_name="Impressions", value=total_impressions, rate=None,
-                            cost_per=Decimal(str(round(spend_f / total_impressions * 1000, 2))) if total_impressions > 0 else None),
-                FunnelStage(stage_name="Reach", value=total_reach,
-                            rate=None, cost_per=Decimal(str(round(spend_f / total_reach * 1000, 2))) if total_reach > 0 else None),
-            ]
-            if total_video_views_3s > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Video Views (3s)", value=total_video_views_3s,
-                    rate=Decimal(str(round(total_video_views_3s / total_impressions, 4))) if total_impressions > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_video_views_3s, 2))) if total_video_views_3s > 0 else None,
-                ))
-            if total_video_views_15s > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Video Views (15s)", value=total_video_views_15s,
-                    rate=Decimal(str(round(total_video_views_15s / total_video_views_3s, 4))) if total_video_views_3s > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_video_views_15s, 2))) if total_video_views_15s > 0 else None,
-                ))
-            if total_link_clicks > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Link Clicks", value=total_link_clicks,
-                    rate=Decimal(str(round(total_link_clicks / total_impressions, 4))) if total_impressions > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_link_clicks, 2))),
-                ))
-            if total_landing_page_views > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Landing Page Views", value=total_landing_page_views,
-                    rate=Decimal(str(round(total_landing_page_views / total_link_clicks, 4))) if total_link_clicks > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_landing_page_views, 2))),
-                ))
-            if total_add_to_carts > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Add to Carts", value=total_add_to_carts,
-                    rate=Decimal(str(round(total_add_to_carts / total_landing_page_views, 4))) if total_landing_page_views > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_add_to_carts, 2))),
-                ))
-            if total_purchases > 0:
-                funnel_stages.append(FunnelStage(
-                    stage_name="Purchases", value=total_purchases,
-                    rate=Decimal(str(round(total_purchases / total_add_to_carts, 4))) if total_add_to_carts > 0 else None,
-                    cost_per=Decimal(str(round(spend_f / total_purchases, 2))),
-                ))
-
-            # Variant leaderboard — full-funnel query
-            variant_row = await session.execute(
-                sa_text("""
-                    SELECT v.id, v.variant_code, v.status,
-                           COALESCE(m.impressions, 0), COALESCE(m.clicks, 0),
-                           COALESCE(m.conversions, 0), COALESCE(m.spend, 0),
-                           COALESCE(m.reach, 0), COALESCE(m.video_views_3s, 0),
-                           COALESCE(m.video_views_15s, 0), COALESCE(m.thruplays, 0),
-                           COALESCE(m.link_clicks, 0), COALESCE(m.landing_page_views, 0),
-                           COALESCE(m.add_to_carts, 0), COALESCE(m.purchases, 0),
-                           COALESCE(m.purchase_value, 0)
-                    FROM variants v
-                    LEFT JOIN LATERAL (
-                        SELECT SUM(impressions) AS impressions, SUM(clicks) AS clicks,
-                               SUM(conversions) AS conversions, SUM(spend) AS spend,
-                               SUM(reach) AS reach, SUM(video_views_3s) AS video_views_3s,
-                               SUM(video_views_15s) AS video_views_15s, SUM(thruplays) AS thruplays,
-                               SUM(link_clicks) AS link_clicks, SUM(landing_page_views) AS landing_page_views,
-                               SUM(add_to_carts) AS add_to_carts, SUM(purchases) AS purchases,
-                               SUM(purchase_value) AS purchase_value
-                        FROM metrics WHERE variant_id = v.id
-                          AND recorded_at >= :day_start AND recorded_at < :day_end
-                    ) m ON TRUE
-                    WHERE v.campaign_id = :id AND v.status IN ('active', 'winner', 'paused')
-                    ORDER BY CASE WHEN COALESCE(m.purchases, 0) > 0 AND COALESCE(m.spend, 0) > 0
-                                  THEN COALESCE(m.purchase_value, 0)::NUMERIC / m.spend
-                                  WHEN COALESCE(m.impressions, 0) > 0
-                                  THEN COALESCE(m.clicks, 0)::NUMERIC / m.impressions
-                                  ELSE 0 END DESC
-                """),
-                {"id": campaign_id, "day_start": day_start, "day_end": day_end},
-            )
-            variant_rows = variant_row.fetchall()
-
-            def _make_variant_summary(row) -> VariantSummary:
-                imps = int(row[3])
-                clicks = int(row[4])
-                convs = int(row[5])
-                spend = Decimal(str(row[6]))
-                reach = int(row[7])
-                vv3s = int(row[8])
-                vv15s = int(row[9])
-                thruplays = int(row[10])
-                lc = int(row[11])
-                lpv = int(row[12])
-                atc = int(row[13])
-                purch = int(row[14])
-                pv = Decimal(str(row[15]))
-
-                ctr = Decimal(str(clicks / imps)) if imps > 0 else Decimal("0")
-                cpa = Decimal(str(float(spend) / convs)) if convs > 0 else None
-                hr = Decimal(str(vv3s / imps)) if imps > 0 else Decimal("0")
-                hold = Decimal(str(vv15s / vv3s)) if vv3s > 0 else Decimal("0")
-                cpp = Decimal(str(float(spend) / purch)) if purch > 0 else None
-                roas = Decimal(str(float(pv) / float(spend))) if float(spend) > 0 and float(pv) > 0 else None
-
-                return VariantSummary(
-                    variant_id=row[0],
-                    variant_code=str(row[1]),
-                    status=str(row[2]),
-                    impressions=imps,
-                    clicks=clicks,
-                    conversions=convs,
-                    spend=spend,
-                    ctr=ctr,
-                    cpa=cpa,
-                    reach=reach,
-                    video_views_3s=vv3s,
-                    video_views_15s=vv15s,
-                    thruplays=thruplays,
-                    link_clicks=lc,
-                    landing_page_views=lpv,
-                    add_to_carts=atc,
-                    purchases=purch,
-                    purchase_value=pv,
-                    hook_rate=hr,
-                    hold_rate=hold,
-                    cost_per_purchase=cpp,
-                    roas=roas,
-                )
-
-            all_variants = [_make_variant_summary(r) for r in variant_rows]
-            best_variant = all_variants[0] if all_variants else None
-            worst_variant = all_variants[-1] if len(all_variants) > 1 else None
-
-            # Fetch variant genomes for enrichment
-            genome_row = await session.execute(
-                sa_text("""
-                    SELECT v.id, v.genome, v.hypothesis,
-                           EXTRACT(DAY FROM NOW() - v.created_at)::INT AS days_active
-                    FROM variants v
-                    WHERE v.campaign_id = :id AND v.status IN ('active', 'winner', 'paused')
-                """),
-                {"id": campaign_id},
-            )
-            genome_map = {
-                str(r[0]): {"genome": r[1] or {}, "hypothesis": r[2], "days_active": int(r[3] or 1)}
-                for r in genome_row.fetchall()
-            }
-
-            # Previous day metrics for trend comparison
-            prev_day = report_day - timedelta(days=1)
-            prev_start = datetime(prev_day.year, prev_day.month, prev_day.day, tzinfo=timezone.utc)
-            prev_end = prev_start + timedelta(days=1)
-            prev_row = await session.execute(
-                sa_text("""
-                    SELECT COALESCE(SUM(m.spend), 0),
-                           COALESCE(SUM(m.purchases), 0),
-                           COALESCE(SUM(m.purchase_value), 0)
-                    FROM metrics m
-                    JOIN variants v ON v.id = m.variant_id
-                    WHERE v.campaign_id = :id
-                      AND m.recorded_at >= :ps AND m.recorded_at < :pe
-                """),
-                {"id": campaign_id, "ps": prev_start, "pe": prev_end},
-            )
-            prev = prev_row.fetchone()
-            prev_spend = Decimal(str(prev[0])) if prev and float(prev[0]) > 0 else None
-            prev_purchases = int(prev[1]) if prev else None
-            prev_pv = Decimal(str(prev[2])) if prev else Decimal("0")
-            prev_avg_cpa = float(prev_spend) / int(prev[1]) if prev_spend and int(prev[1]) > 0 else None
-            prev_avg_roas = float(prev_pv) / float(prev_spend) if prev_spend and float(prev_spend) > 0 and float(prev_pv) > 0 else None
-
-            # Element rankings
-            rankings_row = await session.execute(
-                sa_text("""
-                    SELECT slot_name, slot_value, avg_ctr, avg_cpa, variants_tested,
-                           best_ctr, worst_ctr, total_impressions, total_conversions, confidence,
-                           avg_hook_rate, avg_roas, best_hook_rate, best_cpa, total_purchases
-                    FROM element_performance
-                    WHERE campaign_id = :id AND variants_tested >= 1
-                    ORDER BY avg_ctr DESC NULLS LAST
-                    LIMIT 20
-                """),
-                {"id": campaign_id},
-            )
-            rankings = rankings_row.fetchall()
-            top_elements = [
-                ElementInsight(
-                    slot_name=str(r[0]),
-                    slot_value=str(r[1]),
-                    avg_ctr=Decimal(str(r[2] or 0)),
-                    avg_cpa=Decimal(str(r[3])) if r[3] else None,
-                    variants_tested=int(r[4]),
-                    best_ctr=Decimal(str(r[5])) if r[5] else None,
-                    worst_ctr=Decimal(str(r[6])) if r[6] else None,
-                    total_impressions=int(r[7]),
-                    total_conversions=int(r[8]),
-                    confidence=Decimal(str(r[9])) if r[9] else None,
-                    avg_hook_rate=Decimal(str(r[10])) if r[10] else None,
-                    avg_roas=Decimal(str(r[11])) if r[11] else None,
-                    best_hook_rate=Decimal(str(r[12])) if r[12] else None,
-                    best_cpa=Decimal(str(r[13])) if r[13] else None,
-                    total_purchases=int(r[14]) if r[14] else 0,
-                )
-                for r in rankings
-            ]
-
-            # Element interactions
-            interactions_row = await session.execute(
-                sa_text("""
-                    SELECT slot_a_name, slot_a_value, slot_b_name, slot_b_value,
-                           variants_tested, combined_avg_ctr, solo_a_avg_ctr,
-                           solo_b_avg_ctr, interaction_lift, confidence
-                    FROM element_interactions
-                    WHERE campaign_id = :id
-                    ORDER BY ABS(interaction_lift) DESC NULLS LAST
-                    LIMIT 10
-                """),
-                {"id": campaign_id},
-            )
-            interactions = interactions_row.fetchall()
-            top_interactions = [
-                InteractionInsight(
-                    slot_a_name=str(r[0]),
-                    slot_a_value=str(r[1]),
-                    slot_b_name=str(r[2]),
-                    slot_b_value=str(r[3]),
-                    variants_tested=int(r[4]),
-                    combined_avg_ctr=Decimal(str(r[5] or 0)),
-                    solo_a_avg_ctr=Decimal(str(r[6])) if r[6] else None,
-                    solo_b_avg_ctr=Decimal(str(r[7])) if r[7] else None,
-                    interaction_lift=Decimal(str(r[8])) if r[8] else None,
-                    confidence=Decimal(str(r[9])) if r[9] else None,
-                )
-                for r in interactions
-            ]
-
-            total_launched = sum(c[2] or 0 for c in cycles)
-            total_paused = sum(c[3] or 0 for c in cycles)
-
-            # Reuse WeeklyReport model — works for any time range
-            report = WeeklyReport(
-                campaign_id=UUID(campaign_id),
-                campaign_name=campaign_name,
-                week_start=report_day,
-                week_end=report_day,
-                total_spend=total_spend,
-                total_impressions=total_impressions,
-                total_clicks=total_clicks,
-                total_conversions=total_conversions,
-                avg_ctr=avg_ctr,
-                avg_cpa=avg_cpa,
-                total_reach=total_reach,
-                total_video_views_3s=total_video_views_3s,
-                total_video_views_15s=total_video_views_15s,
-                total_thruplays=total_thruplays,
-                total_link_clicks=total_link_clicks,
-                total_landing_page_views=total_landing_page_views,
-                total_add_to_carts=total_add_to_carts,
-                total_purchases=total_purchases,
-                total_purchase_value=total_purchase_value,
-                avg_hook_rate=avg_hook_rate,
-                avg_hold_rate=avg_hold_rate,
-                avg_cpm=avg_cpm,
-                avg_frequency=avg_frequency,
-                avg_roas=avg_roas,
-                avg_cost_per_purchase=avg_cost_per_purchase,
-                funnel_stages=funnel_stages,
-                best_variant=best_variant,
-                worst_variant=worst_variant,
-                all_variants=all_variants,
-                top_elements=top_elements,
-                top_interactions=top_interactions,
-                cycles_run=len(cycles),
-                variants_launched=total_launched,
-                variants_retired=0,
-                summary_text=f"Daily optimization summary for {campaign_name}",
-            )
+        campaign_name = v2_report.campaign_name
 
         # Print to console
         click.echo(f"\n{'='*60}")
         click.echo(f"DAILY REPORT — {campaign_name}")
         click.echo(f"{'='*60}")
         click.echo(f"Period: {report_day.isoformat()} (yesterday)")
-        click.echo(f"Cycles completed: {len(cycles)}")
-        click.echo(f"Variants launched: {total_launched}")
-        click.echo(f"Variants paused: {total_paused}")
+        click.echo(f"Cycles completed: {v2_report.cycle_number}")
+
+        total_impressions = sum(v.impressions for v in v2_report.variants)
+        total_clicks = sum(v.link_clicks for v in v2_report.variants)
+        total_reach = sum(v.reach for v in v2_report.variants)
+        total_video_views_3s = sum(v.video_views_3s for v in v2_report.variants)
+        total_video_views_15s = sum(v.video_views_15s for v in v2_report.variants)
+        total_add_to_carts = sum(v.add_to_carts for v in v2_report.variants)
+        total_landing_page_views = sum(v.landing_page_views for v in v2_report.variants)
+        total_purchase_value = sum((v.purchase_value for v in v2_report.variants), Decimal("0"))
+
+        avg_hook_rate_f = v2_report.avg_hook_rate_pct / 100
+        avg_hold_rate_f = (
+            total_video_views_15s / total_video_views_3s
+            if total_video_views_3s > 0
+            else 0.0
+        )
+        avg_ctr_f = (
+            total_clicks / total_impressions if total_impressions > 0 else 0.0
+        )
+        avg_cpm_f = (
+            float(v2_report.total_spend) / total_impressions * 1000
+            if total_impressions > 0
+            else 0.0
+        )
+        avg_frequency_f = (
+            total_impressions / total_reach if total_reach > 0 else 0.0
+        )
+
         click.echo(f"\nFull-Funnel Metrics:")
         click.echo(f"  Impressions: {total_impressions:,}")
         click.echo(f"  Reach: {total_reach:,}")
-        click.echo(f"  Video Views (3s): {total_video_views_3s:,}  Hook Rate: {avg_hook_rate:.1%}")
-        click.echo(f"  Video Views (15s): {total_video_views_15s:,}  Hold Rate: {avg_hold_rate:.1%}")
-        click.echo(f"  Link Clicks: {total_link_clicks:,}  CTR: {avg_ctr:.2%}")
+        click.echo(f"  Video Views (3s): {total_video_views_3s:,}  Hook Rate: {avg_hook_rate_f:.1%}")
+        click.echo(f"  Video Views (15s): {total_video_views_15s:,}  Hold Rate: {avg_hold_rate_f:.1%}")
+        click.echo(f"  Link Clicks: {total_clicks:,}  CTR: {avg_ctr_f:.2%}")
         click.echo(f"  Landing Page Views: {total_landing_page_views:,}")
         click.echo(f"  Add to Carts: {total_add_to_carts:,}")
-        click.echo(f"  Purchases: {total_purchases:,}")
+        click.echo(f"  Purchases: {v2_report.total_purchases:,}")
         click.echo(f"  Revenue: ${total_purchase_value:,.2f}")
         click.echo(f"\nEfficiency:")
-        click.echo(f"  Spend: ${total_spend:,.2f}")
-        click.echo(f"  CPM: ${avg_cpm:,.2f}")
-        click.echo(f"  CPA: {'${:,.2f}'.format(avg_cpa) if avg_cpa else 'N/A'}")
-        click.echo(f"  Cost/Purchase: {'${:,.2f}'.format(avg_cost_per_purchase) if avg_cost_per_purchase else 'N/A'}")
-        click.echo(f"  ROAS: {'{:.2f}x'.format(avg_roas) if avg_roas else 'N/A'}")
-        click.echo(f"  Frequency: {avg_frequency:.1f}")
+        click.echo(f"  Spend: ${v2_report.total_spend:,.2f}")
+        click.echo(f"  CPM: ${avg_cpm_f:,.2f}")
+        cpa_str = (
+            f"${v2_report.avg_cost_per_purchase:,.2f}"
+            if v2_report.avg_cost_per_purchase
+            else "N/A"
+        )
+        click.echo(f"  Cost/Purchase: {cpa_str}")
+        click.echo(
+            f"  ROAS: {'{:.2f}x'.format(v2_report.avg_roas) if v2_report.avg_roas else 'N/A'}"
+        )
+        click.echo(f"  Frequency: {avg_frequency_f:.1f}")
 
-        if best_variant:
-            roas_str = f"ROAS {best_variant.roas:.2f}x" if best_variant.roas else f"CTR {best_variant.ctr:.2%}"
-            click.echo(f"\nBest: {best_variant.variant_code} — {roas_str}")
-        if worst_variant:
-            roas_str = f"ROAS {worst_variant.roas:.2f}x" if worst_variant.roas else f"CTR {worst_variant.ctr:.2%}"
-            click.echo(f"Worst: {worst_variant.variant_code} — {roas_str}")
+        if v2_report.best_variant:
+            bv = v2_report.best_variant
+            cpa_fmt = f"${bv.cost_per_purchase:,.2f}" if bv.cost_per_purchase else "N/A"
+            click.echo(f"\nBest: {bv.variant_code} — CPA {cpa_fmt}")
 
-        if top_elements:
-            click.echo(f"\nTop Elements:")
-            for el in top_elements[:10]:
-                roas_str = f" ROAS {el.avg_roas:.2f}x" if el.avg_roas else ""
-                click.echo(f"  {el.slot_name}: {el.slot_value} — CTR {el.avg_ctr:.2%}{roas_str} ({el.variants_tested} variants)")
+        # Render v2 HTML report
+        from src.reports.web import render_daily_report_v2, render_index
 
-        # Generate v2 report with best-ad spotlight
-        from src.reports.web import render_index
-
-        v2_report = None
         try:
-            from src.models.reports import DailyReport, VariantReport
-            from src.reports.builder import (
-                build_diagnostics,
-                build_funnel,
-                build_projection,
-                select_best_variant,
-            )
-            from src.reports.web import render_daily_report_v2
-
-            def _to_variant_report(vs: VariantSummary) -> VariantReport:
-                """Convert a legacy VariantSummary to the new VariantReport."""
-                imps = vs.impressions
-                vv3s = vs.video_views_3s
-                vv15s = vs.video_views_15s
-                lc = vs.link_clicks
-                atc = vs.add_to_carts
-                purch = vs.purchases
-                hr_pct = (vv3s / imps * 100) if imps > 0 else 0.0
-                hold_pct = (vv15s / vv3s * 100) if vv3s > 0 else 0.0
-                ctr_pct = (lc / imps * 100) if imps > 0 else 0.0
-                atc_pct = (atc / lc * 100) if lc > 0 else 0.0
-                checkout_pct = (purch / atc * 100) if atc > 0 else 0.0
-                freq = (imps / vs.reach) if vs.reach > 0 else 0.0
-                cpp = float(vs.cost_per_purchase) if vs.cost_per_purchase else None
-                roas_v = float(vs.roas) if vs.roas else None
-
-                # Enrich with genome data from DB
-                vid = str(vs.variant_id)
-                gdata = genome_map.get(vid, {})
-                genome = gdata.get("genome", {}) if gdata else {}
-                hypothesis = gdata.get("hypothesis") if gdata else None
-                days_active = gdata.get("days_active", 1) if gdata else 1
-
-                # Build genome summary from key slots
-                summary_parts = []
-                if genome.get("headline"):
-                    summary_parts.append(genome["headline"][:30])
-                if genome.get("cta_text"):
-                    summary_parts.append(genome["cta_text"])
-                genome_summary = " + ".join(summary_parts) if summary_parts else vs.variant_code
-
-                return VariantReport(
-                    variant_id=vs.variant_id,
-                    variant_code=vs.variant_code,
-                    genome=genome,
-                    genome_summary=genome_summary,
-                    hypothesis=hypothesis,
-                    status=vs.status,
-                    days_active=days_active,
-                    spend=vs.spend,
-                    purchases=purch,
-                    purchase_value=vs.purchase_value,
-                    cost_per_purchase=cpp,
-                    roas=roas_v,
-                    impressions=imps,
-                    reach=vs.reach,
-                    video_views_3s=vv3s,
-                    video_views_15s=vv15s,
-                    link_clicks=lc,
-                    landing_page_views=vs.landing_page_views,
-                    add_to_carts=atc,
-                    hook_rate_pct=hr_pct,
-                    hold_rate_pct=hold_pct,
-                    ctr_pct=ctr_pct,
-                    atc_rate_pct=atc_pct,
-                    checkout_rate_pct=checkout_pct,
-                    frequency=freq,
-                )
-
-            v2_variants = [_to_variant_report(vs) for vs in all_variants]
-            best_v2 = select_best_variant(v2_variants)
-
-            v2_report = DailyReport(
-                campaign_name=campaign_name,
-                campaign_id=UUID(campaign_id),
-                cycle_number=len(cycles),
-                report_date=report_day,
-                day_number=1,
-                total_spend=total_spend,
-                total_purchases=total_purchases,
-                avg_cost_per_purchase=float(avg_cost_per_purchase) if avg_cost_per_purchase else None,
-                avg_roas=float(avg_roas) if avg_roas else None,
-                avg_hook_rate_pct=float(avg_hook_rate) * 100 if avg_hook_rate else 0.0,
-                # Previous day trends
-                prev_spend=prev_spend,
-                prev_purchases=prev_purchases if prev_purchases and prev_purchases > 0 else None,
-                prev_avg_cpa=prev_avg_cpa,
-                prev_avg_roas=prev_avg_roas,
-                variants=sorted(v2_variants, key=lambda v: (v.cost_per_purchase is None, v.cost_per_purchase or 0)),
-                best_variant=best_v2,
-                best_variant_funnel=build_funnel(best_v2) if best_v2 else [],
-                best_variant_diagnostics=build_diagnostics(best_v2) if best_v2 else [],
-                best_variant_projection=build_projection(best_v2) if best_v2 else None,
-            )
-
             v2_path = render_daily_report_v2(v2_report)
             click.echo(f"\nWeb report: {v2_path}")
         except Exception as exc:
