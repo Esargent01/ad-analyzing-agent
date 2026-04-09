@@ -57,6 +57,11 @@ def _format_one_decimal(value: object) -> str:
     return f"{v:.1f}"
 
 
+def _sort_variants_by_cpa(variants: list) -> list:
+    """Sort variants by cost_per_purchase, None values last."""
+    return sorted(variants, key=lambda v: (v.cost_per_purchase is None, v.cost_per_purchase or 0))
+
+
 def _output_dir() -> Path:
     settings = get_settings()
     return Path(settings.report_output_dir)
@@ -96,8 +101,8 @@ def render_daily_report_v2(report: DailyReport) -> Path:
         best_variant_funnel=report.best_variant_funnel,
         best_variant_diagnostics=report.best_variant_diagnostics,
         best_variant_projection=report.best_variant_projection,
-        # Variants table
-        variants=report.variants,
+        # Variants table (pre-sorted, None-safe)
+        variants=_sort_variants_by_cpa(report.variants),
         # Alerts and actions
         fatigue_alerts=report.fatigue_alerts,
         actions=report.actions,

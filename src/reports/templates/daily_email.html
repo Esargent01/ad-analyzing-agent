@@ -260,7 +260,7 @@
             <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;">ROAS</td>
             <td style="padding: 6px 0 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;">Status</td>
         </tr>
-        {% for v in variants|sort(attribute='cost_per_purchase') %}
+        {% for v in variants %}
         <tr>
             <td style="padding: 6px 8px 6px 0; color: #1a1a1a; border-bottom: 1px solid #e5e5e5; font-family: 'Courier New', Courier, monospace; font-size: 12px;">{{ v.variant_code }}</td>
             <td style="padding: 6px 8px; color: #1a1a1a; border-bottom: 1px solid #e5e5e5;">{% if v.hook_rate_pct is not none %}{{ v.hook_rate_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>

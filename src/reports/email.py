@@ -219,8 +219,11 @@ class EmailReporter:
             best_variant_funnel=report.best_variant_funnel,
             best_variant_diagnostics=report.best_variant_diagnostics,
             best_variant_projection=report.best_variant_projection,
-            # Variants table
-            variants=report.variants,
+            # Variants table (pre-sorted, None-safe)
+            variants=sorted(
+                report.variants,
+                key=lambda v: (v.cost_per_purchase is None, v.cost_per_purchase or 0),
+            ),
             # Alerts and actions
             fatigue_alerts=report.fatigue_alerts,
             actions=report.actions,
