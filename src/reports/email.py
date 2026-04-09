@@ -1,14 +1,15 @@
-"""Weekly email reporter: renders HTML via Jinja2, sends via SendGrid API."""
+"""Email reporter: renders HTML via Jinja2, sends via SendGrid API."""
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 
 import httpx
 import jinja2
 
-from src.models.reports import WeeklyReport
+from src.models.reports import DailyReport, WeeklyReport
 
 logger = logging.getLogger(__name__)
 
@@ -16,8 +17,25 @@ _TEMPLATE_DIR = Path(__file__).parent / "templates"
 _SENDGRID_API_URL = "https://api.sendgrid.com/v3/mail/send"
 
 
+def _format_currency(value: object) -> str:
+    v = float(value) if value is not None else 0.0
+    if v >= 1000:
+        return f"${v:,.0f}"
+    return f"${v:.2f}"
+
+
+def _format_intcomma(value: object) -> str:
+    v = int(value) if value is not None else 0
+    return f"{v:,}"
+
+
+def _format_one_decimal(value: object) -> str:
+    v = float(value) if value is not None else 0.0
+    return f"{v:.1f}"
+
+
 class EmailReporter:
-    """Renders and sends weekly HTML email reports via SendGrid."""
+    """Renders and sends HTML email reports via SendGrid."""
 
     def __init__(self, api_key: str, from_email: str, to_email: str) -> None:
         self._api_key = api_key
@@ -27,6 +45,9 @@ class EmailReporter:
             loader=jinja2.FileSystemLoader(str(_TEMPLATE_DIR)),
             autoescape=True,
         )
+        self._jinja_env.filters["currency"] = _format_currency
+        self._jinja_env.filters["intcomma"] = _format_intcomma
+        self._jinja_env.filters["onedecimal"] = _format_one_decimal
 
     # ------------------------------------------------------------------
     # Public API
@@ -102,9 +123,110 @@ class EmailReporter:
             logger.error("SendGrid request failed: %s", exc)
             return False
 
+    async def send_daily_report(
+        self,
+        report: DailyReport,
+        base_url: str = "",
+    ) -> bool:
+        """Send a daily report email using the v2 template. Returns True on success."""
+        html_content = self._render_daily_html(report, base_url=base_url)
+
+        subject = (
+            f"Daily Ad Report: {report.campaign_name} "
+            f"({report.report_date.isoformat()})"
+        )
+
+        payload: dict[str, object] = {
+            "personalizations": [
+                {
+                    "to": [{"email": self._to_email}],
+                    "subject": subject,
+                },
+            ],
+            "from": {"email": self._from_email},
+            "content": [
+                {"type": "text/html", "value": html_content},
+            ],
+        }
+
+        headers: dict[str, str] = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    _SENDGRID_API_URL,
+                    json=payload,
+                    headers=headers,
+                )
+                if response.status_code in (200, 202):
+                    logger.info(
+                        "Daily report email sent to %s (campaign %s, date %s).",
+                        self._to_email,
+                        report.campaign_name,
+                        report.report_date.isoformat(),
+                    )
+                    return True
+
+                logger.error(
+                    "SendGrid API returned HTTP %d: %s",
+                    response.status_code,
+                    response.text[:500],
+                )
+                return False
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "SendGrid API returned HTTP %d: %s",
+                exc.response.status_code,
+                exc.response.text,
+            )
+            return False
+        except httpx.RequestError as exc:
+            logger.error("SendGrid request failed: %s", exc)
+            return False
+
     # ------------------------------------------------------------------
     # Template rendering
     # ------------------------------------------------------------------
+
+    def _render_daily_html(self, report: DailyReport, base_url: str = "") -> str:
+        """Render the daily email HTML from the Jinja2 template."""
+        template = self._jinja_env.get_template("daily_email.html")
+
+        return template.render(
+            # Header
+            campaign_name=report.campaign_name,
+            report_date=report.report_date.isoformat(),
+            report_date_fmt=report.report_date.strftime("%B %d, %Y"),
+            generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+            base_url=base_url,
+            day_number=report.day_number,
+            cycle_number=report.cycle_number,
+            # Top-line cards
+            total_spend=report.total_spend,
+            total_purchases=report.total_purchases,
+            avg_cost_per_purchase=report.avg_cost_per_purchase,
+            avg_roas=report.avg_roas,
+            # Previous day for trends
+            prev_spend=report.prev_spend,
+            prev_purchases=report.prev_purchases,
+            prev_avg_cpa=report.prev_avg_cpa,
+            prev_avg_roas=report.prev_avg_roas,
+            # Best ad spotlight
+            best_variant=report.best_variant,
+            best_variant_funnel=report.best_variant_funnel,
+            best_variant_diagnostics=report.best_variant_diagnostics,
+            best_variant_projection=report.best_variant_projection,
+            # Variants table
+            variants=report.variants,
+            # Alerts and actions
+            fatigue_alerts=report.fatigue_alerts,
+            actions=report.actions,
+            next_cycle=report.next_cycle,
+            winners=report.winners,
+        )
 
     def _render_html(self, report: WeeklyReport, report_type: str = "Weekly") -> str:
         """Render the report HTML from the Jinja2 template.
