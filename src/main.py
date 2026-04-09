@@ -599,7 +599,9 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                 roas_str = f" ROAS {el.avg_roas:.2f}x" if el.avg_roas else ""
                 click.echo(f"  {el.slot_name}: {el.slot_value} — CTR {el.avg_ctr:.2%}{roas_str} ({el.variants_tested} variants)")
 
-        # Send email if requested
+        week_label = f"{week_start.isocalendar()[0]}-W{week_start.isocalendar()[1]:02d}"
+
+        # Send email if requested (v2 redesigned template)
         if send_email:
             if not settings.sendgrid_api_key or settings.sendgrid_api_key.startswith("placeholder"):
                 click.echo("\nError: SENDGRID_API_KEY not configured in .env")
@@ -611,7 +613,12 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                     from_email=settings.report_email_from,
                     to_email=settings.report_email_to,
                 )
-                success = await reporter.send_weekly_report(report)
+                success = await reporter.send_weekly_report_v2(
+                    report,
+                    campaign_name=campaign_name,
+                    week_label=week_label,
+                    base_url=settings.report_base_url,
+                )
                 if success:
                     click.echo(f"\nEmail report sent to {settings.report_email_to}")
                 else:
@@ -634,7 +641,6 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
         # Generate static HTML report
         from src.reports.web import render_weekly_report as render_weekly_html, render_index
 
-        week_label = f"{week_start.isocalendar()[0]}-W{week_start.isocalendar()[1]:02d}"
         html_path = render_weekly_html(report, campaign_name, week_label)
         click.echo(f"\nWeb report: {html_path}")
 
@@ -893,6 +899,44 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
             best_variant = all_variants[0] if all_variants else None
             worst_variant = all_variants[-1] if len(all_variants) > 1 else None
 
+            # Fetch variant genomes for enrichment
+            genome_row = await session.execute(
+                sa_text("""
+                    SELECT v.id, v.genome, v.hypothesis,
+                           EXTRACT(DAY FROM NOW() - v.created_at)::INT AS days_active
+                    FROM variants v
+                    WHERE v.campaign_id = :id AND v.status IN ('active', 'winner', 'paused')
+                """),
+                {"id": campaign_id},
+            )
+            genome_map = {
+                str(r[0]): {"genome": r[1] or {}, "hypothesis": r[2], "days_active": int(r[3] or 1)}
+                for r in genome_row.fetchall()
+            }
+
+            # Previous day metrics for trend comparison
+            prev_day = report_day - timedelta(days=1)
+            prev_start = datetime(prev_day.year, prev_day.month, prev_day.day, tzinfo=timezone.utc)
+            prev_end = prev_start + timedelta(days=1)
+            prev_row = await session.execute(
+                sa_text("""
+                    SELECT COALESCE(SUM(m.spend), 0),
+                           COALESCE(SUM(m.purchases), 0),
+                           COALESCE(SUM(m.purchase_value), 0)
+                    FROM metrics m
+                    JOIN variants v ON v.id = m.variant_id
+                    WHERE v.campaign_id = :id
+                      AND m.recorded_at >= :ps AND m.recorded_at < :pe
+                """),
+                {"id": campaign_id, "ps": prev_start, "pe": prev_end},
+            )
+            prev = prev_row.fetchone()
+            prev_spend = Decimal(str(prev[0])) if prev and float(prev[0]) > 0 else None
+            prev_purchases = int(prev[1]) if prev else None
+            prev_pv = Decimal(str(prev[2])) if prev else Decimal("0")
+            prev_avg_cpa = float(prev_spend) / int(prev[1]) if prev_spend and int(prev[1]) > 0 else None
+            prev_avg_roas = float(prev_pv) / float(prev_spend) if prev_spend and float(prev_spend) > 0 and float(prev_pv) > 0 else None
+
             # Element rankings
             rankings_row = await session.execute(
                 sa_text("""
@@ -1039,27 +1083,10 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
                 roas_str = f" ROAS {el.avg_roas:.2f}x" if el.avg_roas else ""
                 click.echo(f"  {el.slot_name}: {el.slot_value} — CTR {el.avg_ctr:.2%}{roas_str} ({el.variants_tested} variants)")
 
-        # Send email if requested
-        if send_email:
-            if not settings.sendgrid_api_key or settings.sendgrid_api_key.startswith("placeholder"):
-                click.echo("\nError: SENDGRID_API_KEY not configured in .env")
-            else:
-                from src.reports.email import EmailReporter
-
-                reporter = EmailReporter(
-                    api_key=settings.sendgrid_api_key,
-                    from_email=settings.report_email_from,
-                    to_email=settings.report_email_to,
-                )
-                success = await reporter.send_weekly_report(report, report_type="Daily")
-                if success:
-                    click.echo(f"\nEmail report sent to {settings.report_email_to}")
-                else:
-                    click.echo("\nFailed to send email report. Check logs.")
-
         # Generate v2 report with best-ad spotlight
         from src.reports.web import render_index
 
+        v2_report = None
         try:
             from src.models.reports import DailyReport, VariantReport
             from src.reports.builder import (
@@ -1087,14 +1114,29 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
                 cpp = float(vs.cost_per_purchase) if vs.cost_per_purchase else None
                 roas_v = float(vs.roas) if vs.roas else None
 
+                # Enrich with genome data from DB
+                vid = str(vs.variant_id)
+                gdata = genome_map.get(vid, {})
+                genome = gdata.get("genome", {}) if gdata else {}
+                hypothesis = gdata.get("hypothesis") if gdata else None
+                days_active = gdata.get("days_active", 1) if gdata else 1
+
+                # Build genome summary from key slots
+                summary_parts = []
+                if genome.get("headline"):
+                    summary_parts.append(genome["headline"][:30])
+                if genome.get("cta_text"):
+                    summary_parts.append(genome["cta_text"])
+                genome_summary = " + ".join(summary_parts) if summary_parts else vs.variant_code
+
                 return VariantReport(
                     variant_id=vs.variant_id,
                     variant_code=vs.variant_code,
-                    genome={},
-                    genome_summary=vs.variant_code,
-                    hypothesis=None,
+                    genome=genome,
+                    genome_summary=genome_summary,
+                    hypothesis=hypothesis,
                     status=vs.status,
-                    days_active=1,
+                    days_active=days_active,
                     spend=vs.spend,
                     purchases=purch,
                     purchase_value=vs.purchase_value,
@@ -1129,7 +1171,12 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
                 avg_cost_per_purchase=float(avg_cost_per_purchase) if avg_cost_per_purchase else None,
                 avg_roas=float(avg_roas) if avg_roas else None,
                 avg_hook_rate_pct=float(avg_hook_rate) * 100 if avg_hook_rate else 0.0,
-                variants=sorted(v2_variants, key=lambda v: (v.cost_per_purchase or 9999, -(v.roas or 0))),
+                # Previous day trends
+                prev_spend=prev_spend,
+                prev_purchases=prev_purchases if prev_purchases and prev_purchases > 0 else None,
+                prev_avg_cpa=prev_avg_cpa,
+                prev_avg_roas=prev_avg_roas,
+                variants=sorted(v2_variants, key=lambda v: (v.cost_per_purchase is None, v.cost_per_purchase or 0)),
                 best_variant=best_v2,
                 best_variant_funnel=build_funnel(best_v2) if best_v2 else [],
                 best_variant_diagnostics=build_diagnostics(best_v2) if best_v2 else [],
@@ -1142,6 +1189,28 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
             import traceback
             click.echo(f"\nWarning: v2 report generation failed: {exc}")
             traceback.print_exc()
+
+        # Send v2 daily email if requested
+        if send_email:
+            if not settings.sendgrid_api_key or settings.sendgrid_api_key.startswith("placeholder"):
+                click.echo("\nError: SENDGRID_API_KEY not configured in .env")
+            elif v2_report is not None:
+                from src.reports.email import EmailReporter
+
+                reporter = EmailReporter(
+                    api_key=settings.sendgrid_api_key,
+                    from_email=settings.report_email_from,
+                    to_email=settings.report_email_to,
+                )
+                success = await reporter.send_daily_report(
+                    v2_report, base_url=settings.report_base_url,
+                )
+                if success:
+                    click.echo(f"\nEmail report sent to {settings.report_email_to}")
+                else:
+                    click.echo("\nFailed to send email report. Check logs.")
+            else:
+                click.echo("\nWarning: v2 report not available, email not sent.")
 
         # Update index with all existing reports
         from pathlib import Path as _Path
