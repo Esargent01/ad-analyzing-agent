@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 
+import { StatusPill } from "@/components/StatusPill";
 import { Card } from "@/components/ui/Card";
 import { useMe } from "@/lib/api/hooks";
 
@@ -37,15 +38,9 @@ export function DashboardRoute() {
               className="block rounded-lg border border-[var(--border)] bg-[var(--bg)] p-5 transition-colors hover:border-[var(--accent)] no-underline hover:no-underline"
             >
               <div className="mb-2 flex items-center justify-between">
-                <span
-                  className={
-                    campaign.is_active
-                      ? "status-pill status-winner"
-                      : "status-pill status-paused"
-                  }
-                >
+                <StatusPill kind={campaign.is_active ? "active" : "paused"}>
                   {campaign.is_active ? "Active" : "Paused"}
-                </span>
+                </StatusPill>
               </div>
               <h2 className="text-[15px] font-medium text-[var(--text)]">
                 {campaign.name}

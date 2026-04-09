@@ -10,6 +10,7 @@ import { useMutation, useQuery, type UseQueryOptions } from "@tanstack/react-que
 import { api, ApiError } from "@/lib/api/client";
 import type {
   DailyDatesResponse,
+  ExperimentsResponse,
   MagicLinkRequest,
   MeResponse,
   WeeklyIndexResponse,
@@ -25,6 +26,8 @@ export const qk = {
     ["campaigns", campaignId, "reports", "daily"] as const,
   weeklyIndex: (campaignId: string) =>
     ["campaigns", campaignId, "reports", "weekly"] as const,
+  experiments: (campaignId: string) =>
+    ["campaigns", campaignId, "experiments"] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -97,6 +100,22 @@ export function useWeeklyIndex(campaignId: string | undefined) {
     queryFn: ({ signal }) =>
       api.get<WeeklyIndexResponse>(
         `/api/campaigns/${campaignId}/reports/weekly`,
+        { signal },
+      ),
+    enabled: Boolean(campaignId),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Experiments (proposed variants, gene pool, pending approvals)
+// ---------------------------------------------------------------------------
+
+export function useExperiments(campaignId: string | undefined) {
+  return useQuery<ExperimentsResponse, ApiError>({
+    queryKey: campaignId ? qk.experiments(campaignId) : ["experiments-disabled"],
+    queryFn: ({ signal }) =>
+      api.get<ExperimentsResponse>(
+        `/api/campaigns/${campaignId}/experiments`,
         { signal },
       ),
     enabled: Boolean(campaignId),

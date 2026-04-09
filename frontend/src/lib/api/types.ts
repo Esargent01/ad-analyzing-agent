@@ -37,3 +37,34 @@ export interface WeeklyIndexResponse {
 export interface MagicLinkRequest {
   email: string;
 }
+
+// ---------------------------------------------------------------------------
+// Experiments
+// ---------------------------------------------------------------------------
+
+export interface ProposedVariant {
+  approval_id: string;
+  variant_id: string;
+  variant_code: string;
+  genome: Record<string, string>;
+  genome_summary: string;
+  hypothesis: string | null;
+  submitted_at: string;
+  /** "new" | "expiring_soon" */
+  classification: string;
+  days_until_expiry: number;
+}
+
+export interface GenePoolEntry {
+  id: string;
+  slot_name: string;
+  slot_value: string;
+  description: string | null;
+  source: string | null;
+}
+
+export interface ExperimentsResponse {
+  proposed_variants: ProposedVariant[];
+  gene_pool_by_slot: Record<string, GenePoolEntry[]>;
+  allowed_suggestion_slots: string[];
+}
