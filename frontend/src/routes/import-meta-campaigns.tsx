@@ -176,12 +176,23 @@ export function ImportMetaCampaignsRoute() {
         // Phase G: the server may be telling us to pick an account
         // first (``pick_account_first``) or that we tried to use an
         // account / Page that isn't in the allowlist
-        // (``account_not_in_allowlist``).
-        const detail = (err.body as { detail?: string } | null)?.detail;
-        if (detail === "pick_account_first") {
+        // (``account_not_in_allowlist``). FastAPI serialises
+        // HTTPException(status_code=400, detail="...") into
+        // ``{"detail": "..."}``, which the client wrapper stores on
+        // ``ApiError.detail`` (the whole JSON body, not just the
+        // string). Peel the inner ``.detail`` off.
+        const raw = err.detail;
+        let code: string | undefined;
+        if (typeof raw === "string") {
+          code = raw;
+        } else if (raw && typeof raw === "object" && "detail" in raw) {
+          const inner = (raw as { detail?: unknown }).detail;
+          if (typeof inner === "string") code = inner;
+        }
+        if (code === "pick_account_first") {
           return "Pick an ad account above before fetching campaigns.";
         }
-        if (detail === "account_not_in_allowlist") {
+        if (code === "account_not_in_allowlist") {
           return "That ad account or Page isn't in your connected Meta assets. Refresh and try again.";
         }
         return "Something about the request was invalid. Refresh and try again.";
