@@ -1,0 +1,67 @@
+# fly.toml — Fly.io config for the ad-analyzing-agent FastAPI backend.
+#
+# Before first deploy:
+#   1. Run `fly launch --no-deploy --copy-config` and let it pick a unique
+#      `app` name (or edit the `app` field below manually).
+#   2. Set secrets via `fly secrets set KEY=VALUE ...` — see README /
+#      deploy instructions for the full list.
+#   3. Update the `[env]` block below with the real Fly.dev URL once you
+#      know it (FRONTEND_BASE_URL stays pointing at Vercel/wherever the
+#      React app lives).
+#   4. `fly deploy`.
+
+app = "ad-analyzing-agent"       # Change to a globally-unique name
+primary_region = "ord"           # Chicago — closest low-latency to most US users
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Run Alembic migrations before each deploy goes live. If this command
+# fails the new release never serves traffic, so a broken migration
+# can't take down prod.
+[deploy]
+  release_command = "alembic upgrade head"
+
+# Non-secret runtime env. Secrets (DATABASE_URL, ANTHROPIC_API_KEY,
+# META_APP_SECRET, META_TOKEN_ENCRYPTION_KEY, AUTH_SESSION_SECRET, etc.)
+# are set via `fly secrets set` and injected at runtime — do NOT put
+# them here.
+[env]
+  LOG_LEVEL = "INFO"
+  COOKIE_SECURE = "true"
+  # These four URLs must be updated once you know your Fly subdomain.
+  # Pattern: https://<app>.fly.dev
+  API_BASE_URL = "https://ad-analyzing-agent.fly.dev"
+  META_OAUTH_REDIRECT_URI = "https://ad-analyzing-agent.fly.dev/api/auth/meta/callback"
+  # Frontend URL lives on Vercel (or wherever the React app is hosted).
+  # Leave this as a placeholder until the frontend is deployed.
+  FRONTEND_BASE_URL = "https://ad-analyzing-agent.vercel.app"
+  FRONTEND_ORIGINS = "https://ad-analyzing-agent.vercel.app"
+  META_OAUTH_SCOPES = "ads_management,ads_read,business_management"
+  META_GRAPH_API_VERSION = "v18.0"
+  MAX_CAMPAIGNS_PER_USER = "5"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  # Auto-stop the machine after idle to keep the bill tiny. First request
+  # after a stop pays a ~1s cold-start penalty — fine for OAuth flows,
+  # not great for interactive dashboards. Flip both to false if you want
+  # always-on.
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+  [[http_service.checks]]
+    interval = "30s"
+    timeout = "5s"
+    grace_period = "10s"
+    method = "GET"
+    path = "/api/health"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

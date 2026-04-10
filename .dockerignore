@@ -1,0 +1,47 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.egg-info/
+dist/
+build/
+
+# Node / frontend (the backend image doesn't need these — the frontend
+# deploys separately to Vercel)
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# Generated daily-report HTML (published to GitHub Pages, not served
+# from the API container)
+public/
+
+# Local environment files — secrets come from `fly secrets`, never the
+# image layer.
+.env
+.env.local
+.env.*.local
+frontend/.env.local
+
+# Git + IDE
+.git/
+.github/
+.gitignore
+.vscode/
+.idea/
+.DS_Store
+
+# Docs and dev-only files
+docs/
+*.md
+!README.md
+notebooks/
+tests/

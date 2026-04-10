@@ -212,6 +212,19 @@ if _cors_origins:
 
 
 # ---------------------------------------------------------------------------
+# Health check — used by Fly.io HTTP health checks and uptime monitors.
+# Intentionally does NOT touch the database so a degraded DB doesn't take
+# the whole process out of rotation (and so a cold-started machine can
+# pass its first health check before the DB pool warms up).
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/health")
+async def api_health() -> dict[str, str]:
+    return {"status": "ok"}
+
+
+# ---------------------------------------------------------------------------
 # Lightweight dashboard queries (avoid eager-loading metrics)
 # ---------------------------------------------------------------------------
 
