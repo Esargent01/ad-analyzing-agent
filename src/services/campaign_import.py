@@ -31,7 +31,9 @@ Exception contract:
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
+from datetime import datetime
+from decimal import Decimal, InvalidOperation
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -72,6 +74,59 @@ logger = logging.getLogger(__name__)
 _SEED_SLOTS: tuple[str, ...] = ("headline", "body", "cta_text", "image_url")
 
 
+def _parse_meta_created_time(value: Any) -> datetime | None:
+    """Coerce Meta's ``created_time`` string into a ``datetime``.
+
+    Meta returns ISO 8601 with a compact (no-colon) UTC offset like
+    ``'2026-04-06T14:20:59-0400'``. Python 3.11+ ``fromisoformat``
+    handles this, but older runtimes and some edge cases need a
+    fallback. Return ``None`` if the value is missing or unparseable
+    — the field is optional on the model.
+    """
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str) or not value:
+        return None
+    # Python 3.11+ accepts both ``+HH:MM`` and ``+HHMM`` offsets.
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        pass
+    # Older-format fallback: inject the missing colon in the offset
+    # and retry (``2026-04-06T14:20:59-0400`` → ``...−04:00``).
+    if len(value) >= 5 and (value[-5] in "+-") and value[-3] != ":":
+        patched = f"{value[:-2]}:{value[-2:]}"
+        try:
+            return datetime.fromisoformat(patched)
+        except ValueError:
+            pass
+    logger.warning("Could not parse Meta created_time: %r", value)
+    return None
+
+
+def _parse_meta_daily_budget(value: Any) -> float | None:
+    """Coerce Meta's ``daily_budget`` (string, minor units) to a float.
+
+    Meta returns budgets as strings denominated in the account's
+    minor currency unit — e.g. USD is cents, so ``"5000"`` means
+    $50.00. Divide by 100 for display. Return ``None`` if missing
+    or unparseable; the model field is optional.
+    """
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return float(value) / 100.0
+    if not isinstance(value, str) or not value:
+        return None
+    try:
+        return float(Decimal(value)) / 100.0
+    except (InvalidOperation, ValueError):
+        logger.warning("Could not parse Meta daily_budget: %r", value)
+        return None
+
+
 async def list_importable_campaigns(
     session: AsyncSession, user_id: UUID
 ) -> ImportableCampaignsResponse:
@@ -88,9 +143,7 @@ async def list_importable_campaigns(
     adapter = await get_meta_adapter_for_user(session, user_id)
     meta_campaigns_raw = await adapter.list_campaigns()
 
-    already_imported = await get_imported_meta_campaign_ids_for_user(
-        session, user_id
-    )
+    already_imported = await get_imported_meta_campaign_ids_for_user(session, user_id)
     quota_used = await count_active_campaigns_for_user(session, user_id)
     quota_max = settings.max_campaigns_per_user
 
@@ -99,9 +152,9 @@ async def list_importable_campaigns(
             meta_campaign_id=str(row["meta_campaign_id"]),
             name=str(row.get("name") or "(unnamed)"),
             status=str(row.get("status") or "UNKNOWN"),
-            daily_budget=row.get("daily_budget"),  # type: ignore[arg-type]
-            created_time=row.get("created_time"),  # type: ignore[arg-type]
-            objective=row.get("objective") or None,  # type: ignore[arg-type]
+            daily_budget=_parse_meta_daily_budget(row.get("daily_budget")),
+            created_time=_parse_meta_created_time(row.get("created_time")),
+            objective=(str(row["objective"]) if row.get("objective") else None),
             already_imported=str(row["meta_campaign_id"]) in already_imported,
         )
         for row in meta_campaigns_raw
@@ -161,9 +214,7 @@ async def _seed_gene_pool_entries(
         return 0
 
     # Bulk-check which ones already exist.
-    existing_stmt = select(
-        GenePoolEntry.slot_name, GenePoolEntry.slot_value
-    ).where(
+    existing_stmt = select(GenePoolEntry.slot_name, GenePoolEntry.slot_value).where(
         GenePoolEntry.slot_name.in_({slot for slot, _ in candidates})
     )
     existing_rows = await session.execute(existing_stmt)
@@ -190,9 +241,7 @@ async def _seed_gene_pool_entries(
     return new_rows
 
 
-async def _next_variant_code(
-    session: AsyncSession, campaign_id: UUID
-) -> str:
+async def _next_variant_code(session: AsyncSession, campaign_id: UUID) -> str:
     """Assign the next V-code for a freshly-created campaign.
 
     Since the campaign was just inserted it has zero variants, so
@@ -231,9 +280,7 @@ async def import_campaign(
     # same Meta campaign twice.
     already = await get_imported_meta_campaign_ids_for_user(session, user_id)
     if meta_campaign_id in already:
-        raise CampaignAlreadyImported(
-            f"Meta campaign {meta_campaign_id} is already imported."
-        )
+        raise CampaignAlreadyImported(f"Meta campaign {meta_campaign_id} is already imported.")
 
     # 3. Fetch Meta-side data via the per-user adapter.
     adapter = await get_meta_adapter_for_user(session, user_id)
@@ -243,9 +290,7 @@ async def import_campaign(
         None,
     )
     if match is None:
-        raise ValueError(
-            f"Meta campaign {meta_campaign_id} not found in user's ad account."
-        )
+        raise ValueError(f"Meta campaign {meta_campaign_id} not found in user's ad account.")
 
     ads = await adapter.list_campaign_ads(meta_campaign_id)
 
@@ -262,9 +307,7 @@ async def import_campaign(
         # the user can edit it later.
         daily_budget = Decimal("50.00")
 
-    max_variants = (
-        overrides.max_concurrent_variants or settings.max_concurrent_variants
-    )
+    max_variants = overrides.max_concurrent_variants or settings.max_concurrent_variants
     confidence_threshold = overrides.confidence_threshold or Decimal("0.95")
 
     campaign = Campaign(
