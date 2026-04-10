@@ -11,9 +11,14 @@
 
 import { getCsrfToken } from "@/lib/auth";
 
-const API_BASE_URL: string = (
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
-).replace(/\/$/, "");
+// Default to same-origin (empty string) so production builds hit the Vercel
+// /api/* proxy rewrite without needing a build-time env var. Local dev sets
+// VITE_API_BASE_URL=http://localhost:8000 in frontend/.env.local to point at
+// the backend running outside Vite's dev server.
+const API_BASE_URL: string = (import.meta.env.VITE_API_BASE_URL ?? "").replace(
+  /\/$/,
+  "",
+);
 
 export class ApiError extends Error {
   status: number;
