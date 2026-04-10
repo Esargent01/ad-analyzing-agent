@@ -190,18 +190,27 @@ export function ConnectMetaCard() {
           </dl>
           {/* Phase G: surface the enumerated asset counts so the user
               knows their token has reachable accounts + Pages before
-              they hit the import page. */}
-          <p className="mt-3 text-xs text-[var(--text-tertiary)]">
-            {status.data.available_ad_accounts.length} ad account
-            {status.data.available_ad_accounts.length === 1 ? "" : "s"},{" "}
-            {status.data.available_pages.length} Page
-            {status.data.available_pages.length === 1 ? "" : "s"}
-            {status.data.available_ad_accounts.length === 0 && (
-              <span className="ml-2 text-amber-300">
-                — create one in Meta Ads Manager before importing
-              </span>
-            )}
-          </p>
+              they hit the import page. Defend with ?? [] because a
+              Phase F-era backend (or a cached CDN response) may not
+              include these fields yet — we don't want the dashboard
+              to crash during a staggered deploy. */}
+          {(() => {
+            const accounts = status.data.available_ad_accounts ?? [];
+            const pages = status.data.available_pages ?? [];
+            return (
+              <p className="mt-3 text-xs text-[var(--text-tertiary)]">
+                {accounts.length} ad account
+                {accounts.length === 1 ? "" : "s"},{" "}
+                {pages.length} Page
+                {pages.length === 1 ? "" : "s"}
+                {accounts.length === 0 && (
+                  <span className="ml-2 text-amber-300">
+                    — create one in Meta Ads Manager before importing
+                  </span>
+                )}
+              </p>
+            );
+          })()}
         </>
       )}
 

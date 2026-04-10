@@ -59,15 +59,17 @@ export function ImportMetaCampaignsRoute() {
   const [adAccountId, setAdAccountId] = useState<string | null>(null);
 
   // Seed the account/page selection once the connection status comes
-  // back so single-account users don't see an empty state.
+  // back so single-account users don't see an empty state. Defend
+  // against an older backend whose ``/api/me/meta/status`` payload
+  // doesn't yet carry the Phase G fields — the `?? []` keeps the
+  // length check from crashing on undefined during a staggered deploy.
   useEffect(() => {
     if (!status.data?.connected) return;
     if (adAccountId) return;
+    const accounts = status.data.available_ad_accounts ?? [];
     const defaultAccount =
       status.data.default_ad_account_id ??
-      (status.data.available_ad_accounts.length === 1
-        ? status.data.available_ad_accounts[0].id
-        : null);
+      (accounts.length === 1 ? accounts[0].id : null);
     if (defaultAccount) setAdAccountId(defaultAccount);
   }, [status.data, adAccountId]);
 
