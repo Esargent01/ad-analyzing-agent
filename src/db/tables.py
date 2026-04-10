@@ -137,6 +137,15 @@ class Campaign(Base):
     owner_user_id: Mapped[Optional[UUID]] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
+    # Phase G — per-campaign Meta tenancy. ``meta_ad_account_id`` and
+    # ``meta_page_id`` are enforced NOT NULL for ``platform = 'meta'``
+    # rows via a partial CHECK constraint (see migration 009), but
+    # are nullable on the Python side so future non-Meta platforms
+    # aren't dragged in. ``landing_page_url`` is genuinely optional
+    # — the import flow treats it as a per-product free-text field.
+    meta_ad_account_id: Mapped[Optional[str]] = mapped_column(Text)
+    meta_page_id: Mapped[Optional[str]] = mapped_column(Text)
+    landing_page_url: Mapped[Optional[str]] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
@@ -468,9 +477,7 @@ class User(Base):
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    is_active: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="true"
-    )
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
 
     __table_args__ = (
         UniqueConstraint("email", name="uq_users_email"),
@@ -532,26 +539,33 @@ class UserMetaConnection(Base):
     )
     meta_user_id: Mapped[str] = mapped_column(Text, nullable=False)
     encrypted_access_token: Mapped[str] = mapped_column(Text, nullable=False)
-    token_expires_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True)
-    )
+    token_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     scopes: Mapped[Optional[list[str]]] = mapped_column(ARRAY(Text))
+    # Phase G — enumerated at OAuth callback time, one Graph API
+    # roundtrip per connection. Stored as JSONB so the shape of
+    # ``MetaAdAccountInfo`` / ``MetaPageInfo`` can evolve without a
+    # migration. Python-side access returns ``list[dict]``; the
+    # dashboard layer coerces back into Pydantic before surfacing to
+    # the frontend.
+    available_ad_accounts: Mapped[list[dict]] = mapped_column(
+        JSONB, nullable=False, server_default="'[]'::jsonb"
+    )
+    available_pages: Mapped[list[dict]] = mapped_column(
+        JSONB, nullable=False, server_default="'[]'::jsonb"
+    )
+    # Auto-picked when the user has exactly one account / Page. If
+    # they have many, NULL here and the import UI forces a choice.
+    default_ad_account_id: Mapped[Optional[str]] = mapped_column(Text)
+    default_page_id: Mapped[Optional[str]] = mapped_column(Text)
     connected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
-    last_refreshed_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True)
-    )
+    last_refreshed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
-    __table_args__ = (
-        Index("idx_user_meta_connections_meta_user_id", "meta_user_id"),
-    )
+    __table_args__ = (Index("idx_user_meta_connections_meta_user_id", "meta_user_id"),)
 
     def __repr__(self) -> str:
-        return (
-            f"<UserMetaConnection user={self.user_id} "
-            f"meta={self.meta_user_id}>"
-        )
+        return f"<UserMetaConnection user={self.user_id} meta={self.meta_user_id}>"
 
 
 class UsageLog(Base):
@@ -595,22 +609,13 @@ class UsageLog(Base):
     service: Mapped[str] = mapped_column(Text, nullable=False)
     agent: Mapped[Optional[str]] = mapped_column(Text)
     model: Mapped[Optional[str]] = mapped_column(Text)
-    input_units: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default="0"
-    )
-    output_units: Mapped[int] = mapped_column(
-        Integer, nullable=False, server_default="0"
-    )
-    cost_usd: Mapped[Decimal] = mapped_column(
-        Numeric(12, 6), nullable=False, server_default="0"
-    )
+    input_units: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    output_units: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
+    cost_usd: Mapped[Decimal] = mapped_column(Numeric(12, 6), nullable=False, server_default="0")
     metadata_json: Mapped[Optional[dict]] = mapped_column(JSONB)
 
     def __repr__(self) -> str:
-        return (
-            f"<UsageLog service={self.service} agent={self.agent} "
-            f"cost=${self.cost_usd}>"
-        )
+        return f"<UsageLog service={self.service} agent={self.agent} cost=${self.cost_usd}>"
 
 
 class MagicLinkConsumed(Base):
@@ -630,9 +635,7 @@ class MagicLinkConsumed(Base):
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
 
-    __table_args__ = (
-        Index("idx_magic_links_consumed_at", "consumed_at"),
-    )
+    __table_args__ = (Index("idx_magic_links_consumed_at", "consumed_at"),)
 
     def __repr__(self) -> str:
         return f"<MagicLinkConsumed consumed_at={self.consumed_at}>"

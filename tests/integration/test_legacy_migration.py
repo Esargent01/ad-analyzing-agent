@@ -42,10 +42,7 @@ import pytest
 # ---------------------------------------------------------------------------
 
 MIGRATION_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "008_migrate_legacy_campaigns.py"
+    Path(__file__).resolve().parents[2] / "alembic" / "versions" / "008_migrate_legacy_campaigns.py"
 )
 
 

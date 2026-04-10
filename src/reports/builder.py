@@ -28,14 +28,16 @@ def build_funnel(v: VariantReport) -> list[ReportFunnelStage]:
 
     for label, count, rate, rate_label, color in steps:
         dropoff = ((prev_count - count) / prev_count * 100) if prev_count > 0 else 0
-        stages.append(ReportFunnelStage(
-            label=label,
-            count=count,
-            rate_pct=round(rate, 1),
-            rate_label=rate_label,
-            dropoff_pct=round(dropoff, 0),
-            bar_color=color,
-        ))
+        stages.append(
+            ReportFunnelStage(
+                label=label,
+                count=count,
+                rate_pct=round(rate, 1),
+                rate_label=rate_label,
+                dropoff_pct=round(dropoff, 0),
+                bar_color=color,
+            )
+        )
         prev_count = count  # 0 is fine — next iteration's guard handles it
 
     return stages
@@ -47,68 +49,90 @@ def build_diagnostics(v: VariantReport) -> list[Diagnostic]:
 
     # Hook rate
     if v.hook_rate_pct >= 30:
-        diags.append(Diagnostic(
-            text=f"Hook rate {v.hook_rate_pct:.0f}% — strong opener, above 30% benchmark",
-            severity="good",
-        ))
+        diags.append(
+            Diagnostic(
+                text=f"Hook rate {v.hook_rate_pct:.0f}% — strong opener, above 30% benchmark",
+                severity="good",
+            )
+        )
     elif v.hook_rate_pct >= 25:
-        diags.append(Diagnostic(
-            text=f"Hook rate {v.hook_rate_pct:.0f}% — acceptable but below 30% target",
-            severity="warning",
-        ))
+        diags.append(
+            Diagnostic(
+                text=f"Hook rate {v.hook_rate_pct:.0f}% — acceptable but below 30% target",
+                severity="warning",
+            )
+        )
     else:
-        diags.append(Diagnostic(
-            text=f"Hook rate {v.hook_rate_pct:.0f}% — below 25% floor, creative isn't stopping the scroll",
-            severity="bad",
-        ))
+        diags.append(
+            Diagnostic(
+                text=f"Hook rate {v.hook_rate_pct:.0f}% — below 25% floor, creative isn't stopping the scroll",
+                severity="bad",
+            )
+        )
 
     # Hold rate
     if v.hold_rate_pct >= 25:
-        diags.append(Diagnostic(
-            text=f"Hold rate {v.hold_rate_pct:.0f}% — narrative keeps viewers engaged past 15 seconds",
-            severity="good",
-        ))
+        diags.append(
+            Diagnostic(
+                text=f"Hold rate {v.hold_rate_pct:.0f}% — narrative keeps viewers engaged past 15 seconds",
+                severity="good",
+            )
+        )
     else:
-        diags.append(Diagnostic(
-            text=f"Hold rate {v.hold_rate_pct:.0f}% — viewers lose interest after the hook. Mid-video content needs work.",
-            severity="warning" if v.hold_rate_pct >= 15 else "bad",
-        ))
+        diags.append(
+            Diagnostic(
+                text=f"Hold rate {v.hold_rate_pct:.0f}% — viewers lose interest after the hook. Mid-video content needs work.",
+                severity="warning" if v.hold_rate_pct >= 15 else "bad",
+            )
+        )
 
     # ATC rate
     if v.atc_rate_pct >= 5:
-        diags.append(Diagnostic(
-            text=f"ATC rate {v.atc_rate_pct:.0f}% — landing page conversion is healthy (benchmark: 5-10%)",
-            severity="good",
-        ))
+        diags.append(
+            Diagnostic(
+                text=f"ATC rate {v.atc_rate_pct:.0f}% — landing page conversion is healthy (benchmark: 5-10%)",
+                severity="good",
+            )
+        )
     else:
-        diags.append(Diagnostic(
-            text=f"ATC rate {v.atc_rate_pct:.0f}% — below 5% benchmark. Ad may promise something the landing page doesn't deliver.",
-            severity="bad",
-        ))
+        diags.append(
+            Diagnostic(
+                text=f"ATC rate {v.atc_rate_pct:.0f}% — below 5% benchmark. Ad may promise something the landing page doesn't deliver.",
+                severity="bad",
+            )
+        )
 
     # Checkout rate
     if v.checkout_rate_pct >= 30:
-        diags.append(Diagnostic(
-            text=f"Checkout rate {v.checkout_rate_pct:.0f}% — checkout process is healthy",
-            severity="good",
-        ))
+        diags.append(
+            Diagnostic(
+                text=f"Checkout rate {v.checkout_rate_pct:.0f}% — checkout process is healthy",
+                severity="good",
+            )
+        )
     elif v.checkout_rate_pct > 0:
-        diags.append(Diagnostic(
-            text=f"Checkout rate {v.checkout_rate_pct:.0f}% — below 30% benchmark. Potential friction at payment/shipping.",
-            severity="warning" if v.checkout_rate_pct >= 20 else "bad",
-        ))
+        diags.append(
+            Diagnostic(
+                text=f"Checkout rate {v.checkout_rate_pct:.0f}% — below 30% benchmark. Potential friction at payment/shipping.",
+                severity="warning" if v.checkout_rate_pct >= 20 else "bad",
+            )
+        )
 
     # Frequency
     if v.frequency > 3.0:
-        diags.append(Diagnostic(
-            text=f"Frequency {v.frequency:.1f} — above 3.0, audience seeing the ad too often",
-            severity="bad",
-        ))
+        diags.append(
+            Diagnostic(
+                text=f"Frequency {v.frequency:.1f} — above 3.0, audience seeing the ad too often",
+                severity="bad",
+            )
+        )
     elif v.frequency > 2.5:
-        diags.append(Diagnostic(
-            text=f"Frequency {v.frequency:.1f} — approaching fatigue threshold of 3.0",
-            severity="warning",
-        ))
+        diags.append(
+            Diagnostic(
+                text=f"Frequency {v.frequency:.1f} — approaching fatigue threshold of 3.0",
+                severity="warning",
+            )
+        )
 
     return diags
 
@@ -142,7 +166,7 @@ def build_projection(v: VariantReport) -> str | None:
         projected_purchases = round(v.add_to_carts * (benchmark / 100))
         if projected_purchases > 0:
             projected_cpa = float(v.spend) / projected_purchases
-            improvement = ((v.cost_per_purchase - projected_cpa) / v.cost_per_purchase * 100)
+            improvement = (v.cost_per_purchase - projected_cpa) / v.cost_per_purchase * 100
             return (
                 f"If {label} improved to {benchmark:.0f}%, this ad would produce "
                 f"{projected_purchases} purchases at ${projected_cpa:.2f} CPA — "
@@ -173,7 +197,9 @@ def select_best_variant(variants: list[VariantReport]) -> VariantReport | None:
     eligible = [v for v in variants if v.purchases >= 3 and v.cost_per_purchase is not None]
     if not eligible:
         # Fall back to most purchases if none hit threshold
-        with_purchases = [v for v in variants if v.purchases > 0 and v.cost_per_purchase is not None]
+        with_purchases = [
+            v for v in variants if v.purchases > 0 and v.cost_per_purchase is not None
+        ]
         if with_purchases:
             return min(with_purchases, key=lambda v: (v.cost_per_purchase, -(v.roas or 0)))
         # Final fallback: variant with most impressions

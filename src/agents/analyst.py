@@ -143,9 +143,7 @@ def _compute_element_insights(
             continue
         ctr = agg.clicks / agg.impressions
         for slot_name, slot_value in variant.genome.items():
-            element_data[(slot_name, slot_value)].append(
-                (ctr, agg.impressions, agg.conversions)
-            )
+            element_data[(slot_name, slot_value)].append((ctr, agg.impressions, agg.conversions))
 
     insights: list[ElementInsight] = []
     for (slot_name, slot_value), entries in element_data.items():
@@ -157,9 +155,7 @@ def _compute_element_insights(
         # Compute weighted average CTR
         total_imps = sum(imps for _, imps, _ in entries)
         weighted_avg_ctr = (
-            sum(ctr * imps for ctr, imps, _ in entries) / total_imps
-            if total_imps > 0
-            else 0.0
+            sum(ctr * imps for ctr, imps, _ in entries) / total_imps if total_imps > 0 else 0.0
         )
         # Significance test via one-sample t-test
         _t_stat, _p_val, confidence = element_significance(
@@ -246,9 +242,7 @@ def _detect_fatigued_variants(
     fatigued: list[UUID] = []
 
     for variant_id, rollups in daily_rollups_by_variant.items():
-        daily_ctrs: list[tuple] = [
-            (r.day, float(r.ctr)) for r in rollups
-        ]
+        daily_ctrs: list[tuple] = [(r.day, float(r.ctr)) for r in rollups]
 
         result = detect_fatigue(
             daily_ctrs=daily_ctrs,
@@ -370,9 +364,7 @@ class AnalystAgent:
         # Step (d): Element performance attribution
         global_clicks = sum(a.clicks for a in metrics_by_variant.values())
         global_impressions = sum(a.impressions for a in metrics_by_variant.values())
-        global_mean_ctr = (
-            global_clicks / global_impressions if global_impressions > 0 else 0.0
-        )
+        global_mean_ctr = global_clicks / global_impressions if global_impressions > 0 else 0.0
 
         element_insights = _compute_element_insights(
             variants=variants,
@@ -446,11 +438,7 @@ class AnalystAgent:
         Uses ``two_proportion_z_test`` and ``is_significant`` from the
         stats service. Variants without sufficient data are skipped.
         """
-        baseline_ctr = (
-            baseline_clicks / baseline_impressions
-            if baseline_impressions > 0
-            else 0.0
-        )
+        baseline_ctr = baseline_clicks / baseline_impressions if baseline_impressions > 0 else 0.0
         results: list[VariantSignificanceResult] = []
 
         for variant in variants:
@@ -543,8 +531,7 @@ class AnalystAgent:
             "top_interactions": [
                 {
                     "pair": (
-                        f"{ii.slot_a_name}:{ii.slot_a_value} + "
-                        f"{ii.slot_b_name}:{ii.slot_b_value}"
+                        f"{ii.slot_a_name}:{ii.slot_a_value} + {ii.slot_b_name}:{ii.slot_b_value}"
                     ),
                     "lift": float(ii.interaction_lift) if ii.interaction_lift is not None else None,
                     "combined_ctr": float(ii.combined_avg_ctr),
@@ -633,6 +620,5 @@ class AnalystAgent:
 
         logger.error("LLM failed to produce a summary for cycle %d", cycle_number)
         raise LLMError(
-            f"LLM failed to produce a summary for campaign {campaign_id} "
-            f"cycle {cycle_number}."
+            f"LLM failed to produce a summary for campaign {campaign_id} cycle {cycle_number}."
         )

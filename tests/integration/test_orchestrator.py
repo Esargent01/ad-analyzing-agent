@@ -45,7 +45,7 @@ def _make_mock_session_factory() -> tuple[async_sessionmaker, AsyncMock]:
     # Make execute return mock result sets
     mock_result = MagicMock()
     mock_result.fetchone.return_value = (1,)  # next_cycle_number returns 1
-    mock_result.fetchall.return_value = []     # no deployments/variants by default
+    mock_result.fetchall.return_value = []  # no deployments/variants by default
     mock_session.execute.return_value = mock_result
     mock_session.flush = AsyncMock()
     mock_session.commit = AsyncMock()

@@ -51,9 +51,7 @@ async def init_db() -> None:
     """
     engine = _get_engine()
     async with engine.connect() as conn:
-        await conn.execute(
-            __import__("sqlalchemy").text("SELECT 1")
-        )
+        await conn.execute(__import__("sqlalchemy").text("SELECT 1"))
 
 
 async def close_db() -> None:

@@ -164,9 +164,7 @@ def _format_interactions(
     if not top_interactions:
         return "No interaction data available yet."
 
-    lines: list[str] = [
-        "Slot A | Value A | Slot B | Value B | Lift | Variants Tested"
-    ]
+    lines: list[str] = ["Slot A | Value A | Slot B | Value B | Lift | Variants Tested"]
     lines.append("--- | --- | --- | --- | --- | ---")
     for ix in sorted(
         top_interactions,
@@ -328,9 +326,7 @@ class GeneratorAgent:
                     metadata={"stop_reason": response.stop_reason},
                 )
             except Exception as log_exc:  # noqa: BLE001 — logging must never fail a cycle
-                logger.warning(
-                    "Failed to log generator usage: %s", log_exc
-                )
+                logger.warning("Failed to log generator usage: %s", log_exc)
 
         # Extract and validate tool-use results
         results: list[GenomeWithHypothesis] = []
@@ -376,9 +372,7 @@ class GeneratorAgent:
 
             # Step 3: Check for duplicates (against existing + this batch)
             if genome_key in existing_set:
-                logger.info(
-                    "Skipping duplicate genome produced by LLM: %s", genome_key
-                )
+                logger.info("Skipping duplicate genome produced by LLM: %s", genome_key)
                 continue
 
             # Step 4: Wrap in the output Pydantic model
@@ -388,9 +382,7 @@ class GeneratorAgent:
                     hypothesis=hypothesis,
                 )
             except ValidationError as exc:
-                logger.warning(
-                    "Pydantic validation failed for GenomeWithHypothesis: %s", exc
-                )
+                logger.warning("Pydantic validation failed for GenomeWithHypothesis: %s", exc)
                 continue
 
             existing_set.add(genome_key)

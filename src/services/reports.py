@@ -76,28 +76,20 @@ async def build_weekly_report(
     if week_end is None:
         week_end = week_start + timedelta(days=6)
 
-    week_start_ts = datetime(
-        week_start.year, week_start.month, week_start.day, tzinfo=timezone.utc
-    )
+    week_start_ts = datetime(week_start.year, week_start.month, week_start.day, tzinfo=timezone.utc)
     week_end_ts = datetime(
         week_end.year, week_end.month, week_end.day, tzinfo=timezone.utc
     ) + timedelta(days=1)
 
     campaign_name = await _get_campaign_name(session, campaign_id)
 
-    cycle_rows = await _get_cycles_in_range(
-        session, campaign_id, week_start_ts, week_end_ts
-    )
+    cycle_rows = await _get_cycles_in_range(session, campaign_id, week_start_ts, week_end_ts)
 
-    totals = await _aggregate_metrics(
-        session, campaign_id, week_start_ts, week_end_ts
-    )
+    totals = await _aggregate_metrics(session, campaign_id, week_start_ts, week_end_ts)
 
     funnel_stages = _build_funnel_stages(totals)
 
-    all_variants = await _variant_leaderboard(
-        session, campaign_id, week_start_ts, week_end_ts
-    )
+    all_variants = await _variant_leaderboard(session, campaign_id, week_start_ts, week_end_ts)
     best_variant = all_variants[0] if all_variants else None
     worst_variant = all_variants[-1] if len(all_variants) > 1 else None
 
@@ -168,9 +160,7 @@ async def build_daily_report(
         Fully populated ``DailyReport`` including the best-variant spotlight
         (funnel, diagnostics, projection) and previous-day trend comparisons.
     """
-    day_start = datetime(
-        report_day.year, report_day.month, report_day.day, tzinfo=timezone.utc
-    )
+    day_start = datetime(report_day.year, report_day.month, report_day.day, tzinfo=timezone.utc)
     day_end = day_start + timedelta(days=1)
 
     campaign_name = await _get_campaign_name(session, campaign_id)
@@ -179,25 +169,17 @@ async def build_daily_report(
 
     totals = await _aggregate_metrics(session, campaign_id, day_start, day_end)
 
-    all_variants = await _variant_leaderboard(
-        session, campaign_id, day_start, day_end
-    )
+    all_variants = await _variant_leaderboard(session, campaign_id, day_start, day_end)
 
     genome_map = await _variant_genome_map(session, campaign_id)
 
     prev_day = report_day - timedelta(days=1)
-    prev_start = datetime(
-        prev_day.year, prev_day.month, prev_day.day, tzinfo=timezone.utc
-    )
+    prev_start = datetime(prev_day.year, prev_day.month, prev_day.day, tzinfo=timezone.utc)
     prev_end = prev_start + timedelta(days=1)
-    prev_totals = await _previous_day_totals(
-        session, campaign_id, prev_start, prev_end
-    )
+    prev_totals = await _previous_day_totals(session, campaign_id, prev_start, prev_end)
 
     # Convert leaderboard VariantSummary rows to the richer VariantReport shape.
-    v2_variants = [
-        _variant_summary_to_variant_report(vs, genome_map) for vs in all_variants
-    ]
+    v2_variants = [_variant_summary_to_variant_report(vs, genome_map) for vs in all_variants]
     best_v2 = select_best_variant(v2_variants)
 
     return DailyReport(
@@ -293,38 +275,24 @@ class _AggregateTotals:
         self.purchases = purchases
         self.purchase_value = purchase_value
 
-        self.ctr = (
-            Decimal(str(clicks / impressions)) if impressions > 0 else Decimal("0")
-        )
-        self.cpa = (
-            Decimal(str(float(spend) / conversions)) if conversions > 0 else None
-        )
+        self.ctr = Decimal(str(clicks / impressions)) if impressions > 0 else Decimal("0")
+        self.cpa = Decimal(str(float(spend) / conversions)) if conversions > 0 else None
         self.hook_rate = (
-            Decimal(str(video_views_3s / impressions))
-            if impressions > 0
-            else Decimal("0")
+            Decimal(str(video_views_3s / impressions)) if impressions > 0 else Decimal("0")
         )
         self.hold_rate = (
-            Decimal(str(video_views_15s / video_views_3s))
-            if video_views_3s > 0
-            else Decimal("0")
+            Decimal(str(video_views_15s / video_views_3s)) if video_views_3s > 0 else Decimal("0")
         )
         self.cpm = (
-            Decimal(str((float(spend) / impressions) * 1000))
-            if impressions > 0
-            else Decimal("0")
+            Decimal(str((float(spend) / impressions) * 1000)) if impressions > 0 else Decimal("0")
         )
-        self.frequency = (
-            Decimal(str(impressions / reach)) if reach > 0 else Decimal("0")
-        )
+        self.frequency = Decimal(str(impressions / reach)) if reach > 0 else Decimal("0")
         self.roas = (
             Decimal(str(float(purchase_value) / float(spend)))
             if float(spend) > 0 and float(purchase_value) > 0
             else None
         )
-        self.cost_per_purchase = (
-            Decimal(str(float(spend) / purchases)) if purchases > 0 else None
-        )
+        self.cost_per_purchase = Decimal(str(float(spend) / purchases)) if purchases > 0 else None
 
 
 class _PreviousDayTotals:
@@ -452,9 +420,7 @@ def _build_funnel_stages(t: _AggregateTotals) -> list[FunnelStage]:
             stage_name="Reach",
             value=t.reach,
             rate=None,
-            cost_per=(
-                Decimal(str(round(spend_f / t.reach * 1000, 2))) if t.reach > 0 else None
-            ),
+            cost_per=(Decimal(str(round(spend_f / t.reach * 1000, 2))) if t.reach > 0 else None),
         ),
     ]
     if t.video_views_3s > 0:
@@ -610,11 +576,7 @@ def _row_to_variant_summary(row) -> VariantSummary:
     hr = Decimal(str(vv3s / imps)) if imps > 0 else Decimal("0")
     hold = Decimal(str(vv15s / vv3s)) if vv3s > 0 else Decimal("0")
     cpp = Decimal(str(float(spend) / purch)) if purch > 0 else None
-    roas = (
-        Decimal(str(float(pv) / float(spend)))
-        if float(spend) > 0 and float(pv) > 0
-        else None
-    )
+    roas = Decimal(str(float(pv) / float(spend))) if float(spend) > 0 and float(pv) > 0 else None
 
     return VariantSummary(
         variant_id=row[0],
@@ -642,9 +604,7 @@ def _row_to_variant_summary(row) -> VariantSummary:
     )
 
 
-async def _element_rankings(
-    session: AsyncSession, campaign_id: UUID
-) -> list[ElementInsight]:
+async def _element_rankings(session: AsyncSession, campaign_id: UUID) -> list[ElementInsight]:
     """Top 20 element performance rows, ordered by average CTR."""
     row = await session.execute(
         sa_text(
@@ -717,9 +677,7 @@ async def _element_interactions(
     ]
 
 
-async def _variant_genome_map(
-    session: AsyncSession, campaign_id: UUID
-) -> dict[str, dict]:
+async def _variant_genome_map(session: AsyncSession, campaign_id: UUID) -> dict[str, dict]:
     """Look up ``{variant_id: {genome, hypothesis, days_active}}`` for enrichment."""
     row = await session.execute(
         sa_text(
@@ -764,16 +722,10 @@ async def _previous_day_totals(
         {"id": str(campaign_id), "ps": start, "pe": end},
     )
     prev = row.fetchone()
-    prev_spend = (
-        Decimal(str(prev[0])) if prev and float(prev[0]) > 0 else None
-    )
+    prev_spend = Decimal(str(prev[0])) if prev and float(prev[0]) > 0 else None
     prev_purchases = int(prev[1]) if prev else None
     prev_pv = Decimal(str(prev[2])) if prev else Decimal("0")
-    prev_avg_cpa = (
-        float(prev_spend) / int(prev[1])
-        if prev_spend and int(prev[1]) > 0
-        else None
-    )
+    prev_avg_cpa = float(prev_spend) / int(prev[1]) if prev_spend and int(prev[1]) > 0 else None
     prev_avg_roas = (
         float(prev_pv) / float(prev_spend)
         if prev_spend and float(prev_spend) > 0 and float(prev_pv) > 0

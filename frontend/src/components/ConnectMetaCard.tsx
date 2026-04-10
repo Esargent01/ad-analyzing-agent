@@ -43,6 +43,11 @@ const META_ERROR_LABELS: Record<string, string> = {
   invalid_state: "The OAuth session expired — please try again.",
   exchange_failed: "Meta rejected the authorization code.",
   crypto_error: "Couldn't securely store your Meta token.",
+  // Phase G: the callback fans out into ad account + Page enumeration.
+  // A failure on either leaves the connection unusable for importing,
+  // so we surface a dedicated reconnect nudge.
+  enumeration_failed:
+    "Connected, but couldn't read your ad accounts or Pages. Reconnect to retry.",
 };
 
 export function ConnectMetaCard() {
@@ -162,26 +167,42 @@ export function ConnectMetaCard() {
       </CardHeader>
 
       {connected && status.data && (
-        <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-3">
-          <div>
-            <dt className="text-[var(--text-tertiary)]">Meta user ID</dt>
-            <dd className="mt-0.5 font-mono text-[var(--text)]">
-              {status.data.meta_user_id ?? "—"}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[var(--text-tertiary)]">Connected</dt>
-            <dd className="mt-0.5 text-[var(--text)]">
-              {formatRelative(status.data.connected_at)}
-            </dd>
-          </div>
-          <div>
-            <dt className="text-[var(--text-tertiary)]">Token expires</dt>
-            <dd className="mt-0.5 text-[var(--text)]">
-              {formatRelative(status.data.token_expires_at)}
-            </dd>
-          </div>
-        </dl>
+        <>
+          <dl className="mt-2 grid grid-cols-1 gap-x-6 gap-y-2 text-xs sm:grid-cols-3">
+            <div>
+              <dt className="text-[var(--text-tertiary)]">Meta user ID</dt>
+              <dd className="mt-0.5 font-mono text-[var(--text)]">
+                {status.data.meta_user_id ?? "—"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[var(--text-tertiary)]">Connected</dt>
+              <dd className="mt-0.5 text-[var(--text)]">
+                {formatRelative(status.data.connected_at)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-[var(--text-tertiary)]">Token expires</dt>
+              <dd className="mt-0.5 text-[var(--text)]">
+                {formatRelative(status.data.token_expires_at)}
+              </dd>
+            </div>
+          </dl>
+          {/* Phase G: surface the enumerated asset counts so the user
+              knows their token has reachable accounts + Pages before
+              they hit the import page. */}
+          <p className="mt-3 text-xs text-[var(--text-tertiary)]">
+            {status.data.available_ad_accounts.length} ad account
+            {status.data.available_ad_accounts.length === 1 ? "" : "s"},{" "}
+            {status.data.available_pages.length} Page
+            {status.data.available_pages.length === 1 ? "" : "s"}
+            {status.data.available_ad_accounts.length === 0 && (
+              <span className="ml-2 text-amber-300">
+                — create one in Meta Ads Manager before importing
+              </span>
+            )}
+          </p>
+        </>
       )}
 
       {connect.isError && (

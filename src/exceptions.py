@@ -113,3 +113,26 @@ class CampaignAlreadyImported(AdAgentError):
     ``CampaignCapExceeded`` so the UI can distinguish "you can't
     import this one" from "you can't import any more".
     """
+
+
+class MultipleAdAccountsNoDefault(AdAgentError):
+    """The user has >1 ad account and no ``ad_account_id`` was chosen.
+
+    Raised by the Phase G import flow when ``list_importable_campaigns``
+    is called without an explicit ``ad_account_id`` query param *and*
+    the user has multiple reachable accounts with no
+    ``default_ad_account_id`` set. The dashboard endpoint maps this
+    to HTTP 400 ``pick_account_first`` so the frontend can prompt the
+    user to pick before showing any campaigns.
+    """
+
+
+class AdAccountNotAllowed(AdAgentError):
+    """The submitted ``ad_account_id`` or ``page_id`` isn't in the user's allowlist.
+
+    The cross-user guard in Phase G: on any import request, the server
+    rejects account or Page IDs that aren't in the user's enumerated
+    ``available_ad_accounts`` / ``available_pages`` JSONB lists. This
+    blocks a malicious client from POSTing another user's ad account
+    id, even if they somehow learn the value.
+    """

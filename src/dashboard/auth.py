@@ -214,9 +214,7 @@ def generate_csrf_token() -> str:
 # the user's UUID, sign it, and verify on callback without any DB hit.
 
 
-def create_oauth_state_token(
-    user_id: UUID, ttl_minutes: int = 10
-) -> str:
+def create_oauth_state_token(user_id: UUID, ttl_minutes: int = 10) -> str:
     """Return a signed nonce binding an OAuth start to a user.
 
     Embeds the user's UUID and an expiry. The server passes this as the
@@ -226,9 +224,7 @@ def create_oauth_state_token(
     open for an hour.
     """
     settings = get_settings()
-    expires_at = int(
-        (datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)).timestamp()
-    )
+    expires_at = int((datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)).timestamp())
     payload = f"{_OAUTH_STATE_PREFIX}:{user_id}:{expires_at}"
     signature = _sign(payload, settings.auth_session_secret)
     return _encode(f"{payload}:{signature}")

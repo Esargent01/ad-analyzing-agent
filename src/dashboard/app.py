@@ -20,7 +20,7 @@ doesn't need.
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -30,11 +30,12 @@ from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, Respo
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
-from sqlalchemy import select, text as sa_text
+from sqlalchemy import select
+from sqlalchemy import text as sa_text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload
@@ -50,18 +51,20 @@ from src.dashboard.auth import (
     verify_oauth_state_token,
 )
 from src.dashboard.crypto import MetaTokenCryptoError, encrypt_token
-from src.dashboard.meta_oauth import (
-    MetaOAuthError,
-    build_meta_oauth_url,
-    exchange_code_for_token,
-    exchange_short_for_long_lived,
-    fetch_meta_user_id,
-)
 from src.dashboard.deps import (
     get_current_user,
     get_db_session,
     require_campaign_access,
     require_csrf,
+)
+from src.dashboard.meta_oauth import (
+    MetaOAuthError,
+    build_meta_oauth_url,
+    exchange_code_for_token,
+    exchange_short_for_long_lived,
+    fetch_meta_ad_accounts,
+    fetch_meta_pages,
+    fetch_meta_user_id,
 )
 from src.dashboard.tokens import verify_review_token
 from src.db.engine import get_session
@@ -84,25 +87,28 @@ from src.db.queries import (
     touch_last_login,
     upsert_meta_connection,
 )
+from src.db.tables import Campaign, User, Variant
 from src.exceptions import (
+    AdAccountNotAllowed,
     CampaignAlreadyImported,
     CampaignCapExceeded,
     MetaConnectionMissing,
     MetaTokenExpired,
+    MultipleAdAccountsNoDefault,
 )
 from src.models.campaigns import (
+    CampaignImportFailure,
     CampaignImportRequest,
     CampaignImportResult,
-    CampaignImportFailure,
     ImportableCampaignsResponse,
 )
+from src.models.oauth import MetaAdAccountInfo, MetaPageInfo
+from src.models.reports import DailyReport, ProposedVariant, WeeklyReport
+from src.reports.auth_email import send_magic_link
 from src.services.campaign_import import (
     import_campaign,
     list_importable_campaigns,
 )
-from src.db.tables import Campaign, User, Variant
-from src.models.reports import DailyReport, ProposedVariant, WeeklyReport
-from src.reports.auth_email import send_magic_link
 from src.services.reports import build_daily_report, build_weekly_report
 from src.services.weekly import load_proposed_variants
 
@@ -156,9 +162,7 @@ app.state.limiter = limiter
 
 
 @app.exception_handler(RateLimitExceeded)
-async def _rate_limit_exceeded_handler(
-    request: Request, exc: RateLimitExceeded
-) -> JSONResponse:
+async def _rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
     return JSONResponse(
         status_code=429,
         content={"error": "rate_limited", "detail": str(exc.detail)},
@@ -195,9 +199,7 @@ def _check_email_rate_limit(email: str) -> bool:
 
 def _configured_origins() -> list[str]:
     settings = get_settings()
-    return [
-        o.strip() for o in settings.frontend_origins.split(",") if o.strip()
-    ]
+    return [o.strip() for o in settings.frontend_origins.split(",") if o.strip()]
 
 
 _cors_origins = _configured_origins()
@@ -231,22 +233,14 @@ async def api_health() -> dict[str, str]:
 
 async def _get_campaigns_light(session):
     """Load campaigns without eager-loading variants/metrics."""
-    stmt = (
-        select(Campaign)
-        .where(Campaign.is_active.is_(True))
-        .options(noload("*"))
-    )
+    stmt = select(Campaign).where(Campaign.is_active.is_(True)).options(noload("*"))
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
 
 async def _get_campaign_light(session, campaign_id: UUID):
     """Load a single campaign without eager-loading relationships."""
-    stmt = (
-        select(Campaign)
-        .where(Campaign.id == campaign_id)
-        .options(noload("*"))
-    )
+    stmt = select(Campaign).where(Campaign.id == campaign_id).options(noload("*"))
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
@@ -461,9 +455,7 @@ async def review_page(request: Request, token: str) -> HTMLResponse:
     )
 
 
-async def _load_approval_or_404(
-    session, approval_id: UUID, campaign_id: UUID
-) -> None:
+async def _load_approval_or_404(session, approval_id: UUID, campaign_id: UUID) -> None:
     """Verify an approval exists and belongs to the given campaign."""
     from src.db.tables import ApprovalQueueItem
 
@@ -562,7 +554,8 @@ async def api_suggest_gene_pool(
                 session,
                 slot_name=slot_name,
                 slot_value=slot_value,
-                description=description.strip() or f"Suggested via weekly review by campaign {campaign_id}",
+                description=description.strip()
+                or f"Suggested via weekly review by campaign {campaign_id}",
                 source="user_suggestion",
             )
         except HTTPException:
@@ -626,6 +619,14 @@ class MetaConnectionStatus(BaseModel):
     meta_user_id: str | None = None
     connected_at: datetime | None = None
     token_expires_at: datetime | None = None
+    # Phase G — enumerated once at OAuth callback time. Empty lists
+    # here mean the user has no reachable accounts/pages (brand-new
+    # Facebook account) and the import flow will prompt them to
+    # create one in Meta Ads Manager first.
+    available_ad_accounts: list[MetaAdAccountInfo] = Field(default_factory=list)
+    available_pages: list[MetaPageInfo] = Field(default_factory=list)
+    default_ad_account_id: str | None = None
+    default_page_id: str | None = None
 
 
 class MeResponse(BaseModel):
@@ -737,9 +738,7 @@ class UsageSummary(BaseModel):
 # ---------------------------------------------------------------------------
 
 
-def _set_auth_cookies(
-    response: Response, user_id: UUID
-) -> tuple[str, str]:
+def _set_auth_cookies(response: Response, user_id: UUID) -> tuple[str, str]:
     """Write the session_token + csrf_token cookies on ``response``.
 
     Returns the raw (session_token, csrf_token) pair for test assertions.
@@ -915,10 +914,7 @@ async def api_me(
     return MeResponse(
         id=user.id,
         email=user.email,
-        campaigns=[
-            UserCampaignOut(id=c.id, name=c.name, is_active=c.is_active)
-            for c in campaigns
-        ],
+        campaigns=[UserCampaignOut(id=c.id, name=c.name, is_active=c.is_active) for c in campaigns],
     )
 
 
@@ -970,9 +966,7 @@ async def api_meta_callback(
     frontend = settings.frontend_base_url.rstrip("/")
 
     def _fail(code_: str) -> RedirectResponse:
-        return RedirectResponse(
-            url=f"{frontend}/dashboard?meta_error={code_}", status_code=302
-        )
+        return RedirectResponse(url=f"{frontend}/dashboard?meta_error={code_}", status_code=302)
 
     if error:
         logger.info(
@@ -998,6 +992,19 @@ async def api_meta_callback(
         logger.warning("Meta OAuth exchange failed for user %s: %s", user_id, exc)
         return _fail("exchange_failed")
 
+    # Phase G — enumerate the token's reachable ad accounts + Pages so
+    # the import flow can show real per-user dropdowns instead of
+    # pointing at global settings. Failure here isn't fatal to the
+    # token exchange itself, but without this data the user can't
+    # pick an account on the import page — surface a distinct error
+    # code so the UI can prompt an explicit retry.
+    try:
+        ad_accounts = await fetch_meta_ad_accounts(long_lived.access_token)
+        pages = await fetch_meta_pages(long_lived.access_token)
+    except MetaOAuthError as exc:
+        logger.warning("Meta asset enumeration failed for user %s: %s", user_id, exc)
+        return _fail("enumeration_failed")
+
     try:
         ciphertext = encrypt_token(long_lived.access_token)
     except (MetaTokenCryptoError, ValueError) as exc:
@@ -1006,6 +1013,13 @@ async def api_meta_callback(
 
     scopes = [s.strip() for s in settings.meta_oauth_scopes.split(",") if s.strip()]
 
+    # Auto-pick defaults when the user has exactly one of each. This
+    # spares single-account users (the common SMB case) from ever
+    # seeing the picker. Users with multiple accounts/Pages get NULL
+    # here and the import page forces a choice.
+    default_ad_account_id = ad_accounts[0].id if len(ad_accounts) == 1 else None
+    default_page_id = pages[0].id if len(pages) == 1 else None
+
     await upsert_meta_connection(
         session,
         user_id=user_id,
@@ -1013,13 +1027,19 @@ async def api_meta_callback(
         encrypted_access_token=ciphertext,
         token_expires_at=long_lived.expires_at,
         scopes=scopes,
+        available_ad_accounts=[a.model_dump() for a in ad_accounts],
+        available_pages=[p.model_dump() for p in pages],
+        default_ad_account_id=default_ad_account_id,
+        default_page_id=default_page_id,
     )
     logger.info(
-        "Meta OAuth success: app_user=%s meta_user=%s", user_id, meta_user_id
+        "Meta OAuth success: app_user=%s meta_user=%s accounts=%d pages=%d",
+        user_id,
+        meta_user_id,
+        len(ad_accounts),
+        len(pages),
     )
-    return RedirectResponse(
-        url=f"{frontend}/dashboard?meta_connected=1", status_code=302
-    )
+    return RedirectResponse(url=f"{frontend}/dashboard?meta_connected=1", status_code=302)
 
 
 @app.get("/api/me/meta/status", response_model=MetaConnectionStatus)
@@ -1036,11 +1056,39 @@ async def api_meta_status(
     connection = await get_meta_connection(session, user.id)
     if connection is None:
         return MetaConnectionStatus(connected=False)
+    # Coerce the stored JSONB dicts back into the wire-shape Pydantic
+    # models. Bad rows (e.g. if a future schema tweak drifted from
+    # the JSONB payload) skip silently rather than 500ing the whole
+    # status endpoint — the UI just sees an empty list.
+    ad_accounts: list[MetaAdAccountInfo] = []
+    for raw in connection.available_ad_accounts or []:
+        try:
+            ad_accounts.append(MetaAdAccountInfo.model_validate(raw))
+        except Exception:  # noqa: BLE001 — tolerate stale JSONB shapes
+            logger.warning(
+                "Dropping malformed available_ad_accounts entry for user %s: %r",
+                user.id,
+                raw,
+            )
+    pages: list[MetaPageInfo] = []
+    for raw in connection.available_pages or []:
+        try:
+            pages.append(MetaPageInfo.model_validate(raw))
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Dropping malformed available_pages entry for user %s: %r",
+                user.id,
+                raw,
+            )
     return MetaConnectionStatus(
         connected=True,
         meta_user_id=connection.meta_user_id,
         connected_at=connection.connected_at,
         token_expires_at=connection.token_expires_at,
+        available_ad_accounts=ad_accounts,
+        available_pages=pages,
+        default_ad_account_id=connection.default_ad_account_id,
+        default_page_id=connection.default_page_id,
     )
 
 
@@ -1070,17 +1118,30 @@ async def api_meta_disconnect(
     response_model=ImportableCampaignsResponse,
 )
 async def api_meta_importable_campaigns(
+    ad_account_id: str | None = Query(
+        default=None,
+        description=(
+            "Meta ad account id (e.g. act_123456). Optional — defaults to "
+            "the user's default_ad_account_id. Required when the user has "
+            "multiple accounts with no default."
+        ),
+    ),
     session: AsyncSession = Depends(get_db_session),
     user: User = Depends(get_current_user),
 ) -> ImportableCampaignsResponse:
     """Return the signed-in user's Meta campaigns for the picker.
 
-    Also returns the user's current quota usage so the UI can
-    render a "N/5 used" indicator without a second roundtrip.
-    Requires Meta to be connected first; otherwise 409.
+    Also returns the user's current quota usage + the full set of
+    ad accounts and Pages their token can reach, so the UI can
+    render the account dropdown without a second roundtrip. Requires
+    Meta to be connected first; otherwise 409.
+
+    If the user has multiple ad accounts and hasn't picked one yet,
+    returns HTTP 400 ``pick_account_first`` — the UI should force a
+    dropdown selection before calling again.
     """
     try:
-        return await list_importable_campaigns(session, user.id)
+        return await list_importable_campaigns(session, user.id, ad_account_id=ad_account_id)
     except MetaConnectionMissing as exc:
         raise HTTPException(
             status_code=409,
@@ -1090,6 +1151,16 @@ async def api_meta_importable_campaigns(
         raise HTTPException(
             status_code=409,
             detail={"error": "meta_token_expired", "message": str(exc)},
+        ) from exc
+    except MultipleAdAccountsNoDefault as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "pick_account_first", "message": str(exc)},
+        ) from exc
+    except AdAccountNotAllowed as exc:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "account_not_in_allowlist", "message": str(exc)},
         ) from exc
 
 
@@ -1138,30 +1209,31 @@ async def api_meta_import_campaigns(
                 session=session,
                 user_id=user.id,
                 meta_campaign_id=meta_id,
+                ad_account_id=payload.ad_account_id,
+                page_id=payload.page_id,
+                landing_page_url=payload.landing_page_url,
                 overrides=payload.overrides,
             )
             imported.append(summary)
         except CampaignCapExceeded as exc:
-            failed.append(
-                CampaignImportFailure(
-                    meta_campaign_id=meta_id, error=str(exc)
-                )
-            )
+            failed.append(CampaignImportFailure(meta_campaign_id=meta_id, error=str(exc)))
             # Cap hit mid-batch — everything after this will hit
             # the same wall, so stop and let the UI show partial.
             break
         except CampaignAlreadyImported as exc:
-            failed.append(
-                CampaignImportFailure(
-                    meta_campaign_id=meta_id, error=str(exc)
-                )
-            )
+            failed.append(CampaignImportFailure(meta_campaign_id=meta_id, error=str(exc)))
+        except AdAccountNotAllowed as exc:
+            # Cross-user guard tripped — the whole batch is tainted,
+            # fail hard with HTTP 400 rather than partial success.
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "account_not_in_allowlist",
+                    "message": str(exc),
+                },
+            ) from exc
         except (MetaConnectionMissing, MetaTokenExpired) as exc:
-            failed.append(
-                CampaignImportFailure(
-                    meta_campaign_id=meta_id, error=str(exc)
-                )
-            )
+            failed.append(CampaignImportFailure(meta_campaign_id=meta_id, error=str(exc)))
             break  # connection issue → no retry helps
         except Exception as exc:  # noqa: BLE001 — we want to surface any error
             logger.exception(
@@ -1170,9 +1242,7 @@ async def api_meta_import_campaigns(
                 user.id,
             )
             failed.append(
-                CampaignImportFailure(
-                    meta_campaign_id=meta_id, error=f"internal_error: {exc}"
-                )
+                CampaignImportFailure(meta_campaign_id=meta_id, error=f"internal_error: {exc}")
             )
 
     quota_after = await count_active_campaigns_for_user(session, user.id)
@@ -1194,7 +1264,7 @@ def _default_usage_window() -> tuple[date, date]:
 
     Both dates are inclusive; ``to_date`` is today in UTC.
     """
-    today = datetime.now(timezone.utc).date()
+    today = datetime.now(UTC).date()
     return today - timedelta(days=29), today
 
 
@@ -1240,10 +1310,8 @@ async def api_my_usage(
 
     # Half-open [start, end) window so a single date returns one
     # full day's worth of rows regardless of timezone.
-    start_ts = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
-    end_ts = datetime.combine(
-        range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
-    )
+    start_ts = datetime.combine(range_from, datetime.min.time(), tzinfo=UTC)
+    end_ts = datetime.combine(range_to + timedelta(days=1), datetime.min.time(), tzinfo=UTC)
 
     params = {
         "user_id": user.id,
@@ -1450,9 +1518,7 @@ async def api_weekly_index(
         week_start: date = row[0]
         week_end = week_start + timedelta(days=6)
         label = f"{week_start.strftime('%b %-d')} – {week_end.strftime('%b %-d, %Y')}"
-        weeks.append(
-            WeekDescriptor(week_start=week_start, week_end=week_end, label=label)
-        )
+        weeks.append(WeekDescriptor(week_start=week_start, week_end=week_end, label=label))
     return WeeklyIndexResponse(weeks=weeks)
 
 

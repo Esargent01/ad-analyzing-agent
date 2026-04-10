@@ -39,7 +39,11 @@ import type {
 export const qk = {
   me: ["me"] as const,
   metaStatus: ["me", "meta", "status"] as const,
-  importableCampaigns: ["me", "meta", "campaigns"] as const,
+  // Phase G: campaigns are scoped by ad account, so the cache key
+  // must include the selected account id so different picks don't
+  // clobber each other.
+  importableCampaigns: (adAccountId?: string | null) =>
+    ["me", "meta", "campaigns", adAccountId ?? "default"] as const,
   myUsage: (fromDate?: string, toDate?: string) =>
     ["me", "usage", fromDate ?? "default", toDate ?? "default"] as const,
   dailyDates: (campaignId: string) =>
@@ -161,19 +165,30 @@ export function useDisconnectMeta() {
  * the user's current cap usage so the picker can render a "3/5 used"
  * widget.
  *
+ * Phase G: takes an optional ``adAccountId``. If passed, the query
+ * scopes to that account (and is cached separately in TanStack Query
+ * via the per-account query key). If omitted, the server falls back
+ * to the user's ``default_ad_account_id``; if that's also null the
+ * server returns 400 ``pick_account_first`` and the UI must force a
+ * choice from the account dropdown.
+ *
  * Only enabled when the caller has confirmed Meta is connected — this
  * endpoint 409s without a stored connection.
  */
 export function useImportableCampaigns(
+  adAccountId: string | null = null,
   options: Omit<
     UseQueryOptions<ImportableCampaignsResponse, ApiError>,
     "queryKey" | "queryFn"
   > = {},
 ) {
+  const path = adAccountId
+    ? `/api/me/meta/campaigns?ad_account_id=${encodeURIComponent(adAccountId)}`
+    : "/api/me/meta/campaigns";
   return useQuery<ImportableCampaignsResponse, ApiError>({
-    queryKey: qk.importableCampaigns,
+    queryKey: qk.importableCampaigns(adAccountId),
     queryFn: ({ signal }) =>
-      api.get<ImportableCampaignsResponse>("/api/me/meta/campaigns", { signal }),
+      api.get<ImportableCampaignsResponse>(path, { signal }),
     staleTime: 30_000,
     retry: false,
     ...options,
@@ -182,9 +197,14 @@ export function useImportableCampaigns(
 
 /**
  * Submits the selected campaigns for import. On success we invalidate
- * both the importable-list query (so the cap counter updates + the
- * picker greys out the rows we just imported) and the `me` query (so
- * the sidebar gets the new campaigns).
+ * both the importable-list queries (so the cap counter updates + the
+ * picker greys out the rows we just imported — all account variants
+ * are flushed) and the `me` query (so the sidebar gets the new
+ * campaigns).
+ *
+ * Phase G: the body now carries ``ad_account_id`` + ``page_id`` +
+ * optional ``landing_page_url``. All three are per-import choices the
+ * UI collects from the account/Page/URL widgets.
  */
 export function useImportCampaigns() {
   const qc = useQueryClient();
@@ -195,7 +215,8 @@ export function useImportCampaigns() {
         body as unknown as Record<string, unknown>,
       ),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: qk.importableCampaigns });
+      // Invalidate every per-account variant of the importable list.
+      qc.invalidateQueries({ queryKey: ["me", "meta", "campaigns"] });
       qc.invalidateQueries({ queryKey: qk.me });
     },
   });

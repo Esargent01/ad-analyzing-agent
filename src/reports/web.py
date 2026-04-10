@@ -136,7 +136,9 @@ def render_daily_report(report: WeeklyReport, campaign_name: str, report_date: d
         reverse=True,
     )
 
-    has_purchases = any(v.purchases > 0 for v in report.all_variants) if report.all_variants else False
+    has_purchases = (
+        any(v.purchases > 0 for v in report.all_variants) if report.all_variants else False
+    )
 
     html = template.render(
         campaign_name=campaign_name,
@@ -257,5 +259,3 @@ def render_index(daily_dates: list[str], weekly_labels: list[str]) -> Path:
 
     logger.info("Report index written to %s", out_path)
     return out_path
-
-

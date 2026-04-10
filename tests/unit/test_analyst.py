@@ -174,8 +174,7 @@ class TestAnalystAgent:
 
         # V2 should be in variant_results with a winner recommendation
         winners = [
-            vr for vr in result.variant_results
-            if vr.recommended_action == VariantStatus.WINNER
+            vr for vr in result.variant_results if vr.recommended_action == VariantStatus.WINNER
         ]
         assert len(winners) == 1
         assert winners[0].variant_code == "V2"
@@ -214,8 +213,7 @@ class TestAnalystAgent:
         )
 
         losers = [
-            vr for vr in result.variant_results
-            if vr.recommended_action == VariantStatus.PAUSED
+            vr for vr in result.variant_results if vr.recommended_action == VariantStatus.PAUSED
         ]
         assert len(losers) == 1
         assert losers[0].variant_code == "V2"

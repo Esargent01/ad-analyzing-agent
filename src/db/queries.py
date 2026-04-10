@@ -786,9 +786,7 @@ def _normalize_email(email: str) -> str:
     return email.strip().lower()
 
 
-async def get_user_by_email(
-    session: AsyncSession, email: str
-) -> User | None:
+async def get_user_by_email(session: AsyncSession, email: str) -> User | None:
     """Look up an active user by email. Case-insensitive."""
     stmt = select(User).where(
         User.email == _normalize_email(email),
@@ -815,18 +813,12 @@ async def create_user(session: AsyncSession, email: str) -> User:
 
 async def touch_last_login(session: AsyncSession, user_id: UUID) -> None:
     """Bump ``last_login_at`` to now for the given user."""
-    stmt = (
-        update(User)
-        .where(User.id == user_id)
-        .values(last_login_at=func.now())
-    )
+    stmt = update(User).where(User.id == user_id).values(last_login_at=func.now())
     await session.execute(stmt)
     await session.flush()
 
 
-async def get_user_campaigns(
-    session: AsyncSession, user_id: UUID
-) -> list[Campaign]:
+async def get_user_campaigns(session: AsyncSession, user_id: UUID) -> list[Campaign]:
     """Return every campaign a user can see on the dashboard.
 
     Union of:
@@ -838,23 +830,17 @@ async def get_user_campaigns(
 
     Duplicates are collapsed; results are name-ordered.
     """
-    shared_ids = (
-        select(UserCampaign.campaign_id).where(UserCampaign.user_id == user_id)
-    )
+    shared_ids = select(UserCampaign.campaign_id).where(UserCampaign.user_id == user_id)
     stmt = (
         select(Campaign)
-        .where(
-            (Campaign.id.in_(shared_ids)) | (Campaign.owner_user_id == user_id)
-        )
+        .where((Campaign.id.in_(shared_ids)) | (Campaign.owner_user_id == user_id))
         .order_by(Campaign.name)
     )
     result = await session.execute(stmt)
     return list(result.scalars().unique().all())
 
 
-async def count_active_campaigns_for_user(
-    session: AsyncSession, user_id: UUID
-) -> int:
+async def count_active_campaigns_for_user(session: AsyncSession, user_id: UUID) -> int:
     """Count the *active* campaigns a user owns.
 
     Used to enforce ``settings.max_campaigns_per_user`` at import
@@ -874,22 +860,14 @@ async def count_active_campaigns_for_user(
     return int(result.scalar_one() or 0)
 
 
-async def list_campaigns_for_user(
-    session: AsyncSession, user_id: UUID
-) -> list[Campaign]:
+async def list_campaigns_for_user(session: AsyncSession, user_id: UUID) -> list[Campaign]:
     """Return every campaign *owned* by the given user (not shared)."""
-    stmt = (
-        select(Campaign)
-        .where(Campaign.owner_user_id == user_id)
-        .order_by(Campaign.name)
-    )
+    stmt = select(Campaign).where(Campaign.owner_user_id == user_id).order_by(Campaign.name)
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
 
-async def get_imported_meta_campaign_ids_for_user(
-    session: AsyncSession, user_id: UUID
-) -> set[str]:
+async def get_imported_meta_campaign_ids_for_user(session: AsyncSession, user_id: UUID) -> set[str]:
     """Return the set of ``platform_campaign_id`` values this user
     has already imported from Meta.
 
@@ -962,32 +940,63 @@ async def upsert_meta_connection(
     encrypted_access_token: str,
     token_expires_at: datetime | None,
     scopes: list[str] | None,
+    available_ad_accounts: list[dict] | None = None,
+    available_pages: list[dict] | None = None,
+    default_ad_account_id: str | None = None,
+    default_page_id: str | None = None,
 ) -> UserMetaConnection:
     """Insert or replace the Meta connection for a user.
 
     Re-OAuth flow: a user can click "Connect Meta" again at any time
     and the new token overwrites the old. The ``on_conflict_do_update``
     upsert keys on ``user_id`` (PK).
+
+    Phase G extended the signature to include the enumerated ad
+    accounts / Pages and per-user defaults. Callers that only need to
+    refresh the token (e.g. a future token-refresh job) can leave the
+    new kwargs as ``None`` — they'll only be overwritten when a value
+    is supplied explicitly. In that path we preserve existing JSONB
+    contents by falling back to the current DB values via COALESCE.
     """
+    insert_values: dict[str, object] = {
+        "user_id": user_id,
+        "meta_user_id": meta_user_id,
+        "encrypted_access_token": encrypted_access_token,
+        "token_expires_at": token_expires_at,
+        "scopes": scopes,
+        "last_refreshed_at": func.now(),
+    }
+    if available_ad_accounts is not None:
+        insert_values["available_ad_accounts"] = available_ad_accounts
+    if available_pages is not None:
+        insert_values["available_pages"] = available_pages
+    if default_ad_account_id is not None:
+        insert_values["default_ad_account_id"] = default_ad_account_id
+    if default_page_id is not None:
+        insert_values["default_page_id"] = default_page_id
+
+    update_values: dict[str, object] = {
+        "meta_user_id": meta_user_id,
+        "encrypted_access_token": encrypted_access_token,
+        "token_expires_at": token_expires_at,
+        "scopes": scopes,
+        "last_refreshed_at": func.now(),
+    }
+    if available_ad_accounts is not None:
+        update_values["available_ad_accounts"] = available_ad_accounts
+    if available_pages is not None:
+        update_values["available_pages"] = available_pages
+    if default_ad_account_id is not None:
+        update_values["default_ad_account_id"] = default_ad_account_id
+    if default_page_id is not None:
+        update_values["default_page_id"] = default_page_id
+
     stmt = (
         pg_insert(UserMetaConnection)
-        .values(
-            user_id=user_id,
-            meta_user_id=meta_user_id,
-            encrypted_access_token=encrypted_access_token,
-            token_expires_at=token_expires_at,
-            scopes=scopes,
-            last_refreshed_at=func.now(),
-        )
+        .values(**insert_values)
         .on_conflict_do_update(
             index_elements=["user_id"],
-            set_={
-                "meta_user_id": meta_user_id,
-                "encrypted_access_token": encrypted_access_token,
-                "token_expires_at": token_expires_at,
-                "scopes": scopes,
-                "last_refreshed_at": func.now(),
-            },
+            set_=update_values,
         )
         .returning(UserMetaConnection)
     )
@@ -996,24 +1005,16 @@ async def upsert_meta_connection(
     return result.scalar_one()
 
 
-async def get_meta_connection(
-    session: AsyncSession, user_id: UUID
-) -> UserMetaConnection | None:
+async def get_meta_connection(session: AsyncSession, user_id: UUID) -> UserMetaConnection | None:
     """Return the Meta connection row for a user, or None."""
-    stmt = select(UserMetaConnection).where(
-        UserMetaConnection.user_id == user_id
-    )
+    stmt = select(UserMetaConnection).where(UserMetaConnection.user_id == user_id)
     result = await session.execute(stmt)
     return result.scalar_one_or_none()
 
 
-async def delete_meta_connection(
-    session: AsyncSession, user_id: UUID
-) -> bool:
+async def delete_meta_connection(session: AsyncSession, user_id: UUID) -> bool:
     """Delete a user's Meta connection. Returns False if there was none."""
-    stmt = select(UserMetaConnection).where(
-        UserMetaConnection.user_id == user_id
-    )
+    stmt = select(UserMetaConnection).where(UserMetaConnection.user_id == user_id)
     result = await session.execute(stmt)
     row = result.scalar_one_or_none()
     if row is None:
@@ -1023,9 +1024,7 @@ async def delete_meta_connection(
     return True
 
 
-async def get_campaign_owner_id(
-    session: AsyncSession, campaign_id: UUID
-) -> UUID | None:
+async def get_campaign_owner_id(session: AsyncSession, campaign_id: UUID) -> UUID | None:
     """Return the ``owner_user_id`` for a campaign, or None.
 
     Used by :mod:`src.adapters.meta_factory` to route a cycle to the
@@ -1042,9 +1041,7 @@ async def get_campaign_owner_id(
 # ---------------------------------------------------------------------------
 
 
-async def consume_magic_link_token(
-    session: AsyncSession, token_hash: str
-) -> bool:
+async def consume_magic_link_token(session: AsyncSession, token_hash: str) -> bool:
     """Atomically mark a magic-link token hash as consumed.
 
     Returns ``True`` if this is the *first* time the hash has been seen

@@ -173,14 +173,10 @@ class TestRunWeeklyGeneration:
         assert paused is False
 
     @pytest.mark.asyncio
-    async def test_generation_paused_when_queue_full(
-        self, mock_gene_pool: GenePool
-    ) -> None:
+    async def test_generation_paused_when_queue_full(self, mock_gene_pool: GenePool) -> None:
         """When active + pending >= max, generation is paused."""
         campaign_id = uuid.uuid4()
-        session = _make_session(
-            max_variants=10, active_count=6, pending_count=4
-        )
+        session = _make_session(max_variants=10, active_count=6, pending_count=4)
 
         with (
             patch("src.services.weekly.get_settings", return_value=_make_settings()),
@@ -199,9 +195,7 @@ class TestRunWeeklyGeneration:
         assert paused is True
 
     @pytest.mark.asyncio
-    async def test_expired_count_bubbles_up_with_paused(
-        self, mock_gene_pool: GenePool
-    ) -> None:
+    async def test_expired_count_bubbles_up_with_paused(self, mock_gene_pool: GenePool) -> None:
         """expire_stale_proposals count is returned even when paused."""
         campaign_id = uuid.uuid4()
         session = _make_session(max_variants=5, active_count=3, pending_count=2)
@@ -223,9 +217,7 @@ class TestRunWeeklyGeneration:
         assert paused is True
 
     @pytest.mark.asyncio
-    async def test_generation_capped_at_three(
-        self, mock_gene_pool: GenePool
-    ) -> None:
+    async def test_generation_capped_at_three(self, mock_gene_pool: GenePool) -> None:
         """Per-week generation is capped at 3 regardless of slots available."""
         campaign_id = uuid.uuid4()
         session = _make_session(max_variants=20, active_count=0, pending_count=0)
@@ -273,17 +265,13 @@ class TestRunWeeklyGeneration:
         assert paused is False
 
     @pytest.mark.asyncio
-    async def test_llm_error_returns_gracefully(
-        self, mock_gene_pool: GenePool
-    ) -> None:
+    async def test_llm_error_returns_gracefully(self, mock_gene_pool: GenePool) -> None:
         """LLMError from the generator is swallowed; function returns paused=False."""
         campaign_id = uuid.uuid4()
         session = _make_session(max_variants=10, active_count=0, pending_count=0)
 
         fake_generator = AsyncMock()
-        fake_generator.generate_variants = AsyncMock(
-            side_effect=LLMError("nothing usable")
-        )
+        fake_generator.generate_variants = AsyncMock(side_effect=LLMError("nothing usable"))
 
         with (
             patch("src.services.weekly.get_settings", return_value=_make_settings()),

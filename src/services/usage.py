@@ -102,8 +102,7 @@ def calculate_llm_cost(
     """
     if input_tokens < 0 or output_tokens < 0:
         raise ValueError(
-            f"Token counts must be non-negative, got "
-            f"input={input_tokens}, output={output_tokens}"
+            f"Token counts must be non-negative, got input={input_tokens}, output={output_tokens}"
         )
     if model in PRICING:
         input_rate, output_rate = PRICING[model]
@@ -228,7 +227,5 @@ async def log_meta_call(
         metadata_json={"method": method, **(metadata or {})},
     )
     session.add(row)
-    logger.debug(
-        "Logged Meta API usage: method=%s campaign=%s", method, ctx.campaign_id
-    )
+    logger.debug("Logged Meta API usage: method=%s campaign=%s", method, ctx.campaign_id)
     return row

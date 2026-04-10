@@ -39,14 +39,35 @@ export interface MagicLinkRequest {
 }
 
 // ---------------------------------------------------------------------------
-// Meta OAuth connection (Phase B)
+// Meta OAuth connection (Phase B + Phase G)
 // ---------------------------------------------------------------------------
+
+export interface MetaAdAccountInfo {
+  id: string;
+  name: string;
+  account_status: number;
+  currency: string;
+}
+
+export interface MetaPageInfo {
+  id: string;
+  name: string;
+  category: string;
+}
 
 export interface MetaConnectionStatus {
   connected: boolean;
   meta_user_id: string | null;
   connected_at: string | null;
   token_expires_at: string | null;
+  /** Phase G: ad accounts reachable by the user's token. */
+  available_ad_accounts: MetaAdAccountInfo[];
+  /** Phase G: Pages reachable by the user's token. */
+  available_pages: MetaPageInfo[];
+  /** Phase G: auto-picked default when there's exactly one ad account. */
+  default_ad_account_id: string | null;
+  /** Phase G: auto-picked default when there's exactly one Page. */
+  default_page_id: string | null;
 }
 
 export interface MetaConnectResponse {
@@ -54,7 +75,7 @@ export interface MetaConnectResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Campaign import (Phase D)
+// Campaign import (Phase D + Phase G)
 // ---------------------------------------------------------------------------
 
 export interface ImportableCampaign {
@@ -71,6 +92,16 @@ export interface ImportableCampaignsResponse {
   importable: ImportableCampaign[];
   quota_used: number;
   quota_max: number;
+  /** Phase G: the user's full account allowlist (mirrors
+   * ``MetaConnectionStatus.available_ad_accounts``) so the import page
+   * can render the account picker from a single roundtrip. */
+  available_ad_accounts: MetaAdAccountInfo[];
+  available_pages: MetaPageInfo[];
+  default_ad_account_id: string | null;
+  default_page_id: string | null;
+  /** Phase G: the ad account the returned ``importable`` list was
+   * scoped to — either the explicit query param or the default. */
+  selected_ad_account_id: string | null;
 }
 
 export interface CampaignImportOverrides {
@@ -81,6 +112,15 @@ export interface CampaignImportOverrides {
 
 export interface CampaignImportRequest {
   meta_campaign_ids: string[];
+  /** Phase G: the ad account to pin each imported campaign to.
+   * Required — must be in the user's ``available_ad_accounts``. */
+  ad_account_id: string;
+  /** Phase G: the Page to pin each imported campaign to.
+   * Required — must be in the user's ``available_pages``. */
+  page_id: string;
+  /** Phase G: free-text landing page URL per import batch.
+   * Optional — leave null to skip. */
+  landing_page_url?: string | null;
   overrides?: CampaignImportOverrides;
 }
 

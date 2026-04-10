@@ -33,7 +33,8 @@ class TestEncryptRoundTrip:
     def test_round_trip_preserves_plaintext(self) -> None:
         key = _fresh_key()
         with patch.object(
-            crypto, "get_settings",
+            crypto,
+            "get_settings",
             return_value=type("S", (), {"meta_token_encryption_key": key})(),
         ):
             cipher = crypto.encrypt_token("super-secret-meta-token")
@@ -43,7 +44,8 @@ class TestEncryptRoundTrip:
         """Fernet embeds a timestamp + random IV, so same plaintext → different ciphertext."""
         key = _fresh_key()
         with patch.object(
-            crypto, "get_settings",
+            crypto,
+            "get_settings",
             return_value=type("S", (), {"meta_token_encryption_key": key})(),
         ):
             a = crypto.encrypt_token("same-input")
@@ -56,7 +58,8 @@ class TestEncryptRoundTrip:
 class TestFailureModes:
     def test_missing_key_raises(self) -> None:
         with patch.object(
-            crypto, "get_settings",
+            crypto,
+            "get_settings",
             return_value=type("S", (), {"meta_token_encryption_key": ""})(),
         ):
             with pytest.raises(crypto.MetaTokenCryptoError, match="not set"):
@@ -64,7 +67,8 @@ class TestFailureModes:
 
     def test_malformed_key_raises(self) -> None:
         with patch.object(
-            crypto, "get_settings",
+            crypto,
+            "get_settings",
             return_value=type("S", (), {"meta_token_encryption_key": "not-a-fernet-key"})(),
         ):
             with pytest.raises(crypto.MetaTokenCryptoError, match="not a valid"):
@@ -73,7 +77,8 @@ class TestFailureModes:
     def test_decrypt_with_wrong_key_raises(self) -> None:
         key_a = _fresh_key()
         with patch.object(
-            crypto, "get_settings",
+            crypto,
+            "get_settings",
             return_value=type("S", (), {"meta_token_encryption_key": key_a})(),
         ):
             cipher = crypto.encrypt_token("secret")
@@ -83,18 +88,18 @@ class TestFailureModes:
         key_b = _fresh_key()
         assert key_a != key_b
         with patch.object(
-            crypto, "get_settings",
+            crypto,
+            "get_settings",
             return_value=type("S", (), {"meta_token_encryption_key": key_b})(),
         ):
-            with pytest.raises(
-                crypto.MetaTokenCryptoError, match="failed to decrypt"
-            ):
+            with pytest.raises(crypto.MetaTokenCryptoError, match="failed to decrypt"):
                 crypto.decrypt_token(cipher)
 
     def test_empty_plaintext_rejected(self) -> None:
         key = _fresh_key()
         with patch.object(
-            crypto, "get_settings",
+            crypto,
+            "get_settings",
             return_value=type("S", (), {"meta_token_encryption_key": key})(),
         ):
             with pytest.raises(ValueError):

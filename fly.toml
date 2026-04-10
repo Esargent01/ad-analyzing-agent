@@ -26,6 +26,14 @@ primary_region = "ord"           # Chicago — closest low-latency to most US us
 # META_APP_SECRET, META_TOKEN_ENCRYPTION_KEY, AUTH_SESSION_SECRET, etc.)
 # are set via `fly secrets set` and injected at runtime — do NOT put
 # them here.
+#
+# Phase G cleanup: `META_AD_ACCOUNT_ID`, `META_PAGE_ID`, and
+# `META_LANDING_PAGE_URL` are no longer read by the app — the values
+# now live on each `campaigns` row. Before deploying this PR, run:
+#     fly secrets unset META_AD_ACCOUNT_ID META_PAGE_ID META_LANDING_PAGE_URL
+# Keep them set until *after* migration 009 runs (the backfill reads
+# them from os.environ) to avoid losing the legacy Slice Society
+# campaign's tenancy.
 [env]
   LOG_LEVEL = "INFO"
   COOKIE_SECURE = "true"

@@ -59,9 +59,7 @@ def _override_session(session) -> None:
 
 
 class TestSelfServeSignup:
-    def test_unknown_email_full_flow_creates_user(
-        self, client: TestClient
-    ) -> None:
+    def test_unknown_email_full_flow_creates_user(self, client: TestClient) -> None:
         """POST /magic-link (unknown email) → GET /verify → user created."""
         email = "brand-new@example.com"
         session = AsyncMock()
@@ -72,9 +70,7 @@ class TestSelfServeSignup:
             "src.dashboard.app.send_magic_link",
             new=AsyncMock(return_value=True),
         ) as mock_send:
-            resp = client.post(
-                "/api/auth/magic-link", json={"email": email}
-            )
+            resp = client.post("/api/auth/magic-link", json={"email": email})
 
         assert resp.status_code == 204
         mock_send.assert_awaited_once()
@@ -86,18 +82,23 @@ class TestSelfServeSignup:
         # Step 2: verify the token. Since the email is unknown,
         # ``create_user`` must be called and a session cookie issued.
         new_user = _make_user(email)
-        with patch(
-            "src.dashboard.app.consume_magic_link_token",
-            new=AsyncMock(return_value=True),
-        ), patch(
-            "src.dashboard.app.get_user_by_email",
-            new=AsyncMock(return_value=None),
-        ), patch(
-            "src.dashboard.app.create_user",
-            new=AsyncMock(return_value=new_user),
-        ) as mock_create, patch(
-            "src.dashboard.app.touch_last_login",
-            new=AsyncMock(return_value=None),
+        with (
+            patch(
+                "src.dashboard.app.consume_magic_link_token",
+                new=AsyncMock(return_value=True),
+            ),
+            patch(
+                "src.dashboard.app.get_user_by_email",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "src.dashboard.app.create_user",
+                new=AsyncMock(return_value=new_user),
+            ) as mock_create,
+            patch(
+                "src.dashboard.app.touch_last_login",
+                new=AsyncMock(return_value=None),
+            ),
         ):
             verify_resp = client.get(
                 "/api/auth/verify",
@@ -110,9 +111,7 @@ class TestSelfServeSignup:
         mock_create.assert_awaited_once()
         assert "session_token" in verify_resp.cookies
 
-    def test_replay_of_consumed_token_is_rejected(
-        self, client: TestClient
-    ) -> None:
+    def test_replay_of_consumed_token_is_rejected(self, client: TestClient) -> None:
         """Second visit to the same /verify?token=... 302s with invalid_link."""
         email = "alice@example.com"
         token = create_magic_link_token(email)
@@ -121,15 +120,19 @@ class TestSelfServeSignup:
         user = _make_user(email)
 
         # First verify: succeeds (consume returns True).
-        with patch(
-            "src.dashboard.app.consume_magic_link_token",
-            new=AsyncMock(return_value=True),
-        ), patch(
-            "src.dashboard.app.get_user_by_email",
-            new=AsyncMock(return_value=user),
-        ), patch(
-            "src.dashboard.app.touch_last_login",
-            new=AsyncMock(return_value=None),
+        with (
+            patch(
+                "src.dashboard.app.consume_magic_link_token",
+                new=AsyncMock(return_value=True),
+            ),
+            patch(
+                "src.dashboard.app.get_user_by_email",
+                new=AsyncMock(return_value=user),
+            ),
+            patch(
+                "src.dashboard.app.touch_last_login",
+                new=AsyncMock(return_value=None),
+            ),
         ):
             first = client.get(
                 "/api/auth/verify",
@@ -178,9 +181,7 @@ class TestSelfServeSignup:
 
 
 class TestMagicLinkRateLimit:
-    def test_sixth_request_for_same_email_returns_429(
-        self, client: TestClient
-    ) -> None:
+    def test_sixth_request_for_same_email_returns_429(self, client: TestClient) -> None:
         """Per-email sliding window allows 5 requests, 6th is throttled."""
         email = "burst@example.com"
         session = AsyncMock()
@@ -191,18 +192,14 @@ class TestMagicLinkRateLimit:
             new=AsyncMock(return_value=True),
         ):
             statuses = [
-                client.post(
-                    "/api/auth/magic-link", json={"email": email}
-                ).status_code
+                client.post("/api/auth/magic-link", json={"email": email}).status_code
                 for _ in range(6)
             ]
 
         assert statuses[:5] == [204] * 5
         assert statuses[5] == 429
 
-    def test_rate_limit_is_per_email_not_global(
-        self, client: TestClient
-    ) -> None:
+    def test_rate_limit_is_per_email_not_global(self, client: TestClient) -> None:
         """Burst on one email must not throttle a different email."""
         session = AsyncMock()
         _override_session(session)

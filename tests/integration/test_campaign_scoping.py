@@ -70,25 +70,19 @@ def _override_session(session) -> None:
 
 
 class TestUnauthenticated:
-    def test_daily_dates_without_cookie_returns_401(
-        self, client: TestClient
-    ) -> None:
+    def test_daily_dates_without_cookie_returns_401(self, client: TestClient) -> None:
         session = AsyncMock()
         _override_session(session)
         response = client.get(f"/api/campaigns/{uuid4()}/reports/daily")
         assert response.status_code == 401
 
-    def test_weekly_index_without_cookie_returns_401(
-        self, client: TestClient
-    ) -> None:
+    def test_weekly_index_without_cookie_returns_401(self, client: TestClient) -> None:
         session = AsyncMock()
         _override_session(session)
         response = client.get(f"/api/campaigns/{uuid4()}/reports/weekly")
         assert response.status_code == 401
 
-    def test_experiments_without_cookie_returns_401(
-        self, client: TestClient
-    ) -> None:
+    def test_experiments_without_cookie_returns_401(self, client: TestClient) -> None:
         session = AsyncMock()
         _override_session(session)
         response = client.get(f"/api/campaigns/{uuid4()}/experiments")
@@ -112,9 +106,7 @@ class TestCrossUserIsolation:
         token = create_session_token(user.id)
         client.cookies.set("session_token", token)
         try:
-            response = client.get(
-                f"/api/campaigns/{foreign_campaign_id}/reports/daily"
-            )
+            response = client.get(f"/api/campaigns/{foreign_campaign_id}/reports/daily")
         finally:
             client.cookies.clear()
 
@@ -155,9 +147,7 @@ class TestCrossUserIsolation:
         token = create_session_token(user.id)
         client.cookies.set("session_token", token)
         try:
-            response = client.get(
-                f"/api/campaigns/{campaign_id}/reports/daily"
-            )
+            response = client.get(f"/api/campaigns/{campaign_id}/reports/daily")
         finally:
             client.cookies.clear()
 

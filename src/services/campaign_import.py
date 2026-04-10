@@ -1,11 +1,13 @@
-"""Self-serve campaign import flow (Phase D).
+"""Self-serve campaign import flow (Phase D + Phase G).
 
 Lets a signed-in, Meta-connected user pick campaigns from their own
 Meta ad account and bring them into the system. The result is:
 
 - One new ``campaigns`` row per imported campaign, with
-  ``owner_user_id = <user.id>`` and
-  ``platform_campaign_id = <meta id>``.
+  ``owner_user_id = <user.id>``,
+  ``platform_campaign_id = <meta id>``, and Phase G's per-campaign
+  tenancy columns (``meta_ad_account_id``, ``meta_page_id``,
+  ``landing_page_url``) written from the user's picked values.
 - One new ``variants`` row per existing ad, with the genome
   reconstructed from the Meta creative (headline + body + link +
   image) so historical performance can be attributed.
@@ -19,6 +21,23 @@ The 5-campaign cap (``settings.max_campaigns_per_user``) is enforced
 before any writes happen. Partial failures within a bulk import are
 caught per-campaign — one bad campaign doesn't roll back the others.
 
+Phase G changes:
+
+- :func:`list_importable_campaigns` now takes an optional
+  ``ad_account_id``. If omitted, it falls back to the user's
+  ``default_ad_account_id``; if that's also null (the user has >1
+  account and hasn't picked one), raises
+  :class:`MultipleAdAccountsNoDefault` so the UI can prompt.
+- :func:`import_campaign` now requires ``ad_account_id`` + ``page_id``
+  on every call. Both are validated against the user's enumerated
+  ``available_ad_accounts`` / ``available_pages`` allowlist to block
+  cross-user injection.
+- Neither function goes through :mod:`src.adapters.meta_factory`
+  anymore — the factory is designed around resolved per-campaign
+  values, but during the *import* flow the campaign row doesn't
+  exist yet. We construct the adapter directly here using the
+  user's decrypted token.
+
 Exception contract:
 
 - ``CampaignCapExceeded`` — user is already at the cap.
@@ -26,12 +45,16 @@ Exception contract:
   been imported by this user already.
 - ``MetaConnectionMissing`` / ``MetaTokenExpired`` — user needs to
   reconnect Meta before importing.
+- ``MultipleAdAccountsNoDefault`` — Phase G, user has >1 account
+  and no default; UI must prompt for a choice.
+- ``AdAccountNotAllowed`` — Phase G, submitted account or Page ID
+  isn't in the user's allowlist.
 """
 
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import UTC, datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any
 from uuid import UUID
@@ -39,11 +62,13 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.adapters.meta_factory import get_meta_adapter_for_user
+from src.adapters.meta import MetaAdapter
 from src.config import get_settings
+from src.dashboard.crypto import decrypt_token
 from src.db.queries import (
     count_active_campaigns_for_user,
     get_imported_meta_campaign_ids_for_user,
+    get_meta_connection,
 )
 from src.db.tables import (
     Campaign,
@@ -54,8 +79,12 @@ from src.db.tables import (
     VariantStatus,
 )
 from src.exceptions import (
+    AdAccountNotAllowed,
     CampaignAlreadyImported,
     CampaignCapExceeded,
+    MetaConnectionMissing,
+    MetaTokenExpired,
+    MultipleAdAccountsNoDefault,
 )
 from src.models.campaigns import (
     CampaignImportOverrides,
@@ -63,6 +92,7 @@ from src.models.campaigns import (
     ImportableCampaignsResponse,
     ImportedCampaignSummary,
 )
+from src.models.oauth import MetaAdAccountInfo, MetaPageInfo
 
 logger = logging.getLogger(__name__)
 
@@ -107,40 +137,156 @@ def _parse_meta_created_time(value: Any) -> datetime | None:
 
 
 def _parse_meta_daily_budget(value: Any) -> float | None:
-    """Coerce Meta's ``daily_budget`` (string, minor units) to a float.
+    """Coerce Meta's ``daily_budget`` into a float in major units.
 
-    Meta returns budgets as strings denominated in the account's
-    minor currency unit — e.g. USD is cents, so ``"5000"`` means
-    $50.00. Divide by 100 for display. Return ``None`` if missing
+    ``MetaAdapter.list_campaigns`` already normalises Meta's raw
+    minor-unit string (e.g. USD cents like ``"5000"``) into a
+    major-unit float (``50.0``) before the payload reaches this
+    service, so the happy path here is a numeric passthrough.
+    Strings are still accepted defensively — parsed as dollars,
+    not cents — in case a future adapter or a test fake hands us
+    the raw Meta payload. Return ``None`` if the input is missing
     or unparseable; the model field is optional.
     """
     if value is None:
         return None
     if isinstance(value, (int, float)):
-        return float(value) / 100.0
+        return float(value)
     if not isinstance(value, str) or not value:
         return None
     try:
-        return float(Decimal(value)) / 100.0
+        return float(Decimal(value))
     except (InvalidOperation, ValueError):
         logger.warning("Could not parse Meta daily_budget: %r", value)
         return None
 
 
+def _coerce_available_ad_accounts(
+    raw: list[dict] | None,
+) -> list[MetaAdAccountInfo]:
+    """Best-effort-parse the JSONB column into Pydantic models."""
+    out: list[MetaAdAccountInfo] = []
+    for item in raw or []:
+        try:
+            out.append(MetaAdAccountInfo.model_validate(item))
+        except Exception:  # noqa: BLE001
+            logger.warning("Skipping malformed available_ad_accounts row: %r", item)
+    return out
+
+
+def _coerce_available_pages(raw: list[dict] | None) -> list[MetaPageInfo]:
+    out: list[MetaPageInfo] = []
+    for item in raw or []:
+        try:
+            out.append(MetaPageInfo.model_validate(item))
+        except Exception:  # noqa: BLE001
+            logger.warning("Skipping malformed available_pages row: %r", item)
+    return out
+
+
+async def _build_user_adapter(
+    session: AsyncSession,
+    user_id: UUID,
+    ad_account_id: str,
+    page_id: str = "",
+    landing_page_url: str | None = None,
+) -> MetaAdapter:
+    """Construct a per-request MetaAdapter for the import flow.
+
+    Unlike :mod:`src.adapters.meta_factory`, this helper is used
+    *during* the import flow — before a ``campaigns`` row exists to
+    read per-campaign values off. The caller passes the user's
+    picked ``ad_account_id`` (and optionally ``page_id`` /
+    ``landing_page_url``); this function fetches the connection,
+    checks expiry, and builds a fresh adapter.
+
+    Raises the same exceptions as the factory:
+    ``MetaConnectionMissing`` / ``MetaTokenExpired``.
+    """
+    connection = await get_meta_connection(session, user_id)
+    if connection is None:
+        raise MetaConnectionMissing(f"User {user_id} has not connected a Meta account.")
+    if connection.token_expires_at is not None:
+        now = datetime.now(UTC)
+        if connection.token_expires_at <= now:
+            raise MetaTokenExpired(
+                f"User {user_id}'s Meta token expired at "
+                f"{connection.token_expires_at.isoformat()} — "
+                "they need to reconnect."
+            )
+
+    plaintext_token = decrypt_token(connection.encrypted_access_token)
+    settings = get_settings()
+    return MetaAdapter(
+        app_id=settings.meta_app_id,
+        app_secret=settings.meta_app_secret,
+        access_token=plaintext_token,
+        ad_account_id=ad_account_id,
+        page_id=page_id,
+        landing_page_url=landing_page_url or "",
+    )
+
+
 async def list_importable_campaigns(
-    session: AsyncSession, user_id: UUID
+    session: AsyncSession,
+    user_id: UUID,
+    ad_account_id: str | None = None,
 ) -> ImportableCampaignsResponse:
     """Fetch the user's Meta campaigns and build the picker payload.
 
-    - Fetches the user's connection and builds a fresh adapter.
-    - Calls ``list_campaigns`` on the adapter.
+    - Fetches the user's connection + enumerated assets.
+    - Resolves the effective ``ad_account_id``: explicit arg wins,
+      else ``default_ad_account_id`` from the connection row, else
+      raise :class:`MultipleAdAccountsNoDefault` so the UI prompts.
+    - Constructs a fresh adapter scoped to that account and calls
+      ``list_campaigns``.
     - Cross-references the returned Meta IDs against anything
       already imported by this user, marking duplicates.
-    - Returns quota metadata alongside the list so the UI can
-      render a "3/5 used" widget without a second roundtrip.
+    - Returns quota metadata + the user's full account/Page lists
+      alongside the campaigns so the UI can render the picker and
+      account dropdown from a single roundtrip.
     """
     settings = get_settings()
-    adapter = await get_meta_adapter_for_user(session, user_id)
+    connection = await get_meta_connection(session, user_id)
+    if connection is None:
+        raise MetaConnectionMissing(f"User {user_id} has not connected a Meta account.")
+
+    accounts = _coerce_available_ad_accounts(connection.available_ad_accounts)
+    pages = _coerce_available_pages(connection.available_pages)
+
+    # Resolve the effective ad account. Explicit arg wins; otherwise
+    # fall back to the user's default; otherwise we can't proceed.
+    effective_account = ad_account_id or connection.default_ad_account_id
+    if effective_account is None:
+        if len(accounts) == 0:
+            # Edge case: brand-new Facebook account with no reachable
+            # ad accounts at all. Return an empty picker with context
+            # so the UI can show an actionable "create one in Meta Ads
+            # Manager first" message instead of an error toast.
+            return ImportableCampaignsResponse(
+                importable=[],
+                quota_used=await count_active_campaigns_for_user(session, user_id),
+                quota_max=settings.max_campaigns_per_user,
+                available_ad_accounts=accounts,
+                available_pages=pages,
+                default_ad_account_id=connection.default_ad_account_id,
+                default_page_id=connection.default_page_id,
+                selected_ad_account_id=None,
+            )
+        raise MultipleAdAccountsNoDefault(
+            f"User {user_id} has {len(accounts)} ad accounts and no default set. "
+            "Pick one on the import page before fetching campaigns."
+        )
+
+    # Defence-in-depth: never build an adapter for an account the
+    # user's own token couldn't have enumerated. In practice Meta
+    # would reject the call anyway, but a clean 400 is friendlier.
+    if accounts and effective_account not in {a.id for a in accounts}:
+        raise AdAccountNotAllowed(
+            f"Ad account {effective_account} is not in user {user_id}'s allowlist."
+        )
+
+    adapter = await _build_user_adapter(session, user_id, ad_account_id=effective_account)
     meta_campaigns_raw = await adapter.list_campaigns()
 
     already_imported = await get_imported_meta_campaign_ids_for_user(session, user_id)
@@ -164,6 +310,11 @@ async def list_importable_campaigns(
         importable=importable,
         quota_used=quota_used,
         quota_max=quota_max,
+        available_ad_accounts=accounts,
+        available_pages=pages,
+        default_ad_account_id=connection.default_ad_account_id,
+        default_page_id=connection.default_page_id,
+        selected_ad_account_id=effective_account,
     )
 
 
@@ -259,6 +410,9 @@ async def import_campaign(
     session: AsyncSession,
     user_id: UUID,
     meta_campaign_id: str,
+    ad_account_id: str,
+    page_id: str,
+    landing_page_url: str | None = None,
     overrides: CampaignImportOverrides | None = None,
 ) -> ImportedCampaignSummary:
     """Import a single Meta campaign into the system.
@@ -267,6 +421,13 @@ async def import_campaign(
     the campaign + one variant + one deployment per existing ad +
     seed gene pool entries. Returns a summary; the caller is
     responsible for committing the session.
+
+    Phase G made ``ad_account_id`` and ``page_id`` required: they're
+    validated against the user's ``available_ad_accounts`` /
+    ``available_pages`` allowlist (the security backstop against a
+    malicious client passing another user's account ID) and then
+    persisted on the new ``campaigns`` row so the cron can resolve
+    them without touching settings.
     """
     settings = get_settings()
     overrides = overrides or CampaignImportOverrides()
@@ -282,8 +443,30 @@ async def import_campaign(
     if meta_campaign_id in already:
         raise CampaignAlreadyImported(f"Meta campaign {meta_campaign_id} is already imported.")
 
-    # 3. Fetch Meta-side data via the per-user adapter.
-    adapter = await get_meta_adapter_for_user(session, user_id)
+    # 3. Cross-user allowlist check (Phase G). Reject if either ID
+    # isn't in the user's enumerated assets — this is the backstop
+    # against a client POSTing another user's account or Page id.
+    connection = await get_meta_connection(session, user_id)
+    if connection is None:
+        raise MetaConnectionMissing(f"User {user_id} has not connected a Meta account.")
+    account_ids = {a["id"] for a in connection.available_ad_accounts or []}
+    page_ids = {p["id"] for p in connection.available_pages or []}
+    if account_ids and ad_account_id not in account_ids:
+        raise AdAccountNotAllowed(
+            f"Ad account {ad_account_id} is not in user {user_id}'s allowlist."
+        )
+    if page_ids and page_id not in page_ids:
+        raise AdAccountNotAllowed(f"Page {page_id} is not in user {user_id}'s allowlist.")
+
+    # 4. Fetch Meta-side data via a per-request adapter scoped to the
+    # chosen account.
+    adapter = await _build_user_adapter(
+        session,
+        user_id,
+        ad_account_id=ad_account_id,
+        page_id=page_id,
+        landing_page_url=landing_page_url,
+    )
     meta_campaigns = await adapter.list_campaigns()
     match = next(
         (c for c in meta_campaigns if str(c["meta_campaign_id"]) == meta_campaign_id),
@@ -294,7 +477,7 @@ async def import_campaign(
 
     ads = await adapter.list_campaign_ads(meta_campaign_id)
 
-    # 4. Resolve effective settings from overrides or Meta defaults.
+    # 5. Resolve effective settings from overrides or Meta defaults.
     meta_daily_budget = match.get("daily_budget")
     if overrides.daily_budget is not None:
         daily_budget = overrides.daily_budget
@@ -320,6 +503,9 @@ async def import_campaign(
         confidence_threshold=confidence_threshold,
         is_active=True,
         owner_user_id=user_id,
+        meta_ad_account_id=ad_account_id,
+        meta_page_id=page_id,
+        landing_page_url=landing_page_url,
     )
     session.add(campaign)
     await session.flush()

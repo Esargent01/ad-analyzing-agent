@@ -1,18 +1,36 @@
 /**
- * Phase D self-serve import page.
+ * Phase D + Phase G self-serve import page.
  *
  * Flow:
- * 1. Fetch the connected user's Meta campaigns (`useImportableCampaigns`)
- * 2. Render one `<MetaCampaignRow />` per result with checkboxes
- * 3. Submit the selected IDs via `useImportCampaigns`
- * 4. On success, show the per-campaign result (imported / failed)
+ * 1. Resolve the effective ad account (explicit pick → default → prompt)
+ * 2. Fetch the connected user's Meta campaigns scoped to that account
+ *    (`useImportableCampaigns`)
+ * 3. Render one `<MetaCampaignRow />` per result with checkboxes
+ * 4. Submit the selected IDs + picked account/Page/landing URL via
+ *    `useImportCampaigns`
+ * 5. On success, show the per-campaign result (imported / failed)
  *    and redirect back to the dashboard after a short beat
+ *
+ * Phase G additions:
+ * - The top of the page carries an account dropdown (hidden when the
+ *   user has exactly one account) and a Page dropdown (same rule).
+ *   Switching accounts refetches the campaign list scoped to the new
+ *   account — each account is cached under its own query key.
+ * - A single landing page URL input is shared across all campaigns in
+ *   the current import batch. Optional; the backend accepts null.
+ * - If the backend returns 400 ``pick_account_first`` we show the
+ *   account dropdown prominently and block the submit button until a
+ *   choice is made.
+ * - The submit body carries ``ad_account_id`` + ``page_id`` +
+ *   ``landing_page_url`` as required Phase G fields. Without them the
+ *   backend hard-fails with ``account_not_in_allowlist``.
  *
  * Guardrails:
  * - If Meta is not connected, redirect to /dashboard (the card there
  *   handles the connect flow)
  * - The submit button is disabled when the selection would push the
- *   user over `quota_max`
+ *   user over `quota_max`, when no Page is chosen, or when no account
+ *   has been picked yet
  * - Already-imported rows are locked via `MetaCampaignRow`'s disabled
  *   prop
  */
@@ -34,10 +52,56 @@ import type { CampaignImportResult } from "@/lib/api/types";
 export function ImportMetaCampaignsRoute() {
   const navigate = useNavigate();
   const status = useMetaStatus();
-  const query = useImportableCampaigns({
-    enabled: Boolean(status.data?.connected),
+
+  // Phase G: the selected ad account drives the query. Start with
+  // the user's default if they have one; otherwise leave null and
+  // let the account dropdown force a choice.
+  const [adAccountId, setAdAccountId] = useState<string | null>(null);
+
+  // Seed the account/page selection once the connection status comes
+  // back so single-account users don't see an empty state.
+  useEffect(() => {
+    if (!status.data?.connected) return;
+    if (adAccountId) return;
+    const defaultAccount =
+      status.data.default_ad_account_id ??
+      (status.data.available_ad_accounts.length === 1
+        ? status.data.available_ad_accounts[0].id
+        : null);
+    if (defaultAccount) setAdAccountId(defaultAccount);
+  }, [status.data, adAccountId]);
+
+  const query = useImportableCampaigns(adAccountId, {
+    enabled: Boolean(status.data?.connected && adAccountId),
   });
   const importMutation = useImportCampaigns();
+
+  // The picker payload (when loaded) carries the available accounts +
+  // pages so we don't need a second roundtrip — prefer it over the
+  // ``useMetaStatus`` copy so any refetch keeps us in sync.
+  const availableAccounts =
+    query.data?.available_ad_accounts ??
+    status.data?.available_ad_accounts ??
+    [];
+  const availablePages =
+    query.data?.available_pages ?? status.data?.available_pages ?? [];
+  const defaultPageId =
+    query.data?.default_page_id ?? status.data?.default_page_id ?? null;
+
+  // Page selection — mirror the account logic.
+  const [pageId, setPageId] = useState<string | null>(null);
+  useEffect(() => {
+    if (pageId) return;
+    if (defaultPageId) {
+      setPageId(defaultPageId);
+      return;
+    }
+    if (availablePages.length === 1) {
+      setPageId(availablePages[0].id);
+    }
+  }, [defaultPageId, availablePages, pageId]);
+
+  const [landingPageUrl, setLandingPageUrl] = useState<string>("");
 
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [result, setResult] = useState<CampaignImportResult | null>(null);
@@ -68,13 +132,20 @@ export function ImportMetaCampaignsRoute() {
 
   const overQuota = selected.size > remaining;
   const canSubmit =
-    !importMutation.isPending && selected.size > 0 && !overQuota;
+    !importMutation.isPending &&
+    selected.size > 0 &&
+    !overQuota &&
+    Boolean(adAccountId) &&
+    Boolean(pageId);
 
   const handleSubmit = async () => {
-    if (!canSubmit) return;
+    if (!canSubmit || !adAccountId || !pageId) return;
     try {
       const res = await importMutation.mutateAsync({
         meta_campaign_ids: Array.from(selected),
+        ad_account_id: adAccountId,
+        page_id: pageId,
+        landing_page_url: landingPageUrl.trim() || null,
       });
       setResult(res);
       setSelected(new Set());
@@ -102,11 +173,25 @@ export function ImportMetaCampaignsRoute() {
         return "Meta isn't connected — reconnect from the dashboard and try again.";
       }
       if (err.status === 400) {
+        // Phase G: the server may be telling us to pick an account
+        // first (``pick_account_first``) or that we tried to use an
+        // account / Page that isn't in the allowlist
+        // (``account_not_in_allowlist``).
+        const detail = (err.body as { detail?: string } | null)?.detail;
+        if (detail === "pick_account_first") {
+          return "Pick an ad account above before fetching campaigns.";
+        }
+        if (detail === "account_not_in_allowlist") {
+          return "That ad account or Page isn't in your connected Meta assets. Refresh and try again.";
+        }
         return "Something about the request was invalid. Refresh and try again.";
       }
     }
     return "Something went wrong loading your campaigns.";
   }, [query.error, importMutation.error]);
+
+  const showAccountPicker = availableAccounts.length > 1;
+  const showPagePicker = availablePages.length > 1;
 
   return (
     <div>
@@ -127,6 +212,79 @@ export function ImportMetaCampaignsRoute() {
           total — {quotaUsed} used, {remaining} remaining.
         </p>
       </div>
+
+      {(showAccountPicker || showPagePicker) && (
+        <Card className="mb-4">
+          <CardHeader>
+            <div>
+              <CardTitle>Meta tenancy</CardTitle>
+              <CardDescription>
+                Pick which ad account and Page each imported campaign
+                should run against.
+              </CardDescription>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {showAccountPicker && (
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="label">Ad account</span>
+                  <select
+                    value={adAccountId ?? ""}
+                    onChange={(e) => setAdAccountId(e.target.value || null)}
+                    className="rounded border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-1 text-xs"
+                  >
+                    <option value="">— pick one —</option>
+                    {availableAccounts.map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.name} ({a.id})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {showPagePicker && (
+                <label className="flex flex-col gap-1 text-xs">
+                  <span className="label">Page</span>
+                  <select
+                    value={pageId ?? ""}
+                    onChange={(e) => setPageId(e.target.value || null)}
+                    className="rounded border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-1 text-xs"
+                  >
+                    <option value="">— pick one —</option>
+                    {availablePages.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} ({p.category})
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card className="mb-4">
+        <CardHeader>
+          <div>
+            <CardTitle>Landing page URL</CardTitle>
+            <CardDescription>
+              Optional — applied to every campaign in this import batch.
+              You can change it per campaign later from the dashboard.
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <input
+            type="url"
+            value={landingPageUrl}
+            onChange={(e) => setLandingPageUrl(e.target.value)}
+            placeholder="https://shop.example.com/spring"
+            className="w-full rounded border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-1 text-xs"
+          />
+        </CardContent>
+      </Card>
 
       {errorMessage && (
         <div
@@ -178,7 +336,13 @@ export function ImportMetaCampaignsRoute() {
         </Card>
       )}
 
-      {query.isLoading ? (
+      {!adAccountId ? (
+        <Card>
+          <p className="text-sm text-[var(--text-secondary)]">
+            Pick an ad account above to load its campaigns.
+          </p>
+        </Card>
+      ) : query.isLoading ? (
         <Card>
           <p className="text-sm text-[var(--text-secondary)]">
             Loading campaigns from Meta…
@@ -187,7 +351,9 @@ export function ImportMetaCampaignsRoute() {
       ) : rows.length === 0 ? (
         <Card>
           <p className="text-sm text-[var(--text-secondary)]">
-            No campaigns found in your Meta ad account.
+            {availableAccounts.length === 0
+              ? "Your Meta token has no reachable ad accounts. Create one in Meta Ads Manager, then reconnect."
+              : "No campaigns found in the selected ad account."}
           </p>
         </Card>
       ) : (
@@ -210,6 +376,11 @@ export function ImportMetaCampaignsRoute() {
             {overQuota && (
               <span className="ml-2 text-red-300">
                 over your {remaining}-campaign quota
+              </span>
+            )}
+            {!pageId && (
+              <span className="ml-2 text-red-300">
+                pick a Page above before importing
               </span>
             )}
           </p>

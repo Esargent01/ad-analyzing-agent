@@ -111,9 +111,7 @@ class TestAuth:
 
 
 class TestUsageHappyPath:
-    def test_returns_full_rollup_with_decimal_math(
-        self, client: TestClient
-    ) -> None:
+    def test_returns_full_rollup_with_decimal_math(self, client: TestClient) -> None:
         user = _make_user()
         campaign_a = uuid4()
         campaign_b = uuid4()
@@ -164,9 +162,7 @@ class TestUsageHappyPath:
 
         _sign_in(client, user)
         try:
-            response = client.get(
-                "/api/me/usage?from=2026-04-01&to=2026-04-02"
-            )
+            response = client.get("/api/me/usage?from=2026-04-01&to=2026-04-02")
         finally:
             client.cookies.clear()
 
@@ -194,16 +190,12 @@ class TestUsageHappyPath:
         ]
         assert Decimal(body["by_day"][1]["cost_usd"]) == Decimal("0.075000")
 
-    def test_null_campaign_bucket_is_preserved(
-        self, client: TestClient
-    ) -> None:
+    def test_null_campaign_bucket_is_preserved(self, client: TestClient) -> None:
         """Rows with a NULL campaign_id (e.g., copywriter run without a
         campaign) must still appear in the by_campaign breakdown with
         ``campaign_id: null``."""
         user = _make_user()
-        totals_row = SimpleNamespace(
-            total_cost=Decimal("0.010000"), total_calls=1
-        )
+        totals_row = SimpleNamespace(total_cost=Decimal("0.010000"), total_calls=1)
         service_rows = [
             SimpleNamespace(service="llm", cost=Decimal("0.010000"), calls=1),
         ]
@@ -249,9 +241,7 @@ class TestUsageHappyPath:
             }
         ]
 
-    def test_empty_window_returns_zero_totals(
-        self, client: TestClient
-    ) -> None:
+    def test_empty_window_returns_zero_totals(self, client: TestClient) -> None:
         user = _make_user()
 
         session = _build_session(
@@ -284,9 +274,7 @@ class TestUsageHappyPath:
 
 
 class TestDefaultWindow:
-    def test_default_range_is_trailing_30_days(
-        self, client: TestClient
-    ) -> None:
+    def test_default_range_is_trailing_30_days(self, client: TestClient) -> None:
         user = _make_user()
 
         session = _build_session(
@@ -353,9 +341,7 @@ class TestRangeValidation:
 
         _sign_in(client, user)
         try:
-            response = client.get(
-                "/api/me/usage?from=2024-01-01&to=2026-01-01"
-            )
+            response = client.get("/api/me/usage?from=2024-01-01&to=2026-01-01")
         finally:
             client.cookies.clear()
 

@@ -144,10 +144,7 @@ class EmailReporter:
         """Send a daily report email using the v2 template. Returns True on success."""
         html_content = self._render_daily_html(report, base_url=base_url)
 
-        subject = (
-            f"Daily Ad Report: {report.campaign_name} "
-            f"({report.report_date.isoformat()})"
-        )
+        subject = f"Daily Ad Report: {report.campaign_name} ({report.report_date.isoformat()})"
 
         payload: dict[str, object] = {
             "personalizations": [
@@ -217,10 +214,7 @@ class EmailReporter:
             review_url=review_url,
         )
 
-        subject = (
-            f"Weekly Ad Report: {campaign_name} "
-            f"(Week {week_label})"
-        )
+        subject = f"Weekly Ad Report: {campaign_name} (Week {week_label})"
 
         payload: dict[str, object] = {
             "personalizations": [

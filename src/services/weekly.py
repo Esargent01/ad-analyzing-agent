@@ -87,9 +87,7 @@ async def run_weekly_generation(
         session, campaign_id, ttl_days=settings.proposal_ttl_days
     )
     if expired_count:
-        logger.info(
-            "Expired %d stale proposals for campaign %s", expired_count, campaign_id
-        )
+        logger.info("Expired %d stale proposals for campaign %s", expired_count, campaign_id)
 
     # Step 2: compute capacity
     max_row = await session.execute(
@@ -103,19 +101,13 @@ async def run_weekly_generation(
     max_variants = int(max_variants_row[0])
 
     active_row = await session.execute(
-        text(
-            "SELECT COUNT(*) FROM variants "
-            "WHERE campaign_id = :id AND status = 'active'"
-        ),
+        text("SELECT COUNT(*) FROM variants WHERE campaign_id = :id AND status = 'active'"),
         {"id": campaign_id},
     )
     active_count = int(active_row.scalar_one())
 
     pending_row = await session.execute(
-        text(
-            "SELECT COUNT(*) FROM approval_queue "
-            "WHERE campaign_id = :id AND approved IS NULL"
-        ),
+        text("SELECT COUNT(*) FROM approval_queue WHERE campaign_id = :id AND approved IS NULL"),
         {"id": campaign_id},
     )
     pending_count = int(pending_row.scalar_one())
@@ -172,10 +164,7 @@ async def run_weekly_generation(
 
     # Existing genomes: everything not retired (active, pending, paused, winner)
     existing_row = await session.execute(
-        text(
-            "SELECT genome FROM variants "
-            "WHERE campaign_id = :id AND status != 'retired'"
-        ),
+        text("SELECT genome FROM variants WHERE campaign_id = :id AND status != 'retired'"),
         {"id": campaign_id},
     )
     existing_genomes: list[dict[str, str]] = []
@@ -201,9 +190,7 @@ async def run_weekly_generation(
 
     # Step 4: create variant rows + approval_queue entries
     max_gen_row = await session.execute(
-        text(
-            "SELECT COALESCE(MAX(generation), 0) FROM variants WHERE campaign_id = :id"
-        ),
+        text("SELECT COALESCE(MAX(generation), 0) FROM variants WHERE campaign_id = :id"),
         {"id": campaign_id},
     )
     current_max_gen = int(max_gen_row.scalar_one())
@@ -254,9 +241,7 @@ async def run_weekly_generation(
                 },
             )
         except Exception as exc:  # noqa: BLE001 — tolerate individual failures
-            logger.warning(
-                "Failed to queue weekly variant for genome %s: %s", result.genome, exc
-            )
+            logger.warning("Failed to queue weekly variant for genome %s: %s", result.genome, exc)
 
     await session.flush()
     logger.info(
@@ -302,9 +287,7 @@ async def load_proposed_variants(
             submitted_at = submitted_at.replace(tzinfo=timezone.utc)
 
         age_days = (now - submitted_at).days
-        classification = (
-            "expiring_soon" if submitted_at < expiring_threshold else "new"
-        )
+        classification = "expiring_soon" if submitted_at < expiring_threshold else "new"
         days_until_expiry = max(0, ttl_days - age_days)
 
         genome = item.genome_snapshot if isinstance(item.genome_snapshot, dict) else {}

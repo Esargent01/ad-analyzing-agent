@@ -33,7 +33,7 @@ class TestOAuthStateRoundTrip:
         # Flip a char near the middle so the payload but not the
         # signature still parses — defeats the HMAC check.
         mid = len(token) // 2
-        tampered = token[:mid] + ("A" if token[mid] != "A" else "B") + token[mid + 1:]
+        tampered = token[:mid] + ("A" if token[mid] != "A" else "B") + token[mid + 1 :]
         assert verify_oauth_state_token(tampered) is None
 
     def test_magic_link_token_is_not_accepted_as_state(self) -> None:

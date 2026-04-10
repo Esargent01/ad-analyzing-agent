@@ -182,9 +182,22 @@ class TestRowToVariantSummary:
 
     def test_zero_impressions_yields_zero_ctr(self):
         row = (
-            uuid4(), "V2", "active",
-            0, 0, 0, Decimal("0"),
-            0, 0, 0, 0, 0, 0, 0, 0, Decimal("0"),
+            uuid4(),
+            "V2",
+            "active",
+            0,
+            0,
+            0,
+            Decimal("0"),
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            Decimal("0"),
         )
         vs = _row_to_variant_summary(row)
         assert vs.ctr == Decimal("0")
@@ -344,24 +357,26 @@ def campaign_id() -> UUID:
 class TestBuildDailyReport:
     @pytest.mark.asyncio
     async def test_empty_campaign_returns_empty_daily_report(self, campaign_id):
-        session = _FakeSession([
-            ("FROM campaigns WHERE id", _FakeResult([("Test Campaign",)])),
-            ("FROM test_cycles", _FakeResult([])),
-            # Aggregate metrics — all zeros
-            (
-                "FROM metrics m\n            JOIN variants v",
-                _FakeResult([(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)]),
-            ),
-            # Variant leaderboard — empty
-            ("FROM variants v\n            LEFT JOIN LATERAL", _FakeResult([])),
-            # Genome map — empty
-            (
-                "FROM variants v\n            WHERE v.campaign_id = :id AND v.status IN",
-                _FakeResult([]),
-            ),
-            # Previous day totals — all zeros
-            ("COALESCE(SUM(m.spend), 0)", _FakeResult([(0, 0, 0)])),
-        ])
+        session = _FakeSession(
+            [
+                ("FROM campaigns WHERE id", _FakeResult([("Test Campaign",)])),
+                ("FROM test_cycles", _FakeResult([])),
+                # Aggregate metrics — all zeros
+                (
+                    "FROM metrics m\n            JOIN variants v",
+                    _FakeResult([(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)]),
+                ),
+                # Variant leaderboard — empty
+                ("FROM variants v\n            LEFT JOIN LATERAL", _FakeResult([])),
+                # Genome map — empty
+                (
+                    "FROM variants v\n            WHERE v.campaign_id = :id AND v.status IN",
+                    _FakeResult([]),
+                ),
+                # Previous day totals — all zeros
+                ("COALESCE(SUM(m.spend), 0)", _FakeResult([(0, 0, 0)])),
+            ]
+        )
 
         report = await build_daily_report(session, campaign_id, date(2026, 4, 8))
         assert report.campaign_name == "Test Campaign"
@@ -374,18 +389,18 @@ class TestBuildDailyReport:
 
     @pytest.mark.asyncio
     async def test_missing_campaign_raises_lookup_error(self, campaign_id):
-        session = _FakeSession([
-            ("FROM campaigns WHERE id", _FakeResult([])),
-        ])
+        session = _FakeSession(
+            [
+                ("FROM campaigns WHERE id", _FakeResult([])),
+            ]
+        )
         with pytest.raises(LookupError):
             await build_daily_report(session, campaign_id, date(2026, 4, 8))
 
 
 class TestBuildWeeklyReport:
     @pytest.mark.asyncio
-    async def test_empty_campaign_returns_empty_weekly_report(
-        self, campaign_id, monkeypatch
-    ):
+    async def test_empty_campaign_returns_empty_weekly_report(self, campaign_id, monkeypatch):
         # ``load_proposed_variants`` is imported at module load time, so patch
         # the reference on the service module.
         from src.services import reports as reports_module
@@ -393,21 +408,21 @@ class TestBuildWeeklyReport:
         async def _fake_load_proposed_variants(session, cid):
             return []
 
-        monkeypatch.setattr(
-            reports_module, "load_proposed_variants", _fake_load_proposed_variants
-        )
+        monkeypatch.setattr(reports_module, "load_proposed_variants", _fake_load_proposed_variants)
 
-        session = _FakeSession([
-            ("FROM campaigns WHERE id", _FakeResult([("Test Campaign",)])),
-            ("FROM test_cycles", _FakeResult([])),
-            (
-                "FROM metrics m\n            JOIN variants v",
-                _FakeResult([(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)]),
-            ),
-            ("FROM variants v\n            LEFT JOIN LATERAL", _FakeResult([])),
-            ("FROM element_performance", _FakeResult([])),
-            ("FROM element_interactions", _FakeResult([])),
-        ])
+        session = _FakeSession(
+            [
+                ("FROM campaigns WHERE id", _FakeResult([("Test Campaign",)])),
+                ("FROM test_cycles", _FakeResult([])),
+                (
+                    "FROM metrics m\n            JOIN variants v",
+                    _FakeResult([(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)]),
+                ),
+                ("FROM variants v\n            LEFT JOIN LATERAL", _FakeResult([])),
+                ("FROM element_performance", _FakeResult([])),
+                ("FROM element_interactions", _FakeResult([])),
+            ]
+        )
 
         report = await build_weekly_report(
             session,
@@ -429,29 +444,27 @@ class TestBuildWeeklyReport:
         assert report.review_url is None
 
     @pytest.mark.asyncio
-    async def test_passes_through_generation_side_effects(
-        self, campaign_id, monkeypatch
-    ):
+    async def test_passes_through_generation_side_effects(self, campaign_id, monkeypatch):
         from src.services import reports as reports_module
 
         async def _fake_load_proposed_variants(session, cid):
             return []
 
-        monkeypatch.setattr(
-            reports_module, "load_proposed_variants", _fake_load_proposed_variants
-        )
+        monkeypatch.setattr(reports_module, "load_proposed_variants", _fake_load_proposed_variants)
 
-        session = _FakeSession([
-            ("FROM campaigns WHERE id", _FakeResult([("Test Campaign",)])),
-            ("FROM test_cycles", _FakeResult([])),
-            (
-                "FROM metrics m\n            JOIN variants v",
-                _FakeResult([(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)]),
-            ),
-            ("FROM variants v\n            LEFT JOIN LATERAL", _FakeResult([])),
-            ("FROM element_performance", _FakeResult([])),
-            ("FROM element_interactions", _FakeResult([])),
-        ])
+        session = _FakeSession(
+            [
+                ("FROM campaigns WHERE id", _FakeResult([("Test Campaign",)])),
+                ("FROM test_cycles", _FakeResult([])),
+                (
+                    "FROM metrics m\n            JOIN variants v",
+                    _FakeResult([(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)]),
+                ),
+                ("FROM variants v\n            LEFT JOIN LATERAL", _FakeResult([])),
+                ("FROM element_performance", _FakeResult([])),
+                ("FROM element_interactions", _FakeResult([])),
+            ]
+        )
 
         report = await build_weekly_report(
             session,

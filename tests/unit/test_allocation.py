@@ -45,7 +45,7 @@ class TestThompsonSampler:
         bad_id = uuid.uuid4()
         variants = [
             (good_id, 500, 1000),  # 50% CTR
-            (bad_id, 10, 1000),    # 1% CTR
+            (bad_id, 10, 1000),  # 1% CTR
         ]
         total_good = 0.0
         n_samples = 500
@@ -75,9 +75,7 @@ class TestAllocateBudgets:
         """Total allocated budget must never exceed the total_budget."""
         variants = _make_variants(5, clicks=200, impressions=5000)
         total_budget = Decimal("50.00")
-        allocations = allocate_budgets(
-            variants, total_budget, rng=np.random.default_rng(42)
-        )
+        allocations = allocate_budgets(variants, total_budget, rng=np.random.default_rng(42))
         assert sum(allocations.values()) <= total_budget
 
     def test_minimum_budget_per_variant(self) -> None:
@@ -114,21 +112,19 @@ class TestAllocateBudgets:
         vid = uuid.uuid4()
         variants = [(vid, 100, 2000)]
         total_budget = Decimal("50.00")
-        allocations = allocate_budgets(
-            variants, total_budget, rng=np.random.default_rng(42)
-        )
+        allocations = allocate_budgets(variants, total_budget, rng=np.random.default_rng(42))
         assert len(allocations) == 1
         assert allocations[vid] <= total_budget
         # With only one variant, it gets min + 100% of remainder
-        assert allocations[vid] == total_budget - Decimal("0.00") or allocations[vid] <= total_budget
+        assert (
+            allocations[vid] == total_budget - Decimal("0.00") or allocations[vid] <= total_budget
+        )
 
     def test_allocations_are_rounded_to_two_decimal_places(self) -> None:
         """All allocations should be rounded to 2 decimal places."""
         variants = _make_variants(3, clicks=77, impressions=3333)
         total_budget = Decimal("99.99")
-        allocations = allocate_budgets(
-            variants, total_budget, rng=np.random.default_rng(42)
-        )
+        allocations = allocate_budgets(variants, total_budget, rng=np.random.default_rng(42))
         for budget in allocations.values():
             # Check that it has at most 2 decimal places
             assert budget == budget.quantize(Decimal("0.01"))

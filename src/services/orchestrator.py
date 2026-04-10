@@ -116,9 +116,7 @@ class Orchestrator:
             try:
                 owner_user_id = await get_campaign_owner_id(session, campaign_id)
             except Exception as exc:  # noqa: BLE001
-                logger.warning(
-                    "Couldn't resolve owner for campaign %s: %s", campaign_id, exc
-                )
+                logger.warning("Couldn't resolve owner for campaign %s: %s", campaign_id, exc)
                 owner_user_id = None
             self._current_usage_ctx = AgentContext(
                 user_id=owner_user_id,

@@ -41,15 +41,20 @@ class MetaAdapter(BaseAdapter):
     are dispatched to a thread-pool executor via ``asyncio.to_thread``
     to keep the event loop free.
 
-    **Tokens are per-user and short-lived.** After Phase C, the
-    access token passed to ``__init__`` is always the decrypted
-    long-lived token of a single app user — never a global operator
-    token. Construct a fresh ``MetaAdapter`` at the start of each
-    cycle via :mod:`src.adapters.meta_factory` and discard it when
-    the cycle ends. Never cache an instance across users or across
-    cycles; ``FacebookAdsApi.init`` mutates process-global SDK
-    state, and cached instances will silently leak token identity
-    across concurrent users.
+    **Tokens AND ad account / Page IDs are per-campaign and short-lived.**
+    After Phase C the access token is always the decrypted long-lived
+    token of a single app user (never a global operator token); after
+    Phase G the ``ad_account_id``, ``page_id`` and ``landing_page_url``
+    are also per-campaign values, read off the ``campaigns`` row by
+    :func:`src.adapters.meta_factory.get_meta_adapter_for_campaign`.
+    None of the three come from global settings anymore.
+
+    Construct a fresh ``MetaAdapter`` at the start of each cycle via
+    :mod:`src.adapters.meta_factory` and discard it when the cycle
+    ends. Never cache an instance across users or across cycles —
+    ``FacebookAdsApi.init`` mutates process-global SDK state, and
+    cached instances will silently leak token identity across
+    concurrent users.
     """
 
     def __init__(

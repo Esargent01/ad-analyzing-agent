@@ -67,9 +67,7 @@ class TestMagicLinkRequest:
         # so rate-limit counters don't leak across the suite.
         dashboard_app._email_bucket.clear()
 
-    def test_unknown_email_triggers_send_for_self_serve(
-        self, client: TestClient
-    ) -> None:
+    def test_unknown_email_triggers_send_for_self_serve(self, client: TestClient) -> None:
         """Self-serve: unknown emails also receive magic links."""
         session = AsyncMock()
         with patch(
@@ -136,22 +134,24 @@ class TestVerifyEndpoint:
         assert response.status_code == 302
         assert "error=invalid_link" in response.headers["location"]
 
-    def test_valid_token_sets_cookies_and_redirects(
-        self, client: TestClient
-    ) -> None:
+    def test_valid_token_sets_cookies_and_redirects(self, client: TestClient) -> None:
         user = _make_user("bob@example.com")
         session = AsyncMock()
         token = create_magic_link_token("bob@example.com")
 
-        with patch(
-            "src.dashboard.app.consume_magic_link_token",
-            new=AsyncMock(return_value=True),
-        ), patch(
-            "src.dashboard.app.get_user_by_email",
-            new=AsyncMock(return_value=user),
-        ), patch(
-            "src.dashboard.app.touch_last_login",
-            new=AsyncMock(return_value=None),
+        with (
+            patch(
+                "src.dashboard.app.consume_magic_link_token",
+                new=AsyncMock(return_value=True),
+            ),
+            patch(
+                "src.dashboard.app.get_user_by_email",
+                new=AsyncMock(return_value=user),
+            ),
+            patch(
+                "src.dashboard.app.touch_last_login",
+                new=AsyncMock(return_value=None),
+            ),
         ):
             _override_session(session)
             response = client.get(
@@ -167,26 +167,29 @@ class TestVerifyEndpoint:
         assert "session_token" in cookies
         assert "csrf_token" in cookies
 
-    def test_token_for_unknown_email_creates_user_and_signs_in(
-        self, client: TestClient
-    ) -> None:
+    def test_token_for_unknown_email_creates_user_and_signs_in(self, client: TestClient) -> None:
         """Self-serve: first successful verify for a new email creates the row."""
         new_user = _make_user("nobody@example.com")
         session = AsyncMock()
         token = create_magic_link_token("nobody@example.com")
 
-        with patch(
-            "src.dashboard.app.consume_magic_link_token",
-            new=AsyncMock(return_value=True),
-        ), patch(
-            "src.dashboard.app.get_user_by_email",
-            new=AsyncMock(return_value=None),
-        ), patch(
-            "src.dashboard.app.create_user",
-            new=AsyncMock(return_value=new_user),
-        ) as mock_create, patch(
-            "src.dashboard.app.touch_last_login",
-            new=AsyncMock(return_value=None),
+        with (
+            patch(
+                "src.dashboard.app.consume_magic_link_token",
+                new=AsyncMock(return_value=True),
+            ),
+            patch(
+                "src.dashboard.app.get_user_by_email",
+                new=AsyncMock(return_value=None),
+            ),
+            patch(
+                "src.dashboard.app.create_user",
+                new=AsyncMock(return_value=new_user),
+            ) as mock_create,
+            patch(
+                "src.dashboard.app.touch_last_login",
+                new=AsyncMock(return_value=None),
+            ),
         ):
             _override_session(session)
             response = client.get(
@@ -201,9 +204,7 @@ class TestVerifyEndpoint:
         assert "session_token" in response.cookies
         assert "csrf_token" in response.cookies
 
-    def test_replayed_token_redirects_with_error(
-        self, client: TestClient
-    ) -> None:
+    def test_replayed_token_redirects_with_error(self, client: TestClient) -> None:
         """A token whose hash is already in ``magic_links_consumed`` is rejected."""
         session = AsyncMock()
         token = create_magic_link_token("bob@example.com")
@@ -246,17 +247,13 @@ class TestMeEndpoint:
             client.cookies.clear()
         assert response.status_code == 401
 
-    def test_valid_session_returns_user_and_campaigns(
-        self, client: TestClient
-    ) -> None:
+    def test_valid_session_returns_user_and_campaigns(self, client: TestClient) -> None:
         user = _make_user("carol@example.com")
         campaigns = [_make_campaign("Spring Sale"), _make_campaign("Summer")]
 
         # Mock the user lookup inside get_current_user
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=SimpleNamespace(scalar_one_or_none=lambda: user)
-        )
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: user))
 
         token = create_session_token(user.id)
 
@@ -287,9 +284,7 @@ class TestLogoutEndpoint:
     def test_missing_csrf_returns_403(self, client: TestClient) -> None:
         user = _make_user()
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=SimpleNamespace(scalar_one_or_none=lambda: user)
-        )
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: user))
         _override_session(session)
 
         token = create_session_token(user.id)
@@ -304,31 +299,23 @@ class TestLogoutEndpoint:
     def test_mismatched_csrf_returns_403(self, client: TestClient) -> None:
         user = _make_user()
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=SimpleNamespace(scalar_one_or_none=lambda: user)
-        )
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: user))
         _override_session(session)
 
         token = create_session_token(user.id)
         client.cookies.set("session_token", token)
         client.cookies.set("csrf_token", "aaa")
         try:
-            response = client.post(
-                "/api/auth/logout", headers={"X-CSRF-Token": "bbb"}
-            )
+            response = client.post("/api/auth/logout", headers={"X-CSRF-Token": "bbb"})
         finally:
             client.cookies.clear()
 
         assert response.status_code == 403
 
-    def test_matching_csrf_returns_204_and_clears_cookies(
-        self, client: TestClient
-    ) -> None:
+    def test_matching_csrf_returns_204_and_clears_cookies(self, client: TestClient) -> None:
         user = _make_user()
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=SimpleNamespace(scalar_one_or_none=lambda: user)
-        )
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: user))
         _override_session(session)
 
         token = create_session_token(user.id)
@@ -336,9 +323,7 @@ class TestLogoutEndpoint:
         client.cookies.set("session_token", token)
         client.cookies.set("csrf_token", csrf)
         try:
-            response = client.post(
-                "/api/auth/logout", headers={"X-CSRF-Token": csrf}
-            )
+            response = client.post("/api/auth/logout", headers={"X-CSRF-Token": csrf})
         finally:
             client.cookies.clear()
 

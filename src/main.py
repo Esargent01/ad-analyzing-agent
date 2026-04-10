@@ -40,7 +40,10 @@ def _get_adapter(platform: str):
     settings = get_settings()
 
     if platform == "google_ads":
-        if settings.google_ads_developer_token and not settings.google_ads_developer_token.startswith("placeholder"):
+        if (
+            settings.google_ads_developer_token
+            and not settings.google_ads_developer_token.startswith("placeholder")
+        ):
             from src.adapters.google_ads import GoogleAdsAdapter
 
             return GoogleAdsAdapter(
@@ -123,9 +126,7 @@ def run_cycle(campaign_id: str, with_generate: bool, legacy_no_generate: bool) -
 
             if platform == "meta":
                 try:
-                    adapter = await get_meta_adapter_for_campaign(
-                        session, UUID(campaign_id)
-                    )
+                    adapter = await get_meta_adapter_for_campaign(session, UUID(campaign_id))
                 except MetaConnectionMissing as exc:
                     click.echo(f"Error: {exc}")
                     await close_db()
@@ -235,9 +236,7 @@ def run_all_user_campaigns(dry_run: bool, with_generate: bool) -> None:
             try:
                 async with get_session() as adapter_session:
                     try:
-                        adapter = await get_meta_adapter_for_campaign(
-                            adapter_session, campaign.id
-                        )
+                        adapter = await get_meta_adapter_for_campaign(adapter_session, campaign.id)
                     except (MetaConnectionMissing, MetaTokenExpired) as exc:
                         click.echo(f"  ! skipped: {exc}")
                         failed.append((str(campaign.id), str(exc)))
@@ -248,13 +247,9 @@ def run_all_user_campaigns(dry_run: bool, with_generate: bool) -> None:
                     session_factory=session_factory,
                     settings=settings,
                 )
-                report = await orchestrator.run_cycle(
-                    campaign.id, skip_generate=not with_generate
-                )
+                report = await orchestrator.run_cycle(campaign.id, skip_generate=not with_generate)
                 succeeded += 1
-                click.echo(
-                    f"  ✓ cycle #{report.cycle_number} phase={report.phase_reached}"
-                )
+                click.echo(f"  ✓ cycle #{report.cycle_number} phase={report.phase_reached}")
                 if report.errors:
                     for phase, err in report.errors.items():
                         click.echo(f"    warning in {phase}: {err[:140]}")
@@ -265,8 +260,7 @@ def run_all_user_campaigns(dry_run: bool, with_generate: bool) -> None:
                 failed.append((str(campaign.id), str(exc)))
 
         click.echo(
-            f"\nSummary: {attempted} attempted, {succeeded} succeeded, "
-            f"{len(failed)} failed."
+            f"\nSummary: {attempted} attempted, {succeeded} succeeded, {len(failed)} failed."
         )
         if failed:
             click.echo("Failures:")
@@ -418,13 +412,9 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                     session, campaign_uuid
                 )
                 if expired_count:
-                    click.echo(
-                        f"  Expired {expired_count} stale proposal(s) (>14 days old)"
-                    )
+                    click.echo(f"  Expired {expired_count} stale proposal(s) (>14 days old)")
                 if generation_paused:
-                    click.echo(
-                        "  Generation paused — approval queue at capacity"
-                    )
+                    click.echo("  Generation paused — approval queue at capacity")
             except Exception as exc:  # noqa: BLE001 — surface but don't abort report
                 click.echo(f"  Warning: generation pass failed: {exc}")
                 expired_count = 0
@@ -466,17 +456,21 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
             )
 
         # Print to console
-        click.echo(f"\n{'='*60}")
+        click.echo(f"\n{'=' * 60}")
         click.echo(f"WEEKLY REPORT — {campaign_name}")
-        click.echo(f"{'='*60}")
+        click.echo(f"{'=' * 60}")
         click.echo(f"Period: {report.week_start} to {report.week_end}")
         click.echo(f"Cycles completed: {report.cycles_run}")
         click.echo(f"Variants launched: {report.variants_launched}")
         click.echo(f"\nFull-Funnel Metrics:")
         click.echo(f"  Impressions: {report.total_impressions:,}")
         click.echo(f"  Reach: {report.total_reach:,}")
-        click.echo(f"  Video Views (3s): {report.total_video_views_3s:,}  Hook Rate: {report.avg_hook_rate:.1%}")
-        click.echo(f"  Video Views (15s): {report.total_video_views_15s:,}  Hold Rate: {report.avg_hold_rate:.1%}")
+        click.echo(
+            f"  Video Views (3s): {report.total_video_views_3s:,}  Hook Rate: {report.avg_hook_rate:.1%}"
+        )
+        click.echo(
+            f"  Video Views (15s): {report.total_video_views_15s:,}  Hold Rate: {report.avg_hold_rate:.1%}"
+        )
         click.echo(f"  Link Clicks: {report.total_link_clicks:,}  CTR: {report.avg_ctr:.2%}")
         click.echo(f"  Landing Page Views: {report.total_landing_page_views:,}")
         click.echo(f"  Add to Carts: {report.total_add_to_carts:,}")
@@ -486,29 +480,45 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
         click.echo(f"  Spend: ${report.total_spend:,.2f}")
         click.echo(f"  CPM: ${report.avg_cpm:,.2f}")
         click.echo(f"  CPA: {'${:,.2f}'.format(report.avg_cpa) if report.avg_cpa else 'N/A'}")
-        click.echo(f"  Cost/Purchase: {'${:,.2f}'.format(report.avg_cost_per_purchase) if report.avg_cost_per_purchase else 'N/A'}")
+        click.echo(
+            f"  Cost/Purchase: {'${:,.2f}'.format(report.avg_cost_per_purchase) if report.avg_cost_per_purchase else 'N/A'}"
+        )
         click.echo(f"  ROAS: {'{:.2f}x'.format(report.avg_roas) if report.avg_roas else 'N/A'}")
         click.echo(f"  Frequency: {report.avg_frequency:.1f}")
 
         best_variant = report.best_variant
         worst_variant = report.worst_variant
         if best_variant:
-            roas_str = f"ROAS {best_variant.roas:.2f}x" if best_variant.roas else f"CTR {best_variant.ctr:.2%}"
+            roas_str = (
+                f"ROAS {best_variant.roas:.2f}x"
+                if best_variant.roas
+                else f"CTR {best_variant.ctr:.2%}"
+            )
             click.echo(f"\nBest: {best_variant.variant_code} — {roas_str}")
         if worst_variant:
-            roas_str = f"ROAS {worst_variant.roas:.2f}x" if worst_variant.roas else f"CTR {worst_variant.ctr:.2%}"
+            roas_str = (
+                f"ROAS {worst_variant.roas:.2f}x"
+                if worst_variant.roas
+                else f"CTR {worst_variant.ctr:.2%}"
+            )
             click.echo(f"Worst: {worst_variant.variant_code} — {roas_str}")
 
         if report.top_elements:
             click.echo(f"\nTop Elements:")
             for el in report.top_elements[:10]:
                 roas_str = f" ROAS {el.avg_roas:.2f}x" if el.avg_roas else ""
-                click.echo(f"  {el.slot_name}: {el.slot_value} — CTR {el.avg_ctr:.2%}{roas_str} ({el.variants_tested} variants)")
+                click.echo(
+                    f"  {el.slot_name}: {el.slot_value} — CTR {el.avg_ctr:.2%}{roas_str} ({el.variants_tested} variants)"
+                )
 
         if report.proposed_variants:
             click.echo(f"\nNext week's experiments ({len(report.proposed_variants)} proposed):")
             for pv in report.proposed_variants:
-                badge = f" [expires in {pv.days_until_expiry}d]" if pv.classification == "expiring_soon" else ""
+                badge = (
+                    f" [expires in {pv.days_until_expiry}d]"
+                    if pv.classification == "expiring_soon"
+                    else ""
+                )
                 click.echo(f"  {pv.variant_code}: {pv.genome_summary}{badge}")
                 if pv.hypothesis:
                     click.echo(f"    Hypothesis: {pv.hypothesis}")
@@ -542,7 +552,9 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                     click.echo("\nFailed to send email report. Check logs.")
 
         # Send via Slack if configured
-        if settings.slack_webhook_url and not settings.slack_webhook_url.startswith("https://hooks.slack.com/services/PLACEHOLDER"):
+        if settings.slack_webhook_url and not settings.slack_webhook_url.startswith(
+            "https://hooks.slack.com/services/PLACEHOLDER"
+        ):
             from src.reports.slack import SlackReporter
 
             slack = SlackReporter(webhook_url=settings.slack_webhook_url)
@@ -570,7 +582,9 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
 
         public_dir = _Path(settings.report_output_dir)
         daily_dates = sorted(
-            [p.stem for p in (public_dir / "daily").glob("*.html")] if (public_dir / "daily").exists() else [],
+            [p.stem for p in (public_dir / "daily").glob("*.html")]
+            if (public_dir / "daily").exists()
+            else [],
             reverse=True,
         )
         weekly_labels = sorted(
@@ -586,8 +600,15 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
 
 @cli.command()
 @click.option("--campaign-id", required=True, type=str, help="Campaign UUID.")
-@click.option("--send-email/--no-send-email", default=True, help="Send report via email (default: True).")
-@click.option("--report-date", default=None, type=str, help="Date to report on (YYYY-MM-DD). Defaults to yesterday.")
+@click.option(
+    "--send-email/--no-send-email", default=True, help="Send report via email (default: True)."
+)
+@click.option(
+    "--report-date",
+    default=None,
+    type=str,
+    help="Date to report on (YYYY-MM-DD). Defaults to yesterday.",
+)
 def daily_report(campaign_id: str, send_email: bool, report_date: str | None) -> None:
     """Generate and send a daily performance report for a campaign.
 
@@ -614,9 +635,7 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
         v2_report = None
         async with get_session() as session:
             try:
-                v2_report = await build_daily_report(
-                    session, campaign_uuid, report_day
-                )
+                v2_report = await build_daily_report(session, campaign_uuid, report_day)
             except LookupError:
                 click.echo(f"Error: Campaign {campaign_id} not found.")
                 await close_db()
@@ -625,9 +644,9 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
         campaign_name = v2_report.campaign_name
 
         # Print to console
-        click.echo(f"\n{'='*60}")
+        click.echo(f"\n{'=' * 60}")
         click.echo(f"DAILY REPORT — {campaign_name}")
-        click.echo(f"{'='*60}")
+        click.echo(f"{'=' * 60}")
         click.echo(f"Period: {report_day.isoformat()} (yesterday)")
         click.echo(f"Cycles completed: {v2_report.cycle_number}")
 
@@ -642,27 +661,25 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
 
         avg_hook_rate_f = v2_report.avg_hook_rate_pct / 100
         avg_hold_rate_f = (
-            total_video_views_15s / total_video_views_3s
-            if total_video_views_3s > 0
-            else 0.0
+            total_video_views_15s / total_video_views_3s if total_video_views_3s > 0 else 0.0
         )
-        avg_ctr_f = (
-            total_clicks / total_impressions if total_impressions > 0 else 0.0
-        )
+        avg_ctr_f = total_clicks / total_impressions if total_impressions > 0 else 0.0
         avg_cpm_f = (
             float(v2_report.total_spend) / total_impressions * 1000
             if total_impressions > 0
             else 0.0
         )
-        avg_frequency_f = (
-            total_impressions / total_reach if total_reach > 0 else 0.0
-        )
+        avg_frequency_f = total_impressions / total_reach if total_reach > 0 else 0.0
 
         click.echo(f"\nFull-Funnel Metrics:")
         click.echo(f"  Impressions: {total_impressions:,}")
         click.echo(f"  Reach: {total_reach:,}")
-        click.echo(f"  Video Views (3s): {total_video_views_3s:,}  Hook Rate: {avg_hook_rate_f:.1%}")
-        click.echo(f"  Video Views (15s): {total_video_views_15s:,}  Hold Rate: {avg_hold_rate_f:.1%}")
+        click.echo(
+            f"  Video Views (3s): {total_video_views_3s:,}  Hook Rate: {avg_hook_rate_f:.1%}"
+        )
+        click.echo(
+            f"  Video Views (15s): {total_video_views_15s:,}  Hold Rate: {avg_hold_rate_f:.1%}"
+        )
         click.echo(f"  Link Clicks: {total_clicks:,}  CTR: {avg_ctr_f:.2%}")
         click.echo(f"  Landing Page Views: {total_landing_page_views:,}")
         click.echo(f"  Add to Carts: {total_add_to_carts:,}")
@@ -672,9 +689,7 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
         click.echo(f"  Spend: ${v2_report.total_spend:,.2f}")
         click.echo(f"  CPM: ${avg_cpm_f:,.2f}")
         cpa_str = (
-            f"${v2_report.avg_cost_per_purchase:,.2f}"
-            if v2_report.avg_cost_per_purchase
-            else "N/A"
+            f"${v2_report.avg_cost_per_purchase:,.2f}" if v2_report.avg_cost_per_purchase else "N/A"
         )
         click.echo(f"  Cost/Purchase: {cpa_str}")
         click.echo(
@@ -695,6 +710,7 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
             click.echo(f"\nWeb report: {v2_path}")
         except Exception as exc:
             import traceback
+
             click.echo(f"\nWarning: v2 report generation failed: {exc}")
             traceback.print_exc()
 
@@ -711,7 +727,8 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
                     to_email=settings.report_email_to,
                 )
                 success = await reporter.send_daily_report(
-                    v2_report, base_url=settings.report_base_url,
+                    v2_report,
+                    base_url=settings.report_base_url,
                 )
                 if success:
                     click.echo(f"\nEmail report sent to {settings.report_email_to}")
@@ -729,7 +746,9 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
             reverse=True,
         )
         weekly_labels = sorted(
-            [p.stem for p in (public_dir / "weekly").glob("*.html")] if (public_dir / "weekly").exists() else [],
+            [p.stem for p in (public_dir / "weekly").glob("*.html")]
+            if (public_dir / "weekly").exists()
+            else [],
             reverse=True,
         )
         render_index(daily_dates, weekly_labels)
@@ -803,8 +822,12 @@ def backfill_elements(campaign_id: str) -> None:
                 ctrs = [c for c, _, _ in entries]
                 total_imps = sum(i for _, i, _ in entries)
                 total_conv = sum(c for _, _, c in entries)
-                weighted_avg = sum(c * i for c, i, _ in entries) / total_imps if total_imps > 0 else 0.0
-                _, _, confidence = element_significance(element_ctrs=ctrs, global_mean_ctr=global_mean_ctr)
+                weighted_avg = (
+                    sum(c * i for c, i, _ in entries) / total_imps if total_imps > 0 else 0.0
+                )
+                _, _, confidence = element_significance(
+                    element_ctrs=ctrs, global_mean_ctr=global_mean_ctr
+                )
 
                 await upsert_element_performance(
                     session,
@@ -860,11 +883,28 @@ def backfill_elements(campaign_id: str) -> None:
 
 @cli.command()
 @click.option("--campaign-id", required=True, type=str, help="Local campaign UUID.")
-@click.option("--date-preset", default="last_30d", help="Meta date preset (last_7d, last_30d, etc.).")
-@click.option("--ad-account-id", default=None, type=str, help="Override Meta ad account ID (e.g. act_123456).")
-@click.option("--dry-run", is_flag=True, default=False, help="Preview what would be imported without writing.")
-@click.option("--refresh-metrics", is_flag=True, default=False, help="Re-fetch and update metrics for already-imported ads.")
-def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | None, dry_run: bool, refresh_metrics: bool) -> None:
+@click.option(
+    "--date-preset", default="last_30d", help="Meta date preset (last_7d, last_30d, etc.)."
+)
+@click.option(
+    "--ad-account-id", default=None, type=str, help="Override Meta ad account ID (e.g. act_123456)."
+)
+@click.option(
+    "--dry-run", is_flag=True, default=False, help="Preview what would be imported without writing."
+)
+@click.option(
+    "--refresh-metrics",
+    is_flag=True,
+    default=False,
+    help="Re-fetch and update metrics for already-imported ads.",
+)
+def import_meta_ads(
+    campaign_id: str,
+    date_preset: str,
+    ad_account_id: str | None,
+    dry_run: bool,
+    refresh_metrics: bool,
+) -> None:
     """Import existing Meta ads and their historical metrics into the system.
 
     Discovers all ads in the Meta campaign linked to CAMPAIGN_ID,
@@ -910,17 +950,17 @@ def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | Non
                 return
 
             if not platform_campaign_id:
-                click.echo("Error: Campaign has no platform_campaign_id set. "
-                           "Update it with the Meta campaign ID first.")
+                click.echo(
+                    "Error: Campaign has no platform_campaign_id set. "
+                    "Update it with the Meta campaign ID first."
+                )
                 await close_db()
                 return
 
             # 2. Resolve adapter through the per-user factory (falls back
             # to the global token for legacy campaigns without an owner).
             try:
-                adapter = await get_meta_adapter_for_campaign(
-                    session, UUID(campaign_id)
-                )
+                adapter = await get_meta_adapter_for_campaign(session, UUID(campaign_id))
             except (MetaConnectionMissing, MetaTokenExpired) as exc:
                 click.echo(f"Error: {exc}")
                 await close_db()
@@ -974,7 +1014,9 @@ def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | Non
                 ad_id = str(ad["ad_id"])
 
                 if ad_id in existing_ad_ids and not refresh_metrics:
-                    click.echo(f"  Skipping {ad_id} (already imported, use --refresh-metrics to update)")
+                    click.echo(
+                        f"  Skipping {ad_id} (already imported, use --refresh-metrics to update)"
+                    )
                     continue
 
                 if ad_id in existing_ad_ids and refresh_metrics:
@@ -994,7 +1036,8 @@ def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | Non
                         variant_id = dep[1]
                         try:
                             daily_metrics = await adapter.get_historical_metrics(
-                                ad_id, date_preset=date_preset,
+                                ad_id,
+                                date_preset=date_preset,
                             )
                             for day in daily_metrics:
                                 if int(day["impressions"]) == 0:
@@ -1047,7 +1090,9 @@ def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | Non
                                         "landing_page_views": int(day.get("landing_page_views", 0)),
                                         "add_to_carts": int(day.get("add_to_carts", 0)),
                                         "purchases": int(day.get("purchases", 0)),
-                                        "purchase_value": Decimal(str(day.get("purchase_value", 0))),
+                                        "purchase_value": Decimal(
+                                            str(day.get("purchase_value", 0))
+                                        ),
                                         "recorded_at": day_ts,
                                     },
                                 )
@@ -1123,15 +1168,16 @@ def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | Non
                 # 6. Fetch historical metrics
                 try:
                     daily_metrics = await adapter.get_historical_metrics(
-                        ad_id, date_preset=date_preset,
+                        ad_id,
+                        date_preset=date_preset,
                     )
                     for day in daily_metrics:
                         if int(day["impressions"]) == 0:
                             continue
                         # Parse the date into a timestamp
-                        day_ts = datetime.strptime(
-                            str(day["date_start"]), "%Y-%m-%d"
-                        ).replace(hour=23, minute=59, tzinfo=timezone.utc)
+                        day_ts = datetime.strptime(str(day["date_start"]), "%Y-%m-%d").replace(
+                            hour=23, minute=59, tzinfo=timezone.utc
+                        )
 
                         await session.execute(
                             sa_text("""
@@ -1238,13 +1284,14 @@ def sync_media_library(campaign_id: str, asset_type: str, ad_account_id: str | N
         from src.db.engine import close_db, get_session, init_db
         from src.exceptions import MetaConnectionMissing, MetaTokenExpired
 
-        settings = get_settings()
         await init_db()
 
         async with get_session() as session:
-            # Verify campaign exists
+            # Verify campaign exists and pull its per-campaign ad
+            # account id so the fallback path below can echo a useful
+            # value when no override is supplied.
             row = await session.execute(
-                sa_text("SELECT platform FROM campaigns WHERE id = :id"),
+                sa_text("SELECT platform, meta_ad_account_id FROM campaigns WHERE id = :id"),
                 {"id": campaign_id},
             )
             campaign = row.fetchone()
@@ -1258,25 +1305,30 @@ def sync_media_library(campaign_id: str, asset_type: str, ad_account_id: str | N
                 await close_db()
                 return
 
-            # Resolve adapter through the per-user factory.
+            campaign_ad_account_id = campaign[1]
+
+            # Resolve adapter through the per-user factory. The factory
+            # reads the campaign's ``meta_ad_account_id`` / ``meta_page_id``
+            # columns (Phase G) and passes them through, so the adapter
+            # is already scoped to the right account without touching
+            # global settings.
             try:
-                adapter = await get_meta_adapter_for_campaign(
-                    session, UUID(campaign_id)
-                )
+                adapter = await get_meta_adapter_for_campaign(session, UUID(campaign_id))
             except (MetaConnectionMissing, MetaTokenExpired) as exc:
                 click.echo(f"Error: {exc}")
                 await close_db()
                 return
 
-            # Optional override: caller can point at a different
-            # ad account than the one baked into the adapter.
+            # Optional override: operators can point at a different
+            # ad account than the one on the campaign row (legacy
+            # repair path; not used in normal operation).
             if ad_account_id:
                 from facebook_business.adobjects.adaccount import AdAccount
 
                 adapter._ad_account_id = ad_account_id  # type: ignore[attr-defined]
                 adapter._account = AdAccount(ad_account_id)  # type: ignore[attr-defined]
 
-            effective_account = ad_account_id or settings.meta_ad_account_id
+            effective_account = ad_account_id or campaign_ad_account_id
             click.echo(f"\nFetching {asset_type} assets from Meta account {effective_account}...")
             assets = await adapter.list_media_library(asset_type=asset_type)
 
@@ -1290,7 +1342,9 @@ def sync_media_library(campaign_id: str, asset_type: str, ad_account_id: str | N
             for i, asset in enumerate(assets, 1):
                 size_info = f"{asset.width}x{asset.height}" if asset.width else ""
                 dur_info = f" ({asset.duration_secs:.0f}s)" if asset.duration_secs else ""
-                click.echo(f"  [{i}] [{asset.asset_type.upper()}] {asset.name} {size_info}{dur_info}")
+                click.echo(
+                    f"  [{i}] [{asset.asset_type.upper()}] {asset.name} {size_info}{dur_info}"
+                )
                 click.echo(f"      ID: {asset.platform_id}")
                 if asset.thumbnail_url:
                     click.echo(f"      Thumb: {asset.thumbnail_url[:80]}")
@@ -1413,7 +1467,11 @@ def list_media(campaign_id: str) -> None:
 # ---------------------------------------------------------------------------
 
 VALID_SLOTS = [
-    "headline", "subhead", "cta_text", "media_asset", "audience",
+    "headline",
+    "subhead",
+    "cta_text",
+    "media_asset",
+    "audience",
 ]
 
 
@@ -1426,7 +1484,12 @@ def pool() -> None:
 @click.option("--slot", required=True, type=click.Choice(VALID_SLOTS), help="Slot name.")
 @click.option("--value", required=True, type=str, help="Slot value to add.")
 @click.option("--description", default=None, type=str, help="Human-readable description.")
-@click.option("--meta-audience-id", default=None, type=str, help="Meta custom audience ID (audience slot only).")
+@click.option(
+    "--meta-audience-id",
+    default=None,
+    type=str,
+    help="Meta custom audience ID (audience slot only).",
+)
 def pool_add(slot: str, value: str, description: str | None, meta_audience_id: str | None) -> None:
     """Add a new entry to the gene pool."""
 
@@ -1484,7 +1547,9 @@ def pool_list(slot: str | None) -> None:
         for entry in entries:
             if entry.slot_name != current_slot:
                 current_slot = entry.slot_name
-                click.echo(f"\n{current_slot.upper()} ({sum(1 for e in entries if e.slot_name == current_slot)} entries)")
+                click.echo(
+                    f"\n{current_slot.upper()} ({sum(1 for e in entries if e.slot_name == current_slot)} entries)"
+                )
                 click.echo("-" * 60)
             source_tag = f" [{entry.source}]" if entry.source and entry.source != "seed" else ""
             meta_tag = ""
@@ -1522,11 +1587,25 @@ def pool_retire(slot: str, value: str) -> None:
 
 
 @pool.command("suggest")
-@click.option("--slot", default=None, type=click.Choice(["headline", "subhead", "cta_text"]), help="Slot to suggest for (default: all text slots).")
-@click.option("--brand-context", default=None, type=str, help="Brand voice / product description for context.")
+@click.option(
+    "--slot",
+    default=None,
+    type=click.Choice(["headline", "subhead", "cta_text"]),
+    help="Slot to suggest for (default: all text slots).",
+)
+@click.option(
+    "--brand-context", default=None, type=str, help="Brand voice / product description for context."
+)
 @click.option("--count", default=5, type=int, help="Number of suggestions to generate.")
-@click.option("--campaign-id", default=None, type=str, help="Campaign UUID for performance-informed suggestions.")
-def pool_suggest(slot: str | None, brand_context: str | None, count: int, campaign_id: str | None) -> None:
+@click.option(
+    "--campaign-id",
+    default=None,
+    type=str,
+    help="Campaign UUID for performance-informed suggestions.",
+)
+def pool_suggest(
+    slot: str | None, brand_context: str | None, count: int, campaign_id: str | None
+) -> None:
     """Use the LLM to suggest new creative text for the gene pool."""
 
     async def _run() -> None:
@@ -1580,7 +1659,9 @@ def pool_suggest(slot: str | None, brand_context: str | None, count: int, campai
                 click.echo(f"    Rationale: {s.rationale}")
 
             click.echo(f"\n{len(suggestions)} suggestion(s) saved as pending.")
-            click.echo("Run 'adagent pool review' to see them, 'adagent pool approve --all' to activate.")
+            click.echo(
+                "Run 'adagent pool review' to see them, 'adagent pool approve --all' to activate."
+            )
 
         await close_db()
 
@@ -1618,7 +1699,9 @@ def pool_review() -> None:
 
 @pool.command("approve")
 @click.option("--id", "entry_id", default=None, type=str, help="UUID of the suggestion to approve.")
-@click.option("--all", "approve_all", is_flag=True, default=False, help="Approve all pending suggestions.")
+@click.option(
+    "--all", "approve_all", is_flag=True, default=False, help="Approve all pending suggestions."
+)
 def pool_approve(entry_id: str | None, approve_all: bool) -> None:
     """Approve pending LLM-suggested gene pool entries."""
 
@@ -1727,10 +1810,16 @@ def approve_list(campaign_id: str | None) -> None:
 
 @approve.command("yes")
 @click.option("--id", "approval_id", default=None, type=str, help="Approval queue item UUID.")
-@click.option("--all", "approve_all", is_flag=True, default=False, help="Approve all pending variants.")
-@click.option("--deploy-now", is_flag=True, default=False, help="Deploy approved variants immediately.")
+@click.option(
+    "--all", "approve_all", is_flag=True, default=False, help="Approve all pending variants."
+)
+@click.option(
+    "--deploy-now", is_flag=True, default=False, help="Deploy approved variants immediately."
+)
 @click.option("--campaign-id", default=None, type=str, help="Campaign UUID (required with --all).")
-def approve_yes(approval_id: str | None, approve_all: bool, deploy_now: bool, campaign_id: str | None) -> None:
+def approve_yes(
+    approval_id: str | None, approve_all: bool, deploy_now: bool, campaign_id: str | None
+) -> None:
     """Approve pending variant(s) for deployment."""
 
     async def _run() -> None:
@@ -1772,10 +1861,11 @@ def approve_yes(approval_id: str | None, approve_all: bool, deploy_now: bool, ca
                 # Determine campaign from the first approved item
                 deploy_campaign_id = approved_items[0].campaign_id
                 campaign_row = await session.execute(
-                    __import__("sqlalchemy").select(
-                        __import__("src.db.tables", fromlist=["Campaign"]).Campaign
-                    ).where(
-                        __import__("src.db.tables", fromlist=["Campaign"]).Campaign.id == deploy_campaign_id
+                    __import__("sqlalchemy")
+                    .select(__import__("src.db.tables", fromlist=["Campaign"]).Campaign)
+                    .where(
+                        __import__("src.db.tables", fromlist=["Campaign"]).Campaign.id
+                        == deploy_campaign_id
                     )
                 )
                 campaign = campaign_row.scalar_one_or_none()
@@ -1897,9 +1987,7 @@ def grant_access(email: str, campaign_id: str) -> None:
                 await grant_user_campaign_access(
                     session, user_id=user.id, campaign_id=campaign_uuid
                 )
-                click.echo(
-                    f"Granted {user.email} access to campaign {campaign.name!r}."
-                )
+                click.echo(f"Granted {user.email} access to campaign {campaign.name!r}.")
         finally:
             await close_db()
 

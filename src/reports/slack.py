@@ -161,10 +161,7 @@ class SlackReporter:
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": (
-                            ":warning: *Errors*\n"
-                            f"```{report.error_log[:2900]}```"
-                        ),
+                        "text": (f":warning: *Errors*\n```{report.error_log[:2900]}```"),
                     },
                 }
             )
@@ -244,13 +241,9 @@ class SlackReporter:
 
         # Best / worst variant
         if report.best_variant:
-            blocks.append(
-                self._build_variant_highlight("Best Variant", report.best_variant)
-            )
+            blocks.append(self._build_variant_highlight("Best Variant", report.best_variant))
         if report.worst_variant:
-            blocks.append(
-                self._build_variant_highlight("Worst Variant", report.worst_variant)
-            )
+            blocks.append(self._build_variant_highlight("Worst Variant", report.worst_variant))
 
         blocks.append({"type": "divider"})
 
@@ -307,9 +300,7 @@ class SlackReporter:
     # Helpers
     # ------------------------------------------------------------------
 
-    def _build_actions_section(
-        self, actions: list[CycleAction]
-    ) -> dict[str, object]:
+    def _build_actions_section(self, actions: list[CycleAction]) -> dict[str, object]:
         """Build a section block listing actions taken."""
         action_icons: dict[str, str] = {
             "launch": ":rocket:",
@@ -332,9 +323,7 @@ class SlackReporter:
             "text": {"type": "mrkdwn", "text": "\n".join(lines)},
         }
 
-    def _build_variant_highlight(
-        self, label: str, variant: VariantSummary
-    ) -> dict[str, object]:
+    def _build_variant_highlight(self, label: str, variant: VariantSummary) -> dict[str, object]:
         """Build a section block for a single variant highlight."""
         return {
             "type": "section",

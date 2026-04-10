@@ -62,15 +62,11 @@ class TestMetaConnect:
     def test_returns_authorize_url(self, client: TestClient) -> None:
         user = _make_user()
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=SimpleNamespace(scalar_one_or_none=lambda: user)
-        )
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: user))
         _override_session(session)
         csrf = _signed_in_client(client, user)
 
-        resp = client.post(
-            "/api/me/meta/connect", headers={"X-CSRF-Token": csrf}
-        )
+        resp = client.post("/api/me/meta/connect", headers={"X-CSRF-Token": csrf})
         client.cookies.clear()
 
         assert resp.status_code == 200
@@ -82,17 +78,13 @@ class TestMetaConnect:
 
     def test_requires_authentication(self, client: TestClient) -> None:
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=SimpleNamespace(scalar_one_or_none=lambda: None)
-        )
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: None))
         _override_session(session)
         # Provide CSRF so we get past the CSRF gate and hit the auth check.
         csrf = "csrf-value"
         client.cookies.set("csrf_token", csrf)
         try:
-            resp = client.post(
-                "/api/me/meta/connect", headers={"X-CSRF-Token": csrf}
-            )
+            resp = client.post("/api/me/meta/connect", headers={"X-CSRF-Token": csrf})
         finally:
             client.cookies.clear()
         assert resp.status_code == 401
@@ -100,9 +92,7 @@ class TestMetaConnect:
     def test_requires_csrf(self, client: TestClient) -> None:
         user = _make_user()
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=SimpleNamespace(scalar_one_or_none=lambda: user)
-        )
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: user))
         _override_session(session)
         token = create_session_token(user.id)
         client.cookies.set("session_token", token)
@@ -119,9 +109,7 @@ class TestMetaConnect:
 
 
 class TestMetaCallback:
-    def test_declined_by_user_redirects_with_error(
-        self, client: TestClient
-    ) -> None:
+    def test_declined_by_user_redirects_with_error(self, client: TestClient) -> None:
         session = AsyncMock()
         _override_session(session)
         resp = client.get(
@@ -132,20 +120,14 @@ class TestMetaCallback:
         assert resp.status_code == 302
         assert "meta_error=declined" in resp.headers["location"]
 
-    def test_missing_params_redirects_with_error(
-        self, client: TestClient
-    ) -> None:
+    def test_missing_params_redirects_with_error(self, client: TestClient) -> None:
         session = AsyncMock()
         _override_session(session)
-        resp = client.get(
-            "/api/auth/meta/callback", follow_redirects=False
-        )
+        resp = client.get("/api/auth/meta/callback", follow_redirects=False)
         assert resp.status_code == 302
         assert "meta_error=missing_params" in resp.headers["location"]
 
-    def test_invalid_state_redirects_with_error(
-        self, client: TestClient
-    ) -> None:
+    def test_invalid_state_redirects_with_error(self, client: TestClient) -> None:
         session = AsyncMock()
         _override_session(session)
         resp = client.get(
@@ -156,9 +138,7 @@ class TestMetaCallback:
         assert resp.status_code == 302
         assert "meta_error=invalid_state" in resp.headers["location"]
 
-    def test_happy_path_upserts_connection_and_redirects_success(
-        self, client: TestClient
-    ) -> None:
+    def test_happy_path_upserts_connection_and_redirects_success(self, client: TestClient) -> None:
         user_id = uuid4()
         state = create_oauth_state_token(user_id)
 
@@ -176,24 +156,58 @@ class TestMetaCallback:
         session = AsyncMock()
         _override_session(session)
 
-        with patch(
-            "src.dashboard.app.exchange_code_for_token",
-            new=AsyncMock(return_value=short),
-        ), patch(
-            "src.dashboard.app.exchange_short_for_long_lived",
-            new=AsyncMock(return_value=long_lived),
-        ), patch(
-            "src.dashboard.app.fetch_meta_user_id",
-            new=AsyncMock(return_value="9876543210"),
-        ), patch(
-            "src.dashboard.app.encrypt_token",
-            return_value="ENC(long-lived-xyz)",
-        ), patch(
-            "src.dashboard.app.upsert_meta_connection",
-            new=AsyncMock(
-                return_value=SimpleNamespace(user_id=user_id)
+        # Phase G: the callback now also enumerates ad accounts + Pages
+        # off the user's token, so mock those helpers too. A single-account
+        # / single-page response exercises the happy path where the
+        # callback can auto-pick defaults without prompting.
+        from src.models.oauth import MetaAdAccountInfo, MetaPageInfo
+
+        fake_accounts = [
+            MetaAdAccountInfo(
+                id="act_1234567890",
+                name="Operator Main",
+                account_status=1,
+                currency="USD",
+            )
+        ]
+        fake_pages = [
+            MetaPageInfo(
+                id="111111111",
+                name="Slice Society",
+                category="Restaurant",
+            )
+        ]
+
+        with (
+            patch(
+                "src.dashboard.app.exchange_code_for_token",
+                new=AsyncMock(return_value=short),
             ),
-        ) as mock_upsert:
+            patch(
+                "src.dashboard.app.exchange_short_for_long_lived",
+                new=AsyncMock(return_value=long_lived),
+            ),
+            patch(
+                "src.dashboard.app.fetch_meta_user_id",
+                new=AsyncMock(return_value="9876543210"),
+            ),
+            patch(
+                "src.dashboard.app.fetch_meta_ad_accounts",
+                new=AsyncMock(return_value=fake_accounts),
+            ),
+            patch(
+                "src.dashboard.app.fetch_meta_pages",
+                new=AsyncMock(return_value=fake_pages),
+            ),
+            patch(
+                "src.dashboard.app.encrypt_token",
+                return_value="ENC(long-lived-xyz)",
+            ),
+            patch(
+                "src.dashboard.app.upsert_meta_connection",
+                new=AsyncMock(return_value=SimpleNamespace(user_id=user_id)),
+            ) as mock_upsert,
+        ):
             resp = client.get(
                 "/api/auth/meta/callback",
                 params={"code": "oauth-code", "state": state},
@@ -219,9 +233,7 @@ class TestMetaStatus:
     def test_not_connected_returns_false(self, client: TestClient) -> None:
         user = _make_user()
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=SimpleNamespace(scalar_one_or_none=lambda: user)
-        )
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: user))
         _override_session(session)
         _signed_in_client(client, user)
 
@@ -234,19 +246,25 @@ class TestMetaStatus:
 
         assert resp.status_code == 200
         body = resp.json()
+        # Phase G: the status payload always surfaces the enumerated
+        # ad accounts + Pages + defaults so the dashboard can render
+        # picker state without a second roundtrip. Disconnected users
+        # get empty lists + null defaults.
         assert body == {
             "connected": False,
             "meta_user_id": None,
             "connected_at": None,
             "token_expires_at": None,
+            "available_ad_accounts": [],
+            "available_pages": [],
+            "default_ad_account_id": None,
+            "default_page_id": None,
         }
 
     def test_connected_returns_metadata(self, client: TestClient) -> None:
         user = _make_user()
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=SimpleNamespace(scalar_one_or_none=lambda: user)
-        )
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: user))
         _override_session(session)
         _signed_in_client(client, user)
 
@@ -257,6 +275,25 @@ class TestMetaStatus:
             meta_user_id="9876543210",
             connected_at=connected,
             token_expires_at=expires,
+            # Phase G: the connection row now carries the enumerated
+            # allowlist and per-tenant defaults.
+            available_ad_accounts=[
+                {
+                    "id": "act_1234567890",
+                    "name": "Operator Main",
+                    "account_status": 1,
+                    "currency": "USD",
+                }
+            ],
+            available_pages=[
+                {
+                    "id": "111111111",
+                    "name": "Slice Society",
+                    "category": "Restaurant",
+                }
+            ],
+            default_ad_account_id="act_1234567890",
+            default_page_id="111111111",
         )
         with patch(
             "src.dashboard.app.get_meta_connection",
@@ -271,6 +308,12 @@ class TestMetaStatus:
         assert body["meta_user_id"] == "9876543210"
         assert body["connected_at"] is not None
         assert body["token_expires_at"] is not None
+        # Phase G: check the new fields flow through the status response.
+        assert body["default_ad_account_id"] == "act_1234567890"
+        assert body["default_page_id"] == "111111111"
+        assert len(body["available_ad_accounts"]) == 1
+        assert body["available_ad_accounts"][0]["id"] == "act_1234567890"
+        assert len(body["available_pages"]) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -282,9 +325,7 @@ class TestMetaDisconnect:
     def test_requires_csrf(self, client: TestClient) -> None:
         user = _make_user()
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=SimpleNamespace(scalar_one_or_none=lambda: user)
-        )
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: user))
         _override_session(session)
 
         token = create_session_token(user.id)
@@ -296,14 +337,10 @@ class TestMetaDisconnect:
 
         assert resp.status_code == 403
 
-    def test_deletes_connection_with_csrf(
-        self, client: TestClient
-    ) -> None:
+    def test_deletes_connection_with_csrf(self, client: TestClient) -> None:
         user = _make_user()
         session = AsyncMock()
-        session.execute = AsyncMock(
-            return_value=SimpleNamespace(scalar_one_or_none=lambda: user)
-        )
+        session.execute = AsyncMock(return_value=SimpleNamespace(scalar_one_or_none=lambda: user))
         _override_session(session)
         csrf = _signed_in_client(client, user)
 

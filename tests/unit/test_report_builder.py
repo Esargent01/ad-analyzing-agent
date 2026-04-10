@@ -111,8 +111,14 @@ class TestBuildFunnel:
         assert stages[3].rate_pct == 5.0
 
     def test_zero_impressions_no_crash(self):
-        v = _variant(impressions=0, video_views_3s=0, video_views_15s=0,
-                     link_clicks=0, add_to_carts=0, purchases=0)
+        v = _variant(
+            impressions=0,
+            video_views_3s=0,
+            video_views_15s=0,
+            link_clicks=0,
+            add_to_carts=0,
+            purchases=0,
+        )
         stages = build_funnel(v)
         assert len(stages) == 6
         # All dropoffs should be 0 when prev_count is 0
@@ -219,12 +225,14 @@ class TestBuildProjection:
         assert result is None
 
     def test_all_above_benchmark_returns_none(self):
-        result = build_projection(_variant(
-            hook_rate_pct=35.0,
-            hold_rate_pct=30.0,
-            atc_rate_pct=12.0,
-            checkout_rate_pct=35.0,
-        ))
+        result = build_projection(
+            _variant(
+                hook_rate_pct=35.0,
+                hold_rate_pct=30.0,
+                atc_rate_pct=12.0,
+                checkout_rate_pct=35.0,
+            )
+        )
         assert result is None
 
     def test_checkout_rate_projection(self):

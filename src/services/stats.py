@@ -47,9 +47,7 @@ def compare_variants(
     p_pooled = total_clicks / total_impressions
 
     # Standard error of the difference
-    se = math.sqrt(
-        p_pooled * (1 - p_pooled) * (1 / baseline_impressions + 1 / variant_impressions)
-    )
+    se = math.sqrt(p_pooled * (1 - p_pooled) * (1 / baseline_impressions + 1 / variant_impressions))
 
     if se == 0.0:
         return 0.0, 1.0, False

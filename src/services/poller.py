@@ -128,9 +128,7 @@ class MetricsPoller:
 
         return snapshots
 
-    async def _fetch_active_deployments(
-        self, campaign_id: uuid.UUID
-    ) -> list[_DeploymentInfo]:
+    async def _fetch_active_deployments(self, campaign_id: uuid.UUID) -> list[_DeploymentInfo]:
         """Query active deployments for a campaign."""
         query = text("""
             SELECT d.id, d.variant_id, d.platform_ad_id, d.platform

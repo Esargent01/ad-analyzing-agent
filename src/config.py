@@ -48,20 +48,18 @@ class Settings(BaseSettings):
     # must click "Connect Meta" in the dashboard before their
     # campaigns can run.
     #
+    # After Phase G, the ad account / Page / landing-page URL are
+    # also per-campaign — enumerated at OAuth callback time into
+    # ``user_meta_connections.available_ad_accounts`` / ``_pages``
+    # and pinned per-import onto ``campaigns.meta_ad_account_id`` /
+    # ``meta_page_id`` / ``landing_page_url``. The old global
+    # settings (``META_AD_ACCOUNT_ID``, ``META_PAGE_ID``,
+    # ``META_LANDING_PAGE_URL``) are gone.
+    #
     # ``meta_app_id`` / ``meta_app_secret`` are still required — they
     # identify the Meta App used for the OAuth exchange itself.
-    #
-    # ``meta_ad_account_id`` / ``meta_page_id`` / ``meta_landing_page_url``
-    # remain as settings for now: Phase D's import flow does not yet
-    # store them per-campaign, so the adapter factory falls back to
-    # the operator's defaults. A "Phase G" cleanup will move these
-    # onto the ``campaigns`` table so different campaigns can target
-    # different ad accounts and landing pages.
     meta_app_id: str = ""
     meta_app_secret: str = ""
-    meta_ad_account_id: str = ""
-    meta_page_id: str = ""
-    meta_landing_page_url: str = "https://example.com"
 
     # Google Ads
     google_ads_developer_token: str = ""
