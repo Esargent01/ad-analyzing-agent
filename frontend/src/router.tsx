@@ -5,6 +5,7 @@ import { CampaignDetailRoute } from "@/routes/campaign-detail";
 import { DailyReportDetailRoute } from "@/routes/daily-report-detail";
 import { DashboardRoute } from "@/routes/dashboard";
 import { ExperimentsRoute } from "@/routes/experiments";
+import { ImportMetaCampaignsRoute } from "@/routes/import-meta-campaigns";
 import { MagicLinkSentRoute } from "@/routes/magic-link-sent";
 import { ReportsDailyListRoute } from "@/routes/reports-daily-list";
 import { ReportsWeeklyListRoute } from "@/routes/reports-weekly-list";
@@ -34,6 +35,10 @@ export const router = createBrowserRouter([
       {
         path: "/dashboard",
         element: <DashboardRoute />,
+      },
+      {
+        path: "/campaigns/import",
+        element: <ImportMetaCampaignsRoute />,
       },
       {
         path: "/campaigns/:campaignId",

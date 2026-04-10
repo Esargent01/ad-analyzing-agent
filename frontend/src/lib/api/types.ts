@@ -39,6 +39,110 @@ export interface MagicLinkRequest {
 }
 
 // ---------------------------------------------------------------------------
+// Meta OAuth connection (Phase B)
+// ---------------------------------------------------------------------------
+
+export interface MetaConnectionStatus {
+  connected: boolean;
+  meta_user_id: string | null;
+  connected_at: string | null;
+  token_expires_at: string | null;
+}
+
+export interface MetaConnectResponse {
+  auth_url: string;
+}
+
+// ---------------------------------------------------------------------------
+// Campaign import (Phase D)
+// ---------------------------------------------------------------------------
+
+export interface ImportableCampaign {
+  meta_campaign_id: string;
+  name: string;
+  status: string;
+  daily_budget: number | null;
+  created_time: string | null;
+  objective: string | null;
+  already_imported: boolean;
+}
+
+export interface ImportableCampaignsResponse {
+  importable: ImportableCampaign[];
+  quota_used: number;
+  quota_max: number;
+}
+
+export interface CampaignImportOverrides {
+  daily_budget?: string | number | null;
+  max_concurrent_variants?: number | null;
+  confidence_threshold?: string | number | null;
+}
+
+export interface CampaignImportRequest {
+  meta_campaign_ids: string[];
+  overrides?: CampaignImportOverrides;
+}
+
+export interface ImportedCampaignSummary {
+  id: string;
+  name: string;
+  platform_campaign_id: string;
+  daily_budget: string | number;
+  seeded_gene_pool_entries: number;
+  registered_deployments: number;
+}
+
+export interface CampaignImportFailure {
+  meta_campaign_id: string;
+  error: string;
+}
+
+export interface CampaignImportResult {
+  imported: ImportedCampaignSummary[];
+  failed: CampaignImportFailure[];
+  quota_used_after: number;
+  quota_max: number;
+}
+
+// ---------------------------------------------------------------------------
+// Per-user usage / cost rollup (Phase E)
+//
+// Dollar amounts arrive from Pydantic v2 as JSON strings (Decimal → str)
+// so every numeric-looking field here is typed ``string`` and coerced
+// through ``Number()`` at render time.
+// ---------------------------------------------------------------------------
+
+export interface UsageServiceBreakdown {
+  service: string; // "llm" | "meta_api" | "email"
+  cost_usd: string;
+  calls: number;
+}
+
+export interface UsageCampaignBreakdown {
+  campaign_id: string | null;
+  campaign_name: string | null;
+  cost_usd: string;
+  calls: number;
+}
+
+export interface UsageDayBreakdown {
+  day: string; // ISO YYYY-MM-DD
+  cost_usd: string;
+  calls: number;
+}
+
+export interface UsageSummary {
+  from_date: string; // ISO YYYY-MM-DD
+  to_date: string; // ISO YYYY-MM-DD
+  total_cost_usd: string;
+  total_calls: number;
+  by_service: UsageServiceBreakdown[];
+  by_campaign: UsageCampaignBreakdown[];
+  by_day: UsageDayBreakdown[];
+}
+
+// ---------------------------------------------------------------------------
 // Experiments
 // ---------------------------------------------------------------------------
 

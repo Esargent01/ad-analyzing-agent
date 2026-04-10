@@ -17,8 +17,11 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from src.exceptions import GenomeValidationError, LLMError
 from src.models.genome import GenePool, GenomeSchema
+from src.services.usage import AgentContext, log_llm_call
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from src.models.analysis import ElementInsight, InteractionInsight
 
 logger = logging.getLogger(__name__)
@@ -221,9 +224,22 @@ class GeneratorAgent:
         model: The Anthropic model identifier to use.
     """
 
-    def __init__(self, client: anthropic.AsyncAnthropic, model: str) -> None:
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic,
+        model: str,
+        usage_session: "AsyncSession | None" = None,
+        usage_context: AgentContext | None = None,
+    ) -> None:
         self._client = client
         self._model = model
+        # Optional cost-logging plumbing (Phase E). When both a
+        # session and a context are provided, every messages.create
+        # call writes a ``usage_log`` row before returning. Either
+        # being ``None`` disables logging — that's what existing
+        # unit tests rely on.
+        self._usage_session = usage_session
+        self._usage_context = usage_context
 
     async def generate_variants(
         self,
@@ -298,6 +314,23 @@ class GeneratorAgent:
             response.usage.input_tokens,
             response.usage.output_tokens,
         )
+
+        # Cost attribution (Phase E). Silently skipped if the agent
+        # was built without usage plumbing (e.g. unit tests).
+        if self._usage_session is not None and self._usage_context is not None:
+            try:
+                await log_llm_call(
+                    self._usage_session,
+                    self._usage_context,
+                    model=self._model,
+                    input_tokens=int(response.usage.input_tokens),
+                    output_tokens=int(response.usage.output_tokens),
+                    metadata={"stop_reason": response.stop_reason},
+                )
+            except Exception as log_exc:  # noqa: BLE001 — logging must never fail a cycle
+                logger.warning(
+                    "Failed to log generator usage: %s", log_exc
+                )
 
         # Extract and validate tool-use results
         results: list[GenomeWithHypothesis] = []

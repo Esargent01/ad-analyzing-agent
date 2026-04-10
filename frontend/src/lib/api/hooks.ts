@@ -15,13 +15,19 @@ import {
 import { api, ApiError } from "@/lib/api/client";
 import type {
   ApproveResponse,
+  CampaignImportRequest,
+  CampaignImportResult,
   DailyDatesResponse,
   DailyReport,
   ExperimentsResponse,
+  ImportableCampaignsResponse,
   MagicLinkRequest,
   MeResponse,
+  MetaConnectResponse,
+  MetaConnectionStatus,
   SuggestRequest,
   SuggestResponse,
+  UsageSummary,
   WeeklyIndexResponse,
   WeeklyReport,
 } from "@/lib/api/types";
@@ -32,6 +38,10 @@ import type {
 
 export const qk = {
   me: ["me"] as const,
+  metaStatus: ["me", "meta", "status"] as const,
+  importableCampaigns: ["me", "meta", "campaigns"] as const,
+  myUsage: (fromDate?: string, toDate?: string) =>
+    ["me", "usage", fromDate ?? "default", toDate ?? "default"] as const,
   dailyDates: (campaignId: string) =>
     ["campaigns", campaignId, "reports", "daily"] as const,
   dailyReport: (campaignId: string, reportDate: string) =>
@@ -88,6 +98,142 @@ export function useLogout() {
     mutationFn: async () => {
       await api.post<void>("/api/auth/logout");
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Meta OAuth connection (Phase B)
+// ---------------------------------------------------------------------------
+
+/**
+ * Polls the backend for whether the signed-in user has a stored Meta
+ * connection. Cheap to call; re-run when the page regains focus so the
+ * UI flips from "Connect" to "Connected" immediately after the OAuth
+ * callback lands.
+ */
+export function useMetaStatus(
+  options: Omit<
+    UseQueryOptions<MetaConnectionStatus, ApiError>,
+    "queryKey" | "queryFn"
+  > = {},
+) {
+  return useQuery<MetaConnectionStatus, ApiError>({
+    queryKey: qk.metaStatus,
+    queryFn: ({ signal }) =>
+      api.get<MetaConnectionStatus>("/api/me/meta/status", { signal }),
+    staleTime: 60_000,
+    ...options,
+  });
+}
+
+/**
+ * Starts the OAuth dance. Caller should `window.location.href` the
+ * returned `auth_url` — Facebook will bounce back to the callback
+ * endpoint, which 302s to `/dashboard?meta_connected=1`.
+ */
+export function useConnectMeta() {
+  return useMutation<MetaConnectResponse, ApiError, void>({
+    mutationFn: () => api.post<MetaConnectResponse>("/api/me/meta/connect"),
+  });
+}
+
+/**
+ * Drops the stored encrypted token. Invalidates the status query so
+ * the card flips back to the unconnected state.
+ */
+export function useDisconnectMeta() {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, void>({
+    mutationFn: () => api.delete<void>("/api/me/meta/connection"),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.metaStatus });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Meta campaign import (Phase D)
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetches the list of campaigns the connected user has in their Meta
+ * ad account, with a flag for anything already imported. Also surfaces
+ * the user's current cap usage so the picker can render a "3/5 used"
+ * widget.
+ *
+ * Only enabled when the caller has confirmed Meta is connected — this
+ * endpoint 409s without a stored connection.
+ */
+export function useImportableCampaigns(
+  options: Omit<
+    UseQueryOptions<ImportableCampaignsResponse, ApiError>,
+    "queryKey" | "queryFn"
+  > = {},
+) {
+  return useQuery<ImportableCampaignsResponse, ApiError>({
+    queryKey: qk.importableCampaigns,
+    queryFn: ({ signal }) =>
+      api.get<ImportableCampaignsResponse>("/api/me/meta/campaigns", { signal }),
+    staleTime: 30_000,
+    retry: false,
+    ...options,
+  });
+}
+
+/**
+ * Submits the selected campaigns for import. On success we invalidate
+ * both the importable-list query (so the cap counter updates + the
+ * picker greys out the rows we just imported) and the `me` query (so
+ * the sidebar gets the new campaigns).
+ */
+export function useImportCampaigns() {
+  const qc = useQueryClient();
+  return useMutation<CampaignImportResult, ApiError, CampaignImportRequest>({
+    mutationFn: (body) =>
+      api.post<CampaignImportResult>(
+        "/api/me/meta/campaigns/import",
+        body as unknown as Record<string, unknown>,
+      ),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.importableCampaigns });
+      qc.invalidateQueries({ queryKey: qk.me });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Per-user usage rollup (Phase E)
+// ---------------------------------------------------------------------------
+
+export interface UsageRange {
+  /** ISO YYYY-MM-DD — defaults to 30 days ago on the server. */
+  from?: string;
+  /** ISO YYYY-MM-DD — defaults to today on the server. */
+  to?: string;
+}
+
+/**
+ * Fetches the signed-in user's cost/call rollup for the given window.
+ * Omit ``from``/``to`` to get the backend default (trailing 30 days).
+ */
+export function useMyUsage(
+  range: UsageRange = {},
+  options: Omit<
+    UseQueryOptions<UsageSummary, ApiError>,
+    "queryKey" | "queryFn"
+  > = {},
+) {
+  const search = new URLSearchParams();
+  if (range.from) search.set("from", range.from);
+  if (range.to) search.set("to", range.to);
+  const qs = search.toString();
+  const path = qs ? `/api/me/usage?${qs}` : "/api/me/usage";
+
+  return useQuery<UsageSummary, ApiError>({
+    queryKey: qk.myUsage(range.from, range.to),
+    queryFn: ({ signal }) => api.get<UsageSummary>(path, { signal }),
+    staleTime: 60_000,
+    ...options,
   });
 }
 

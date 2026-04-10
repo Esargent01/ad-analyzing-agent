@@ -25,6 +25,11 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
+        # Silently ignore stray env vars — this makes it safe to
+        # leave retired keys (e.g., the pre-Phase-F
+        # ``META_ACCESS_TOKEN``) in ``.env`` for backup purposes
+        # without crashing the process at startup.
+        extra="ignore",
     )
 
     # Database
@@ -35,9 +40,25 @@ class Settings(BaseSettings):
     anthropic_model: str = "claude-sonnet-4-20250514"
 
     # Meta Marketing API
+    #
+    # After Phase F every campaign runs on its *owner's* OAuth token,
+    # which is stored encrypted in ``user_meta_connections`` and
+    # decrypted on demand by ``src.adapters.meta_factory``. There is
+    # no longer a ``META_ACCESS_TOKEN`` environment variable; a user
+    # must click "Connect Meta" in the dashboard before their
+    # campaigns can run.
+    #
+    # ``meta_app_id`` / ``meta_app_secret`` are still required — they
+    # identify the Meta App used for the OAuth exchange itself.
+    #
+    # ``meta_ad_account_id`` / ``meta_page_id`` / ``meta_landing_page_url``
+    # remain as settings for now: Phase D's import flow does not yet
+    # store them per-campaign, so the adapter factory falls back to
+    # the operator's defaults. A "Phase G" cleanup will move these
+    # onto the ``campaigns`` table so different campaigns can target
+    # different ad accounts and landing pages.
     meta_app_id: str = ""
     meta_app_secret: str = ""
-    meta_access_token: str = ""
     meta_ad_account_id: str = ""
     meta_page_id: str = ""
     meta_landing_page_url: str = "https://example.com"
@@ -98,6 +119,20 @@ class Settings(BaseSettings):
     # domain set e.g. ``.example.com``.
     cookie_domain: str = ""
     cookie_secure: bool = True
+
+    # Meta OAuth (Phase B). The redirect URI must also be added to the
+    # Meta App dashboard for both dev (localhost) and production URLs.
+    meta_oauth_redirect_uri: str = "http://localhost:8000/api/auth/meta/callback"
+    meta_oauth_scopes: str = "ads_management,ads_read,business_management"
+    meta_graph_api_version: str = "v18.0"
+    # Fernet key for encrypting stored Meta access tokens at rest.
+    # Generate with:
+    #   python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # LOSING THIS KEY ORPHANS EVERY STORED META TOKEN — back it up.
+    meta_token_encryption_key: str = ""
+
+    # Per-user limits (Phase D+). Tunable once Phase E exposes cost data.
+    max_campaigns_per_user: int = 5
 
 
 @lru_cache(maxsize=1)

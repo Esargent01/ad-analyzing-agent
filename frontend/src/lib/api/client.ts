@@ -108,6 +108,8 @@ export const api = {
     body?: JsonBody,
     opts?: Omit<RequestOptions, "method" | "body">,
   ) => apiRequest<T>(path, { ...opts, method: "POST", body }),
+  delete: <T>(path: string, opts?: Omit<RequestOptions, "method" | "body">) =>
+    apiRequest<T>(path, { ...opts, method: "DELETE" }),
 };
 
 export { API_BASE_URL };

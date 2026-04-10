@@ -31,6 +31,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, field_validator
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from sqlalchemy import select, text as sa_text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,9 +42,20 @@ from sqlalchemy.orm import noload
 from src.config import get_settings
 from src.dashboard.auth import (
     create_magic_link_token,
+    create_oauth_state_token,
     create_session_token,
     generate_csrf_token,
+    hash_magic_link_token,
     verify_magic_link_token,
+    verify_oauth_state_token,
+)
+from src.dashboard.crypto import MetaTokenCryptoError, encrypt_token
+from src.dashboard.meta_oauth import (
+    MetaOAuthError,
+    build_meta_oauth_url,
+    exchange_code_for_token,
+    exchange_short_for_long_lived,
+    fetch_meta_user_id,
 )
 from src.dashboard.deps import (
     get_current_user,
@@ -54,8 +68,12 @@ from src.db.engine import get_session
 from src.db.queries import (
     add_gene_pool_entry,
     approve_variant,
+    consume_magic_link_token,
+    count_active_campaigns_for_user,
     create_user,
+    delete_meta_connection,
     get_element_rankings,
+    get_meta_connection,
     get_pending_approvals,
     get_recent_cycles,
     get_top_interactions,
@@ -64,6 +82,23 @@ from src.db.queries import (
     list_gene_pool_entries,
     reject_variant,
     touch_last_login,
+    upsert_meta_connection,
+)
+from src.exceptions import (
+    CampaignAlreadyImported,
+    CampaignCapExceeded,
+    MetaConnectionMissing,
+    MetaTokenExpired,
+)
+from src.models.campaigns import (
+    CampaignImportRequest,
+    CampaignImportResult,
+    CampaignImportFailure,
+    ImportableCampaignsResponse,
+)
+from src.services.campaign_import import (
+    import_campaign,
+    list_importable_campaigns,
 )
 from src.db.tables import Campaign, User, Variant
 from src.models.reports import DailyReport, ProposedVariant, WeeklyReport
@@ -85,6 +120,75 @@ app = FastAPI(
 
 
 # ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+#
+# Two layers for ``POST /api/auth/magic-link``:
+#
+# 1. **Per-IP** — slowapi decorator with a 20/hour budget. Keyed by the
+#    left-most entry in ``X-Forwarded-For`` so we get the real client IP
+#    behind Fly.io / Vercel edge proxies instead of the proxy's own IP.
+# 2. **Per-email** — a small in-process sliding window implemented in
+#    ``_email_bucket`` below, 5/minute. slowapi's decorator key function
+#    can't see the request body (the body hasn't been parsed at that
+#    point), so per-email limiting is done manually inside the handler.
+#
+# Both are best-effort: the process-local in-memory store is fine for a
+# single-node deploy and keeps us off Redis for Phase A. When we scale
+# out, move both limits to a shared backend.
+
+
+def _forwarded_ip_key(request: Request) -> str:
+    """Return the real client IP, honouring ``X-Forwarded-For``.
+
+    Fly.io / Vercel sit in front of the backend, so ``request.client.host``
+    is the proxy IP, not the user's. Fall back to ``get_remote_address``
+    when no forwarded header is present.
+    """
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",", 1)[0].strip()
+    return get_remote_address(request)
+
+
+limiter = Limiter(key_func=_forwarded_ip_key)
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def _rate_limit_exceeded_handler(
+    request: Request, exc: RateLimitExceeded
+) -> JSONResponse:
+    return JSONResponse(
+        status_code=429,
+        content={"error": "rate_limited", "detail": str(exc.detail)},
+    )
+
+
+# Per-email sliding window: {email: [timestamp, timestamp, ...]}
+_MAGIC_LINK_EMAIL_WINDOW_SECONDS = 60
+_MAGIC_LINK_EMAIL_MAX_HITS = 5
+_email_bucket: dict[str, list[float]] = {}
+
+
+def _check_email_rate_limit(email: str) -> bool:
+    """Record a hit for ``email`` and return True if the limit is exceeded.
+
+    Allows up to ``_MAGIC_LINK_EMAIL_MAX_HITS`` requests per
+    ``_MAGIC_LINK_EMAIL_WINDOW_SECONDS`` per email. Old timestamps are
+    pruned on each call so the dict stays bounded over time.
+    """
+    import time
+
+    now = time.monotonic()
+    cutoff = now - _MAGIC_LINK_EMAIL_WINDOW_SECONDS
+    hits = [t for t in _email_bucket.get(email, []) if t > cutoff]
+    hits.append(now)
+    _email_bucket[email] = hits
+    return len(hits) > _MAGIC_LINK_EMAIL_MAX_HITS
+
+
+# ---------------------------------------------------------------------------
 # CORS — only allow configured frontend origins
 # ---------------------------------------------------------------------------
 
@@ -102,7 +206,7 @@ if _cors_origins:
         CORSMiddleware,
         allow_origins=_cors_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "OPTIONS"],
+        allow_methods=["GET", "POST", "DELETE", "OPTIONS"],
         allow_headers=["Content-Type", "X-CSRF-Token"],
     )
 
@@ -500,6 +604,17 @@ class UserCampaignOut(BaseModel):
     is_active: bool
 
 
+class MetaConnectResponse(BaseModel):
+    auth_url: str
+
+
+class MetaConnectionStatus(BaseModel):
+    connected: bool
+    meta_user_id: str | None = None
+    connected_at: datetime | None = None
+    token_expires_at: datetime | None = None
+
+
 class MeResponse(BaseModel):
     id: UUID
     email: str
@@ -553,6 +668,55 @@ class SuggestResponse(BaseModel):
     status: str
     slot_name: str
     slot_value: str
+
+
+class UsageServiceBreakdown(BaseModel):
+    """Cost + call count for a single ``service`` bucket."""
+
+    service: str  # 'llm' | 'meta_api' | 'email'
+    cost_usd: Decimal
+    calls: int
+
+
+class UsageCampaignBreakdown(BaseModel):
+    """Cost + call count for a single campaign.
+
+    ``campaign_id`` and ``campaign_name`` may both be ``None`` when
+    the rows were written without a campaign (e.g., standalone
+    copywriter runs) or the campaign has since been deleted —
+    usage_log uses ``ON DELETE SET NULL`` for its FKs.
+    """
+
+    campaign_id: UUID | None = None
+    campaign_name: str | None = None
+    cost_usd: Decimal
+    calls: int
+
+
+class UsageDayBreakdown(BaseModel):
+    """Cost + call count for a single UTC day."""
+
+    day: date
+    cost_usd: Decimal
+    calls: int
+
+
+class UsageSummary(BaseModel):
+    """Aggregated usage/cost rollup for the signed-in user.
+
+    Powers the "this month" cost tile on the dashboard and any
+    per-user budgeting conversations. Dollar amounts are rounded to
+    six decimal places to match the precision of
+    ``usage_log.cost_usd``.
+    """
+
+    from_date: date
+    to_date: date
+    total_cost_usd: Decimal
+    total_calls: int
+    by_service: list[UsageServiceBreakdown]
+    by_campaign: list[UsageCampaignBreakdown]
+    by_day: list[UsageDayBreakdown]
 
 
 # ---------------------------------------------------------------------------
@@ -615,25 +779,42 @@ def _clear_auth_cookies(response: Response) -> None:
 
 
 @app.post("/api/auth/magic-link", status_code=204)
+@limiter.limit("20/hour")
 async def api_magic_link(
+    request: Request,
     body: MagicLinkRequest,
     session: AsyncSession = Depends(get_db_session),
 ) -> Response:
     """Email a sign-in link to ``body.email``.
 
-    Always returns 204 whether the email exists or not — this prevents
-    user enumeration. Dev mode logs the link to stdout instead of
-    sending (see ``src/reports/auth_email.py``).
+    Self-serve: the link is sent for *any* well-formed email; the user
+    row is created lazily inside ``api_auth_verify`` on first successful
+    verify. Returning 204 regardless of whether the email already exists
+    prevents enumeration.
+
+    Rate-limited at two layers — 20/hour per client IP (via slowapi
+    decorator) and 5/minute per email (in-process sliding window). A
+    429 response is returned whichever limit fires first. Dev mode logs
+    the link to stdout instead of sending (see
+    ``src/reports/auth_email.py``).
     """
-    user = await get_user_by_email(session, body.email)
-    if user is not None:
-        settings = get_settings()
-        token = create_magic_link_token(user.email)
-        link = f"{settings.api_base_url.rstrip('/')}/api/auth/verify?token={token}"
-        try:
-            await send_magic_link(user.email, link)
-        except Exception as exc:  # noqa: BLE001 — delivery failure shouldn't leak
-            logger.warning("Magic-link delivery failed for %s: %s", user.email, exc)
+    if _check_email_rate_limit(body.email):
+        logger.info("Magic-link email rate limit hit for %s", body.email)
+        return JSONResponse(
+            status_code=429,
+            content={
+                "error": "rate_limited",
+                "detail": "Too many magic-link requests for this email",
+            },
+        )
+
+    settings = get_settings()
+    token = create_magic_link_token(body.email)
+    link = f"{settings.api_base_url.rstrip('/')}/api/auth/verify?token={token}"
+    try:
+        await send_magic_link(body.email, link)
+    except Exception as exc:  # noqa: BLE001 — delivery failure shouldn't leak
+        logger.warning("Magic-link delivery failed for %s: %s", body.email, exc)
     return Response(status_code=204)
 
 
@@ -644,26 +825,54 @@ async def api_auth_verify(
 ) -> RedirectResponse:
     """Consume a magic-link token and redirect to the frontend dashboard.
 
+    Ordering matters:
+
+    1. Verify the HMAC + expiry. Bad → 302 invalid_link.
+    2. Atomically insert the token hash into ``magic_links_consumed``.
+       If the hash already exists it's a replay → 302 invalid_link. This
+       is the single-use guarantee.
+    3. Look up the user by email; if missing, create one (self-serve).
+       The create is race-safe: on ``IntegrityError`` we re-read.
+    4. Touch ``last_login_at`` and issue cookies.
+
     On success sets the ``session_token`` + ``csrf_token`` cookies and
-    302-redirects to ``<frontend_base_url>/dashboard``. On failure
-    redirects to ``<frontend_base_url>/sign-in?error=invalid_link``.
+    302-redirects to ``<frontend_base_url>/dashboard``.
     """
     settings = get_settings()
     frontend = settings.frontend_base_url.rstrip("/")
+    invalid_redirect = RedirectResponse(
+        url=f"{frontend}/sign-in?error=invalid_link",
+        status_code=302,
+    )
 
     email = verify_magic_link_token(token)
     if email is None:
-        return RedirectResponse(
-            url=f"{frontend}/sign-in?error=invalid_link",
-            status_code=302,
-        )
+        return invalid_redirect
 
+    # Single-use enforcement: first verify wins, every replay hits the
+    # ON CONFLICT branch and bounces.
+    token_hash = hash_magic_link_token(token)
+    newly_consumed = await consume_magic_link_token(session, token_hash)
+    if not newly_consumed:
+        logger.info("Rejected replay of consumed magic-link token")
+        return invalid_redirect
+
+    # Self-serve signup: unknown email → create user on first successful
+    # verify. Concurrent verifies for a brand-new email race on the unique
+    # constraint; catch IntegrityError and re-read.
     user = await get_user_by_email(session, email)
     if user is None:
-        return RedirectResponse(
-            url=f"{frontend}/sign-in?error=invalid_link",
-            status_code=302,
-        )
+        try:
+            user = await create_user(session, email)
+            logger.info("Self-serve signup: created user %s", email)
+        except IntegrityError:
+            await session.rollback()
+            user = await get_user_by_email(session, email)
+        if user is None:
+            # Shouldn't happen — the unique constraint was violated by a
+            # concurrent insert but we still can't find the row. Fail closed.
+            logger.error("Self-serve signup race lost for %s", email)
+            return invalid_redirect
 
     await touch_last_login(session, user.id)
 
@@ -697,6 +906,458 @@ async def api_me(
             UserCampaignOut(id=c.id, name=c.name, is_active=c.is_active)
             for c in campaigns
         ],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Meta OAuth (Phase B)
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/me/meta/connect", response_model=MetaConnectResponse)
+async def api_meta_connect(
+    _: None = Depends(require_csrf),
+    user: User = Depends(get_current_user),
+) -> MetaConnectResponse:
+    """Return the Meta authorize URL for the current user to start OAuth.
+
+    The frontend receives the URL and does
+    ``window.location.href = auth_url``. The ``state`` parameter is a
+    signed nonce binding this OAuth start to the user — we verify it on
+    the callback and refuse to exchange the code if it doesn't match.
+    """
+    state = create_oauth_state_token(user.id)
+    auth_url = build_meta_oauth_url(state)
+    return MetaConnectResponse(auth_url=auth_url)
+
+
+@app.get("/api/auth/meta/callback")
+async def api_meta_callback(
+    code: str | None = Query(None),
+    state: str | None = Query(None),
+    error: str | None = Query(None),
+    error_description: str | None = Query(None),
+    session: AsyncSession = Depends(get_db_session),
+) -> RedirectResponse:
+    """Handle the Meta OAuth callback redirect.
+
+    Unauthenticated by design — Meta's redirect is a top-level browser
+    navigation and doesn't carry our session cookie reliably. We bind
+    the flow to a user via the HMAC-signed ``state`` nonce instead.
+
+    Always redirects to the frontend dashboard with a query param:
+
+    - ``?meta_connected=1`` on success
+    - ``?meta_error=<code>`` on any failure
+
+    Failures are logged server-side but the URL error code is coarse on
+    purpose to avoid leaking Meta API internals into the browser.
+    """
+    settings = get_settings()
+    frontend = settings.frontend_base_url.rstrip("/")
+
+    def _fail(code_: str) -> RedirectResponse:
+        return RedirectResponse(
+            url=f"{frontend}/dashboard?meta_error={code_}", status_code=302
+        )
+
+    if error:
+        logger.info(
+            "Meta OAuth user declined or errored: %s (%s)",
+            error,
+            error_description,
+        )
+        return _fail("declined")
+
+    if not code or not state:
+        return _fail("missing_params")
+
+    user_id = verify_oauth_state_token(state)
+    if user_id is None:
+        logger.info("Meta OAuth callback with invalid/expired state nonce")
+        return _fail("invalid_state")
+
+    try:
+        short = await exchange_code_for_token(code)
+        long_lived = await exchange_short_for_long_lived(short.access_token)
+        meta_user_id = await fetch_meta_user_id(long_lived.access_token)
+    except MetaOAuthError as exc:
+        logger.warning("Meta OAuth exchange failed for user %s: %s", user_id, exc)
+        return _fail("exchange_failed")
+
+    try:
+        ciphertext = encrypt_token(long_lived.access_token)
+    except (MetaTokenCryptoError, ValueError) as exc:
+        logger.error("Meta token encryption failed: %s", exc)
+        return _fail("crypto_error")
+
+    scopes = [s.strip() for s in settings.meta_oauth_scopes.split(",") if s.strip()]
+
+    await upsert_meta_connection(
+        session,
+        user_id=user_id,
+        meta_user_id=meta_user_id,
+        encrypted_access_token=ciphertext,
+        token_expires_at=long_lived.expires_at,
+        scopes=scopes,
+    )
+    logger.info(
+        "Meta OAuth success: app_user=%s meta_user=%s", user_id, meta_user_id
+    )
+    return RedirectResponse(
+        url=f"{frontend}/dashboard?meta_connected=1", status_code=302
+    )
+
+
+@app.get("/api/me/meta/status", response_model=MetaConnectionStatus)
+async def api_meta_status(
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> MetaConnectionStatus:
+    """Return the current user's Meta connection status.
+
+    Does **not** decrypt or return the access token — only the
+    ``meta_user_id`` and metadata the UI needs to show "connected as
+    <id>" or prompt a re-connect.
+    """
+    connection = await get_meta_connection(session, user.id)
+    if connection is None:
+        return MetaConnectionStatus(connected=False)
+    return MetaConnectionStatus(
+        connected=True,
+        meta_user_id=connection.meta_user_id,
+        connected_at=connection.connected_at,
+        token_expires_at=connection.token_expires_at,
+    )
+
+
+@app.delete("/api/me/meta/connection", status_code=204)
+async def api_meta_disconnect(
+    _: None = Depends(require_csrf),
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> Response:
+    """Delete the current user's Meta connection (user-initiated disconnect).
+
+    Phase C and beyond will refuse to run cycles for campaigns whose
+    owner has no connection, so disconnecting effectively pauses the
+    user's campaigns until they re-connect.
+    """
+    await delete_meta_connection(session, user.id)
+    return Response(status_code=204)
+
+
+# ---------------------------------------------------------------------------
+# Self-serve campaign import (Phase D)
+# ---------------------------------------------------------------------------
+
+
+@app.get(
+    "/api/me/meta/campaigns",
+    response_model=ImportableCampaignsResponse,
+)
+async def api_meta_importable_campaigns(
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> ImportableCampaignsResponse:
+    """Return the signed-in user's Meta campaigns for the picker.
+
+    Also returns the user's current quota usage so the UI can
+    render a "N/5 used" indicator without a second roundtrip.
+    Requires Meta to be connected first; otherwise 409.
+    """
+    try:
+        return await list_importable_campaigns(session, user.id)
+    except MetaConnectionMissing as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "meta_not_connected", "message": str(exc)},
+        ) from exc
+    except MetaTokenExpired as exc:
+        raise HTTPException(
+            status_code=409,
+            detail={"error": "meta_token_expired", "message": str(exc)},
+        ) from exc
+
+
+@app.post(
+    "/api/me/meta/campaigns/import",
+    response_model=CampaignImportResult,
+)
+async def api_meta_import_campaigns(
+    payload: CampaignImportRequest,
+    _: None = Depends(require_csrf),
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> CampaignImportResult:
+    """Bulk-import Meta campaigns chosen from the picker.
+
+    Each campaign is attempted independently: one failure doesn't
+    roll back earlier successes. Partial success is the common
+    case — the response body carries ``imported`` and ``failed``
+    arrays and the endpoint always returns 200.
+
+    The 5-campaign cap (``settings.max_campaigns_per_user``) is
+    enforced before the first write; if a user is already at the
+    cap the whole request is rejected with a single
+    ``CampaignCapExceeded`` error entry.
+    """
+    settings = get_settings()
+    imported: list = []
+    failed: list[CampaignImportFailure] = []
+
+    # Short-circuit if the user is already over cap — no point
+    # doing any Meta calls at all.
+    starting = await count_active_campaigns_for_user(session, user.id)
+    if starting >= settings.max_campaigns_per_user:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "campaign_cap_exceeded",
+                "current": starting,
+                "maximum": settings.max_campaigns_per_user,
+            },
+        )
+
+    for meta_id in payload.meta_campaign_ids:
+        try:
+            summary = await import_campaign(
+                session=session,
+                user_id=user.id,
+                meta_campaign_id=meta_id,
+                overrides=payload.overrides,
+            )
+            imported.append(summary)
+        except CampaignCapExceeded as exc:
+            failed.append(
+                CampaignImportFailure(
+                    meta_campaign_id=meta_id, error=str(exc)
+                )
+            )
+            # Cap hit mid-batch — everything after this will hit
+            # the same wall, so stop and let the UI show partial.
+            break
+        except CampaignAlreadyImported as exc:
+            failed.append(
+                CampaignImportFailure(
+                    meta_campaign_id=meta_id, error=str(exc)
+                )
+            )
+        except (MetaConnectionMissing, MetaTokenExpired) as exc:
+            failed.append(
+                CampaignImportFailure(
+                    meta_campaign_id=meta_id, error=str(exc)
+                )
+            )
+            break  # connection issue → no retry helps
+        except Exception as exc:  # noqa: BLE001 — we want to surface any error
+            logger.exception(
+                "Unexpected error importing campaign %s for user %s",
+                meta_id,
+                user.id,
+            )
+            failed.append(
+                CampaignImportFailure(
+                    meta_campaign_id=meta_id, error=f"internal_error: {exc}"
+                )
+            )
+
+    quota_after = await count_active_campaigns_for_user(session, user.id)
+    return CampaignImportResult(
+        imported=imported,
+        failed=failed,
+        quota_used_after=quota_after,
+        quota_max=settings.max_campaigns_per_user,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Per-user usage + cost rollup (Phase E)
+# ---------------------------------------------------------------------------
+
+
+def _default_usage_window() -> tuple[date, date]:
+    """Return (from_date, to_date) covering the trailing 30 days.
+
+    Both dates are inclusive; ``to_date`` is today in UTC.
+    """
+    today = datetime.now(timezone.utc).date()
+    return today - timedelta(days=29), today
+
+
+@app.get("/api/me/usage", response_model=UsageSummary)
+async def api_my_usage(
+    from_date: date | None = Query(default=None, alias="from"),
+    to_date: date | None = Query(default=None, alias="to"),
+    session: AsyncSession = Depends(get_db_session),
+    user: User = Depends(get_current_user),
+) -> UsageSummary:
+    """Return a cost + call-count rollup for the current user.
+
+    Aggregates ``usage_log`` rows (filtered by ``user_id``) between
+    two inclusive UTC dates. If the range is omitted, defaults to
+    the trailing 30 days. The response is structured for direct
+    rendering in the dashboard "this month" tile:
+
+    - ``total_cost_usd`` — single number for the prominent big-stat
+    - ``by_service`` — LLM vs Meta vs email split
+    - ``by_campaign`` — which campaigns are driving spend
+    - ``by_day`` — sparkline-ready daily series
+
+    Bounds: we cap the range at 366 days to protect the hypertable
+    from accidental year-over-year scans.
+    """
+    default_from, default_to = _default_usage_window()
+    range_from = from_date or default_from
+    range_to = to_date or default_to
+
+    if range_to < range_from:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_range", "message": "to must be >= from"},
+        )
+    if (range_to - range_from).days > 366:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "range_too_large",
+                "message": "usage window is capped at 366 days",
+            },
+        )
+
+    # Half-open [start, end) window so a single date returns one
+    # full day's worth of rows regardless of timezone.
+    start_ts = datetime.combine(range_from, datetime.min.time(), tzinfo=timezone.utc)
+    end_ts = datetime.combine(
+        range_to + timedelta(days=1), datetime.min.time(), tzinfo=timezone.utc
+    )
+
+    params = {
+        "user_id": user.id,
+        "start_ts": start_ts,
+        "end_ts": end_ts,
+    }
+
+    # Totals
+    totals_row = (
+        await session.execute(
+            sa_text(
+                """
+                SELECT
+                  COALESCE(SUM(cost_usd), 0) AS total_cost,
+                  COALESCE(COUNT(*), 0)      AS total_calls
+                FROM usage_log
+                WHERE user_id = :user_id
+                  AND recorded_at >= :start_ts
+                  AND recorded_at <  :end_ts
+                """
+            ),
+            params,
+        )
+    ).one()
+    total_cost = Decimal(totals_row.total_cost or 0)
+    total_calls = int(totals_row.total_calls or 0)
+
+    # Per-service split
+    service_rows = (
+        await session.execute(
+            sa_text(
+                """
+                SELECT
+                  service,
+                  COALESCE(SUM(cost_usd), 0) AS cost,
+                  COUNT(*)                   AS calls
+                FROM usage_log
+                WHERE user_id = :user_id
+                  AND recorded_at >= :start_ts
+                  AND recorded_at <  :end_ts
+                GROUP BY service
+                ORDER BY cost DESC
+                """
+            ),
+            params,
+        )
+    ).fetchall()
+    by_service = [
+        UsageServiceBreakdown(
+            service=row.service,
+            cost_usd=Decimal(row.cost or 0),
+            calls=int(row.calls or 0),
+        )
+        for row in service_rows
+    ]
+
+    # Per-campaign split (LEFT JOIN so NULL campaign_ids still show up)
+    campaign_rows = (
+        await session.execute(
+            sa_text(
+                """
+                SELECT
+                  u.campaign_id              AS campaign_id,
+                  c.name                     AS campaign_name,
+                  COALESCE(SUM(u.cost_usd), 0) AS cost,
+                  COUNT(*)                   AS calls
+                FROM usage_log u
+                LEFT JOIN campaigns c ON c.id = u.campaign_id
+                WHERE u.user_id = :user_id
+                  AND u.recorded_at >= :start_ts
+                  AND u.recorded_at <  :end_ts
+                GROUP BY u.campaign_id, c.name
+                ORDER BY cost DESC
+                """
+            ),
+            params,
+        )
+    ).fetchall()
+    by_campaign = [
+        UsageCampaignBreakdown(
+            campaign_id=row.campaign_id,
+            campaign_name=row.campaign_name,
+            cost_usd=Decimal(row.cost or 0),
+            calls=int(row.calls or 0),
+        )
+        for row in campaign_rows
+    ]
+
+    # Per-day split — use DATE() in UTC to match the existing report
+    # endpoints (we're not using time_bucket here because the dashboard
+    # only ever asks for daily granularity).
+    day_rows = (
+        await session.execute(
+            sa_text(
+                """
+                SELECT
+                  DATE(recorded_at AT TIME ZONE 'UTC') AS day,
+                  COALESCE(SUM(cost_usd), 0)           AS cost,
+                  COUNT(*)                             AS calls
+                FROM usage_log
+                WHERE user_id = :user_id
+                  AND recorded_at >= :start_ts
+                  AND recorded_at <  :end_ts
+                GROUP BY day
+                ORDER BY day ASC
+                """
+            ),
+            params,
+        )
+    ).fetchall()
+    by_day = [
+        UsageDayBreakdown(
+            day=row.day,
+            cost_usd=Decimal(row.cost or 0),
+            calls=int(row.calls or 0),
+        )
+        for row in day_rows
+    ]
+
+    return UsageSummary(
+        from_date=range_from,
+        to_date=range_to,
+        total_cost_usd=total_cost,
+        total_calls=total_calls,
+        by_service=by_service,
+        by_campaign=by_campaign,
+        by_day=by_day,
     )
 
 

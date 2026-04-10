@@ -37,6 +37,7 @@ logger = logging.getLogger(__name__)
 # it invalidates the signature.
 _MAGIC_LINK_PREFIX = "ml"
 _SESSION_PREFIX = "sn"
+_OAUTH_STATE_PREFIX = "os"
 
 
 def _sign(payload: str, secret: str) -> str:
@@ -75,6 +76,16 @@ def create_magic_link_token(email: str, ttl_minutes: int | None = None) -> str:
     payload = f"{_MAGIC_LINK_PREFIX}:{email}:{expires_at}"
     signature = _sign(payload, settings.auth_session_secret)
     return _encode(f"{payload}:{signature}")
+
+
+def hash_magic_link_token(token: str) -> str:
+    """Return a stable hex SHA-256 digest of a raw magic-link token.
+
+    Used as the primary key on the ``magic_links_consumed`` ledger so
+    replays can be rejected without storing the raw token. The hex digest
+    is URL-safe and trivially comparable across processes.
+    """
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
 def verify_magic_link_token(token: str) -> str | None:
@@ -189,3 +200,76 @@ def generate_csrf_token() -> str:
     header + cookie proves the request originated from our frontend.
     """
     return secrets.token_urlsafe(32)
+
+
+# ---------------------------------------------------------------------------
+# OAuth state nonce (Meta Connect flow)
+# ---------------------------------------------------------------------------
+#
+# We can't use a session-cookie-side nonce because the OAuth callback
+# from Meta arrives as a top-level navigation from facebook.com, which
+# for ``SameSite=None; Secure`` cookies is usually fine but for stricter
+# configs may drop the cookie. A self-contained signed nonce — like our
+# magic-link tokens — bypasses the problem: we bind the OAuth start to
+# the user's UUID, sign it, and verify on callback without any DB hit.
+
+
+def create_oauth_state_token(
+    user_id: UUID, ttl_minutes: int = 10
+) -> str:
+    """Return a signed nonce binding an OAuth start to a user.
+
+    Embeds the user's UUID and an expiry. The server passes this as the
+    ``state`` parameter on the Meta authorize URL, and verifies it via
+    :func:`verify_oauth_state_token` on the callback. Short TTL
+    (default 10 minutes) is plenty — users don't leave OAuth dialogs
+    open for an hour.
+    """
+    settings = get_settings()
+    expires_at = int(
+        (datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)).timestamp()
+    )
+    payload = f"{_OAUTH_STATE_PREFIX}:{user_id}:{expires_at}"
+    signature = _sign(payload, settings.auth_session_secret)
+    return _encode(f"{payload}:{signature}")
+
+
+def verify_oauth_state_token(token: str) -> UUID | None:
+    """Verify an OAuth ``state`` nonce. Returns the bound user UUID or None.
+
+    Rejects malformed, expired, tampered, or wrong-prefix tokens. The
+    caller should treat ``None`` as a hard failure and refuse to
+    exchange the OAuth code.
+    """
+    settings = get_settings()
+    try:
+        raw = _decode(token)
+        prefix, user_str, expires_str, signature = raw.rsplit(":", 3)
+        if prefix != _OAUTH_STATE_PREFIX:
+            logger.debug("Token prefix is not an oauth-state prefix")
+            return None
+    except (ValueError, UnicodeDecodeError) as exc:
+        logger.debug("Malformed oauth state token: %s", exc)
+        return None
+
+    payload = f"{prefix}:{user_str}:{expires_str}"
+    expected = _sign(payload, settings.auth_session_secret)
+    if not hmac.compare_digest(expected, signature):
+        logger.debug("Invalid oauth state signature")
+        return None
+
+    try:
+        expires_at = int(expires_str)
+    except ValueError:
+        logger.debug("Invalid oauth state expiry")
+        return None
+
+    if datetime.now(timezone.utc).timestamp() > expires_at:
+        logger.debug("Expired oauth state")
+        return None
+
+    try:
+        return UUID(user_str)
+    except ValueError:
+        logger.debug("Invalid oauth state user UUID")
+        return None

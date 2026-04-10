@@ -23,10 +23,12 @@ from src.db.tables import (
     ElementInteraction,
     ElementPerformance,
     GenePoolEntry,
+    MagicLinkConsumed,
     Metric,
     TestCycle,
     User,
     UserCampaign,
+    UserMetaConnection,
     Variant,
     VariantStatus,
 )
@@ -825,15 +827,81 @@ async def touch_last_login(session: AsyncSession, user_id: UUID) -> None:
 async def get_user_campaigns(
     session: AsyncSession, user_id: UUID
 ) -> list[Campaign]:
-    """Return all campaigns the given user has access to, ordered by name."""
+    """Return every campaign a user can see on the dashboard.
+
+    Union of:
+    - campaigns explicitly granted via the ``user_campaigns`` join
+      table (pre-Phase-D sharing model — kept for legacy operator
+      access)
+    - campaigns owned outright by the user (Phase D onwards, set
+      when the user imports a campaign via the self-serve flow)
+
+    Duplicates are collapsed; results are name-ordered.
+    """
+    shared_ids = (
+        select(UserCampaign.campaign_id).where(UserCampaign.user_id == user_id)
+    )
     stmt = (
         select(Campaign)
-        .join(UserCampaign, UserCampaign.campaign_id == Campaign.id)
-        .where(UserCampaign.user_id == user_id)
+        .where(
+            (Campaign.id.in_(shared_ids)) | (Campaign.owner_user_id == user_id)
+        )
+        .order_by(Campaign.name)
+    )
+    result = await session.execute(stmt)
+    return list(result.scalars().unique().all())
+
+
+async def count_active_campaigns_for_user(
+    session: AsyncSession, user_id: UUID
+) -> int:
+    """Count the *active* campaigns a user owns.
+
+    Used to enforce ``settings.max_campaigns_per_user`` at import
+    time. Only counts rows where ``is_active = TRUE`` — paused or
+    retired campaigns don't eat into the cap, which lets users
+    rotate through campaigns without hitting the ceiling forever.
+    """
+    stmt = (
+        select(func.count())
+        .select_from(Campaign)
+        .where(
+            Campaign.owner_user_id == user_id,
+            Campaign.is_active.is_(True),
+        )
+    )
+    result = await session.execute(stmt)
+    return int(result.scalar_one() or 0)
+
+
+async def list_campaigns_for_user(
+    session: AsyncSession, user_id: UUID
+) -> list[Campaign]:
+    """Return every campaign *owned* by the given user (not shared)."""
+    stmt = (
+        select(Campaign)
+        .where(Campaign.owner_user_id == user_id)
         .order_by(Campaign.name)
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def get_imported_meta_campaign_ids_for_user(
+    session: AsyncSession, user_id: UUID
+) -> set[str]:
+    """Return the set of ``platform_campaign_id`` values this user
+    has already imported from Meta.
+
+    The import picker uses this to grey out / filter out campaigns
+    that would be a no-op duplicate.
+    """
+    stmt = select(Campaign.platform_campaign_id).where(
+        Campaign.owner_user_id == user_id,
+        Campaign.platform_campaign_id.is_not(None),
+    )
+    result = await session.execute(stmt)
+    return {str(row) for row in result.scalars().all() if row}
 
 
 async def grant_user_campaign_access(
@@ -880,3 +948,120 @@ async def revoke_user_campaign_access(
     await session.delete(row)
     await session.flush()
     return True
+
+
+# ---------------------------------------------------------------------------
+# Meta OAuth connections (Phase B)
+# ---------------------------------------------------------------------------
+
+
+async def upsert_meta_connection(
+    session: AsyncSession,
+    user_id: UUID,
+    meta_user_id: str,
+    encrypted_access_token: str,
+    token_expires_at: datetime | None,
+    scopes: list[str] | None,
+) -> UserMetaConnection:
+    """Insert or replace the Meta connection for a user.
+
+    Re-OAuth flow: a user can click "Connect Meta" again at any time
+    and the new token overwrites the old. The ``on_conflict_do_update``
+    upsert keys on ``user_id`` (PK).
+    """
+    stmt = (
+        pg_insert(UserMetaConnection)
+        .values(
+            user_id=user_id,
+            meta_user_id=meta_user_id,
+            encrypted_access_token=encrypted_access_token,
+            token_expires_at=token_expires_at,
+            scopes=scopes,
+            last_refreshed_at=func.now(),
+        )
+        .on_conflict_do_update(
+            index_elements=["user_id"],
+            set_={
+                "meta_user_id": meta_user_id,
+                "encrypted_access_token": encrypted_access_token,
+                "token_expires_at": token_expires_at,
+                "scopes": scopes,
+                "last_refreshed_at": func.now(),
+            },
+        )
+        .returning(UserMetaConnection)
+    )
+    result = await session.execute(stmt)
+    await session.flush()
+    return result.scalar_one()
+
+
+async def get_meta_connection(
+    session: AsyncSession, user_id: UUID
+) -> UserMetaConnection | None:
+    """Return the Meta connection row for a user, or None."""
+    stmt = select(UserMetaConnection).where(
+        UserMetaConnection.user_id == user_id
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+async def delete_meta_connection(
+    session: AsyncSession, user_id: UUID
+) -> bool:
+    """Delete a user's Meta connection. Returns False if there was none."""
+    stmt = select(UserMetaConnection).where(
+        UserMetaConnection.user_id == user_id
+    )
+    result = await session.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row is None:
+        return False
+    await session.delete(row)
+    await session.flush()
+    return True
+
+
+async def get_campaign_owner_id(
+    session: AsyncSession, campaign_id: UUID
+) -> UUID | None:
+    """Return the ``owner_user_id`` for a campaign, or None.
+
+    Used by :mod:`src.adapters.meta_factory` to route a cycle to the
+    right user's Meta token. None means "no owner yet — legacy
+    campaign, use the global-token fallback".
+    """
+    stmt = select(Campaign.owner_user_id).where(Campaign.id == campaign_id)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
+
+
+# ---------------------------------------------------------------------------
+# Magic-link single-use enforcement
+# ---------------------------------------------------------------------------
+
+
+async def consume_magic_link_token(
+    session: AsyncSession, token_hash: str
+) -> bool:
+    """Atomically mark a magic-link token hash as consumed.
+
+    Returns ``True`` if this is the *first* time the hash has been seen
+    (the caller may proceed to sign the user in), ``False`` if the hash
+    has already been consumed (the caller must reject the request as
+    ``invalid_link``).
+
+    The insert is ``ON CONFLICT DO NOTHING`` so concurrent verify
+    requests for the same token race cleanly: whichever insert actually
+    inserts wins, every other observer sees zero affected rows.
+    """
+    stmt = (
+        pg_insert(MagicLinkConsumed)
+        .values(token_hash=token_hash)
+        .on_conflict_do_nothing(index_elements=["token_hash"])
+    )
+    result = await session.execute(stmt)
+    await session.flush()
+    # ``rowcount`` is 1 when the insert actually wrote a row, 0 on conflict.
+    return (result.rowcount or 0) > 0

@@ -40,6 +40,16 @@ class MetaAdapter(BaseAdapter):
     The ``facebook-business`` SDK is synchronous, so all SDK calls
     are dispatched to a thread-pool executor via ``asyncio.to_thread``
     to keep the event loop free.
+
+    **Tokens are per-user and short-lived.** After Phase C, the
+    access token passed to ``__init__`` is always the decrypted
+    long-lived token of a single app user — never a global operator
+    token. Construct a fresh ``MetaAdapter`` at the start of each
+    cycle via :mod:`src.adapters.meta_factory` and discard it when
+    the cycle ends. Never cache an instance across users or across
+    cycles; ``FacebookAdsApi.init`` mutates process-global SDK
+    state, and cached instances will silently leak token identity
+    across concurrent users.
     """
 
     def __init__(
@@ -474,6 +484,59 @@ class MetaAdapter(BaseAdapter):
     # ------------------------------------------------------------------
     # Discovery & historical import
     # ------------------------------------------------------------------
+
+    async def list_campaigns(self) -> list[dict[str, object]]:
+        """List every campaign in the ad account.
+
+        Used by the Phase D self-serve import flow: the user picks
+        which of their existing Meta campaigns to bring into the
+        system. Only the fields needed to populate a picker row are
+        returned — name, status, daily budget, created timestamp.
+        """
+        logger.info("Listing campaigns in Meta account %s", self._ad_account_id)
+
+        from facebook_business.adobjects.campaign import Campaign
+
+        def _list() -> list[dict[str, object]]:
+            campaigns = self._account.get_campaigns(
+                fields=[
+                    Campaign.Field.id,
+                    Campaign.Field.name,
+                    Campaign.Field.status,
+                    Campaign.Field.daily_budget,
+                    Campaign.Field.created_time,
+                    Campaign.Field.objective,
+                ],
+            )
+            results: list[dict[str, object]] = []
+            for c in campaigns:
+                raw_budget = c.get("daily_budget")
+                # Meta returns daily_budget in the account's currency
+                # minor units (e.g. cents) as a string. Normalise to
+                # a float in major units so the UI doesn't have to
+                # care about currency precision.
+                daily_budget: float | None = None
+                if raw_budget not in (None, ""):
+                    try:
+                        daily_budget = float(raw_budget) / 100.0
+                    except (TypeError, ValueError):
+                        daily_budget = None
+
+                results.append(
+                    {
+                        "meta_campaign_id": str(c["id"]),
+                        "name": c.get("name", ""),
+                        "status": c.get("status", "UNKNOWN"),
+                        "daily_budget": daily_budget,
+                        "created_time": c.get("created_time"),
+                        "objective": c.get("objective", ""),
+                    }
+                )
+            return results
+
+        campaigns_list: list[dict[str, object]] = await self._run_sync(partial(_list))  # type: ignore[assignment]
+        logger.info("Found %d campaigns in Meta account", len(campaigns_list))
+        return campaigns_list
 
     async def list_campaign_ads(self, campaign_id: str) -> list[dict[str, object]]:
         """List all ads in a Meta campaign with their creative details.

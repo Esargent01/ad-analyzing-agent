@@ -25,27 +25,21 @@ def _configure_logging() -> None:
 
 
 def _get_adapter(platform: str):
-    """Return the appropriate adapter for the given platform.
+    """Return an adapter for a non-Meta platform.
 
-    Falls back to MockAdapter when real API credentials are not configured.
+    Meta adapters now route through
+    :func:`src.adapters.meta_factory.get_meta_adapter_for_campaign`
+    so callers can honour per-user OAuth tokens. This helper is
+    kept only for ``google_ads`` and the mock fallback — calling it
+    with ``platform == "meta"`` falls through to the mock adapter
+    and emits a warning, which is the safe default for dev boxes
+    without Google Ads credentials.
     """
     from src.adapters.mock import MockAdapter
 
     settings = get_settings()
 
-    if platform == "meta":
-        if settings.meta_access_token and not settings.meta_access_token.startswith("placeholder"):
-            from src.adapters.meta import MetaAdapter
-
-            return MetaAdapter(
-                app_id=settings.meta_app_id,
-                app_secret=settings.meta_app_secret,
-                access_token=settings.meta_access_token,
-                ad_account_id=settings.meta_ad_account_id,
-                page_id=settings.meta_page_id,
-                landing_page_url=settings.meta_landing_page_url,
-            )
-    elif platform == "google_ads":
+    if platform == "google_ads":
         if settings.google_ads_developer_token and not settings.google_ads_developer_token.startswith("placeholder"):
             from src.adapters.google_ads import GoogleAdsAdapter
 
@@ -56,6 +50,11 @@ def _get_adapter(platform: str):
                 refresh_token=settings.google_ads_refresh_token,
                 customer_id=settings.google_ads_customer_id,
             )
+    elif platform == "meta":
+        click.echo(
+            "  Warning: _get_adapter called with platform='meta'; "
+            "meta callers should use meta_factory instead. Falling back to MockAdapter."
+        )
 
     # Default: mock adapter for development / unrecognized platforms
     click.echo(f"  Using MockAdapter for platform '{platform}' (no real credentials configured)")
@@ -99,13 +98,17 @@ def run_cycle(campaign_id: str, with_generate: bool, legacy_no_generate: bool) -
     async def _run() -> None:
         from sqlalchemy import text as sa_text
 
+        from src.adapters.meta_factory import get_meta_adapter_for_campaign
         from src.db.engine import _get_session_factory, close_db, get_session, init_db
+        from src.exceptions import MetaConnectionMissing, MetaTokenExpired
         from src.services.orchestrator import Orchestrator
 
         settings = get_settings()
         await init_db()
 
-        # Look up campaign platform to select the right adapter
+        # Resolve the adapter inside the session so the factory can
+        # read the campaign's owner (Phase C) and fetch the owning
+        # user's encrypted token.
         async with get_session() as session:
             row = await session.execute(
                 sa_text("SELECT platform FROM campaigns WHERE id = :id"),
@@ -118,7 +121,24 @@ def run_cycle(campaign_id: str, with_generate: bool, legacy_no_generate: bool) -
                 return
             platform = str(result[0])
 
-        adapter = _get_adapter(platform)
+            if platform == "meta":
+                try:
+                    adapter = await get_meta_adapter_for_campaign(
+                        session, UUID(campaign_id)
+                    )
+                except MetaConnectionMissing as exc:
+                    click.echo(f"Error: {exc}")
+                    await close_db()
+                    return
+                except MetaTokenExpired as exc:
+                    click.echo(
+                        f"Error: {exc}\nThe campaign owner must reconnect Meta in the dashboard."
+                    )
+                    await close_db()
+                    return
+            else:
+                adapter = _get_adapter(platform)
+
         session_factory = _get_session_factory()
         orchestrator = Orchestrator(
             adapter=adapter,
@@ -133,6 +153,126 @@ def run_cycle(campaign_id: str, with_generate: bool, legacy_no_generate: bool) -
         if report.errors:
             for phase, err in report.errors.items():
                 click.echo(f"  Error in {phase}: {err[:200]}")
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@cli.command(name="run-all-user-campaigns")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="List every candidate campaign without running a cycle.",
+)
+@click.option(
+    "--with-generate",
+    is_flag=True,
+    default=False,
+    help="Also run the generate + deploy phases for each campaign.",
+)
+def run_all_user_campaigns(dry_run: bool, with_generate: bool) -> None:
+    """Run a monitoring cycle for every active, user-owned campaign.
+
+    This is the daily cron entry point for the self-serve era — it
+    fans out across every campaign that has an ``owner_user_id``
+    and is still ``is_active = TRUE``, running them sequentially
+    with per-campaign error isolation.
+
+    One failed campaign does not stop the batch. At the end a
+    concise summary is printed: attempted / succeeded / failed.
+    """
+
+    async def _run() -> None:
+        from sqlalchemy import select
+
+        from src.adapters.meta_factory import get_meta_adapter_for_campaign
+        from src.db.engine import _get_session_factory, close_db, get_session, init_db
+        from src.db.tables import Campaign
+        from src.exceptions import MetaConnectionMissing, MetaTokenExpired
+        from src.services.orchestrator import Orchestrator
+
+        settings = get_settings()
+        await init_db()
+
+        async with get_session() as session:
+            stmt = (
+                select(Campaign)
+                .where(
+                    Campaign.is_active.is_(True),
+                    Campaign.owner_user_id.is_not(None),
+                )
+                .order_by(Campaign.name)
+            )
+            result = await session.execute(stmt)
+            campaigns = list(result.scalars().all())
+
+        if not campaigns:
+            click.echo("No user-owned active campaigns found.")
+            await close_db()
+            return
+
+        click.echo(
+            f"Found {len(campaigns)} user-owned active campaign"
+            f"{'' if len(campaigns) == 1 else 's'}:"
+        )
+        for c in campaigns:
+            click.echo(f"  - {c.name} ({c.id})")
+
+        if dry_run:
+            click.echo("Dry run — no cycles executed.")
+            await close_db()
+            return
+
+        session_factory = _get_session_factory()
+        attempted = 0
+        succeeded = 0
+        failed: list[tuple[str, str]] = []
+
+        for campaign in campaigns:
+            attempted += 1
+            click.echo(f"\n→ Running cycle for {campaign.name} ({campaign.id})")
+            try:
+                async with get_session() as adapter_session:
+                    try:
+                        adapter = await get_meta_adapter_for_campaign(
+                            adapter_session, campaign.id
+                        )
+                    except (MetaConnectionMissing, MetaTokenExpired) as exc:
+                        click.echo(f"  ! skipped: {exc}")
+                        failed.append((str(campaign.id), str(exc)))
+                        continue
+
+                orchestrator = Orchestrator(
+                    adapter=adapter,
+                    session_factory=session_factory,
+                    settings=settings,
+                )
+                report = await orchestrator.run_cycle(
+                    campaign.id, skip_generate=not with_generate
+                )
+                succeeded += 1
+                click.echo(
+                    f"  ✓ cycle #{report.cycle_number} phase={report.phase_reached}"
+                )
+                if report.errors:
+                    for phase, err in report.errors.items():
+                        click.echo(f"    warning in {phase}: {err[:140]}")
+            except Exception as exc:  # noqa: BLE001
+                logger = logging.getLogger(__name__)
+                logger.exception("run-all-user-campaigns: cycle failed for %s", campaign.id)
+                click.echo(f"  ✗ error: {exc}")
+                failed.append((str(campaign.id), str(exc)))
+
+        click.echo(
+            f"\nSummary: {attempted} attempted, {succeeded} succeeded, "
+            f"{len(failed)} failed."
+        )
+        if failed:
+            click.echo("Failures:")
+            for cid, err in failed:
+                click.echo(f"  {cid}: {err[:200]}")
+
         await close_db()
 
     asyncio.run(_run())
@@ -738,8 +878,9 @@ def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | Non
 
         from sqlalchemy import text as sa_text
 
-        from src.adapters.meta import MetaAdapter
+        from src.adapters.meta_factory import get_meta_adapter_for_campaign
         from src.db.engine import close_db, get_session, init_db
+        from src.exceptions import MetaConnectionMissing, MetaTokenExpired
 
         settings = get_settings()
         await init_db()
@@ -774,21 +915,25 @@ def import_meta_ads(campaign_id: str, date_preset: str, ad_account_id: str | Non
                 await close_db()
                 return
 
-            # 2. Connect to Meta
-            if not settings.meta_access_token or settings.meta_access_token.startswith("placeholder"):
-                click.echo("Error: Meta API credentials not configured in .env")
+            # 2. Resolve adapter through the per-user factory (falls back
+            # to the global token for legacy campaigns without an owner).
+            try:
+                adapter = await get_meta_adapter_for_campaign(
+                    session, UUID(campaign_id)
+                )
+            except (MetaConnectionMissing, MetaTokenExpired) as exc:
+                click.echo(f"Error: {exc}")
                 await close_db()
                 return
 
-            effective_ad_account = ad_account_id or settings.meta_ad_account_id
-            adapter = MetaAdapter(
-                app_id=settings.meta_app_id,
-                app_secret=settings.meta_app_secret,
-                access_token=settings.meta_access_token,
-                ad_account_id=effective_ad_account,
-                page_id=settings.meta_page_id,
-                landing_page_url=settings.meta_landing_page_url,
-            )
+            # Optional per-invocation override of the ad account so
+            # operators can target a different account than the
+            # owner's default (useful for legacy support).
+            if ad_account_id:
+                from facebook_business.adobjects.adaccount import AdAccount
+
+                adapter._ad_account_id = ad_account_id  # type: ignore[attr-defined]
+                adapter._account = AdAccount(ad_account_id)  # type: ignore[attr-defined]
 
             # 3. List all ads in the campaign
             click.echo(f"\nDiscovering ads in Meta campaign {platform_campaign_id}...")
@@ -1089,8 +1234,9 @@ def sync_media_library(campaign_id: str, asset_type: str, ad_account_id: str | N
 
         from sqlalchemy import text as sa_text
 
-        from src.adapters.meta import MetaAdapter
+        from src.adapters.meta_factory import get_meta_adapter_for_campaign
         from src.db.engine import close_db, get_session, init_db
+        from src.exceptions import MetaConnectionMissing, MetaTokenExpired
 
         settings = get_settings()
         await init_db()
@@ -1112,22 +1258,25 @@ def sync_media_library(campaign_id: str, asset_type: str, ad_account_id: str | N
                 await close_db()
                 return
 
-            # Connect to Meta
-            if not settings.meta_access_token or settings.meta_access_token.startswith("placeholder"):
-                click.echo("Error: Meta API credentials not configured.")
+            # Resolve adapter through the per-user factory.
+            try:
+                adapter = await get_meta_adapter_for_campaign(
+                    session, UUID(campaign_id)
+                )
+            except (MetaConnectionMissing, MetaTokenExpired) as exc:
+                click.echo(f"Error: {exc}")
                 await close_db()
                 return
 
-            effective_account = ad_account_id or settings.meta_ad_account_id
-            adapter = MetaAdapter(
-                app_id=settings.meta_app_id,
-                app_secret=settings.meta_app_secret,
-                access_token=settings.meta_access_token,
-                ad_account_id=effective_account,
-                page_id=settings.meta_page_id,
-                landing_page_url=settings.meta_landing_page_url,
-            )
+            # Optional override: caller can point at a different
+            # ad account than the one baked into the adapter.
+            if ad_account_id:
+                from facebook_business.adobjects.adaccount import AdAccount
 
+                adapter._ad_account_id = ad_account_id  # type: ignore[attr-defined]
+                adapter._account = AdAccount(ad_account_id)  # type: ignore[attr-defined]
+
+            effective_account = ad_account_id or settings.meta_ad_account_id
             click.echo(f"\nFetching {asset_type} assets from Meta account {effective_account}...")
             assets = await adapter.list_media_library(asset_type=asset_type)
 
@@ -1631,7 +1780,25 @@ def approve_yes(approval_id: str | None, approve_all: bool, deploy_now: bool, ca
                 )
                 campaign = campaign_row.scalar_one_or_none()
                 if campaign:
-                    adapter = _get_adapter(campaign.platform.value)
+                    if campaign.platform.value == "meta":
+                        from src.adapters.meta_factory import (
+                            get_meta_adapter_for_campaign,
+                        )
+                        from src.exceptions import (
+                            MetaConnectionMissing,
+                            MetaTokenExpired,
+                        )
+
+                        try:
+                            adapter = await get_meta_adapter_for_campaign(
+                                session, deploy_campaign_id
+                            )
+                        except (MetaConnectionMissing, MetaTokenExpired) as exc:
+                            click.echo(f"Error: {exc}")
+                            await close_db()
+                            return
+                    else:
+                        adapter = _get_adapter(campaign.platform.value)
                     results = await deploy_approved_variants(session, adapter, deploy_campaign_id)
                     click.echo(f"Deployed {len(results)} variant(s).")
                 else:

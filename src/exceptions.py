@@ -63,3 +63,53 @@ class DeploymentError(AdAgentError):
 
 class ApprovalRequiredError(AdAgentError):
     """Variant requires human approval before deployment."""
+
+
+class MetaConnectionMissing(AdAgentError):
+    """The user has no Meta OAuth connection on file.
+
+    Raised by ``src.adapters.meta_factory`` when a cycle tries to
+    resolve a MetaAdapter for a campaign whose owner has never
+    completed the Connect Meta flow (or has disconnected since).
+    The orchestrator catches this, skips the cycle, and surfaces
+    "owner must reconnect" in the UI / daily report.
+    """
+
+
+class MetaTokenExpired(AdAgentError):
+    """The user's long-lived Meta token is past its expiry.
+
+    Meta's long-lived tokens last ~60 days. Phase C does not
+    refresh them automatically — instead the factory raises this
+    so the orchestrator can skip the cycle and email the owner
+    with a reconnect prompt. Phase G is the planned home for an
+    automatic refresh job.
+    """
+
+
+class CampaignCapExceeded(AdAgentError):
+    """User already owns the maximum number of active campaigns.
+
+    Raised by the Phase D import flow when a user tries to import
+    campaign N+1 past ``settings.max_campaigns_per_user``. The cap
+    protects the monthly LLM + Meta API spend bound per user —
+    it's deliberately low (default 5) and tunable.
+    """
+
+    def __init__(self, current: int, maximum: int) -> None:
+        self.current = current
+        self.maximum = maximum
+        super().__init__(
+            f"Campaign cap reached: you already own {current} of {maximum} "
+            "campaigns. Retire one before importing another."
+        )
+
+
+class CampaignAlreadyImported(AdAgentError):
+    """The Meta campaign has already been imported by this user.
+
+    Raised by the Phase D import flow when a user tries to
+    double-import a campaign. Kept separate from
+    ``CampaignCapExceeded`` so the UI can distinguish "you can't
+    import this one" from "you can't import any more".
+    """

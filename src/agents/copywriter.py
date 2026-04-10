@@ -14,8 +14,11 @@ import anthropic
 from pydantic import BaseModel, ConfigDict
 
 from src.exceptions import LLMError
+from src.services.usage import AgentContext, log_llm_call
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from src.db.tables import ElementPerformance, GenePoolEntry
 
 logger = logging.getLogger(__name__)
@@ -80,9 +83,14 @@ class CopywriterAgent:
         self,
         api_key: str,
         model: str = "claude-sonnet-4-20250514",
+        usage_session: "AsyncSession | None" = None,
+        usage_context: AgentContext | None = None,
     ) -> None:
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model
+        # Phase E cost hooks — same opt-in pattern as the other agents.
+        self._usage_session = usage_session
+        self._usage_context = usage_context
 
     async def suggest_entries(
         self,
@@ -183,6 +191,19 @@ class CopywriterAgent:
             )
         except anthropic.APIError as exc:
             raise LLMError(f"Anthropic API error: {exc}") from exc
+
+        if self._usage_session is not None and self._usage_context is not None:
+            try:
+                await log_llm_call(
+                    self._usage_session,
+                    self._usage_context,
+                    model=self._model,
+                    input_tokens=int(response.usage.input_tokens),
+                    output_tokens=int(response.usage.output_tokens),
+                    metadata={"stop_reason": response.stop_reason},
+                )
+            except Exception as log_exc:  # noqa: BLE001
+                logger.warning("Failed to log copywriter usage: %s", log_exc)
 
         # Extract tool calls
         suggestions: list[SuggestedEntry] = []

@@ -32,8 +32,11 @@ from src.services.stats import (
     element_significance,
     has_sufficient_data,
 )
+from src.services.usage import AgentContext, log_llm_call
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from src.models.metrics import DailyRollup
     from src.models.variant import VariantResponse
 
@@ -282,9 +285,19 @@ class AnalystAgent:
         model: The Anthropic model identifier to use.
     """
 
-    def __init__(self, client: anthropic.AsyncAnthropic, model: str) -> None:
+    def __init__(
+        self,
+        client: anthropic.AsyncAnthropic,
+        model: str,
+        usage_session: "AsyncSession | None" = None,
+        usage_context: AgentContext | None = None,
+    ) -> None:
         self._client = client
         self._model = model
+        # Phase E cost-attribution hooks. See GeneratorAgent for the
+        # same pattern — both args must be set to enable logging.
+        self._usage_session = usage_session
+        self._usage_context = usage_context
 
     async def analyze_cycle(
         self,
@@ -582,6 +595,19 @@ class AnalystAgent:
             response.usage.input_tokens,
             response.usage.output_tokens,
         )
+
+        if self._usage_session is not None and self._usage_context is not None:
+            try:
+                await log_llm_call(
+                    self._usage_session,
+                    self._usage_context,
+                    model=self._model,
+                    input_tokens=int(response.usage.input_tokens),
+                    output_tokens=int(response.usage.output_tokens),
+                    metadata={"stop_reason": response.stop_reason},
+                )
+            except Exception as log_exc:  # noqa: BLE001
+                logger.warning("Failed to log analyst usage: %s", log_exc)
 
         # Extract the summary from the tool-use response
         for block in response.content:

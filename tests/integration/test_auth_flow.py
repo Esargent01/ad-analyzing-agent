@@ -62,13 +62,17 @@ def _override_session(session) -> None:
 
 
 class TestMagicLinkRequest:
-    def test_unknown_email_still_returns_204(self, client: TestClient) -> None:
-        """No enumeration: missing user and known user both 204."""
+    def setup_method(self) -> None:
+        # Per-email sliding window is process-local; clear between tests
+        # so rate-limit counters don't leak across the suite.
+        dashboard_app._email_bucket.clear()
+
+    def test_unknown_email_triggers_send_for_self_serve(
+        self, client: TestClient
+    ) -> None:
+        """Self-serve: unknown emails also receive magic links."""
         session = AsyncMock()
         with patch(
-            "src.dashboard.app.get_user_by_email",
-            new=AsyncMock(return_value=None),
-        ) as mock_lookup, patch(
             "src.dashboard.app.send_magic_link",
             new=AsyncMock(return_value=True),
         ) as mock_send:
@@ -79,18 +83,17 @@ class TestMagicLinkRequest:
             )
 
         assert response.status_code == 204
-        mock_lookup.assert_awaited_once()
-        # No email should be sent when the user doesn't exist.
-        mock_send.assert_not_awaited()
+        # Self-serve: ANY well-formed email gets a link. The user row is
+        # created lazily inside ``api_auth_verify`` on first verify.
+        mock_send.assert_awaited_once()
+        args, _ = mock_send.await_args
+        assert args[0] == "ghost@example.com"
+        assert "token=" in args[1]
 
     def test_known_email_triggers_send(self, client: TestClient) -> None:
-        user = _make_user("alice@example.com")
         session = AsyncMock()
 
         with patch(
-            "src.dashboard.app.get_user_by_email",
-            new=AsyncMock(return_value=user),
-        ), patch(
             "src.dashboard.app.send_magic_link",
             new=AsyncMock(return_value=True),
         ) as mock_send:
@@ -141,6 +144,9 @@ class TestVerifyEndpoint:
         token = create_magic_link_token("bob@example.com")
 
         with patch(
+            "src.dashboard.app.consume_magic_link_token",
+            new=AsyncMock(return_value=True),
+        ), patch(
             "src.dashboard.app.get_user_by_email",
             new=AsyncMock(return_value=user),
         ), patch(
@@ -161,14 +167,25 @@ class TestVerifyEndpoint:
         assert "session_token" in cookies
         assert "csrf_token" in cookies
 
-    def test_token_for_unknown_email_redirects_with_error(
+    def test_token_for_unknown_email_creates_user_and_signs_in(
         self, client: TestClient
     ) -> None:
+        """Self-serve: first successful verify for a new email creates the row."""
+        new_user = _make_user("nobody@example.com")
         session = AsyncMock()
         token = create_magic_link_token("nobody@example.com")
 
         with patch(
+            "src.dashboard.app.consume_magic_link_token",
+            new=AsyncMock(return_value=True),
+        ), patch(
             "src.dashboard.app.get_user_by_email",
+            new=AsyncMock(return_value=None),
+        ), patch(
+            "src.dashboard.app.create_user",
+            new=AsyncMock(return_value=new_user),
+        ) as mock_create, patch(
+            "src.dashboard.app.touch_last_login",
             new=AsyncMock(return_value=None),
         ):
             _override_session(session)
@@ -179,7 +196,32 @@ class TestVerifyEndpoint:
             )
 
         assert response.status_code == 302
+        assert "/dashboard" in response.headers["location"]
+        mock_create.assert_awaited_once()
+        assert "session_token" in response.cookies
+        assert "csrf_token" in response.cookies
+
+    def test_replayed_token_redirects_with_error(
+        self, client: TestClient
+    ) -> None:
+        """A token whose hash is already in ``magic_links_consumed`` is rejected."""
+        session = AsyncMock()
+        token = create_magic_link_token("bob@example.com")
+
+        with patch(
+            "src.dashboard.app.consume_magic_link_token",
+            new=AsyncMock(return_value=False),
+        ):
+            _override_session(session)
+            response = client.get(
+                "/api/auth/verify",
+                params={"token": token},
+                follow_redirects=False,
+            )
+
+        assert response.status_code == 302
         assert "error=invalid_link" in response.headers["location"]
+        assert "session_token" not in response.cookies
 
 
 # ---------------------------------------------------------------------------

@@ -24,6 +24,7 @@ from src.adapters.base import BaseAdapter
 from src.agents.generator import GeneratorAgent
 from src.config import Settings
 from src.db.queries import (
+    get_campaign_owner_id,
     get_element_rankings,
     get_top_interactions,
     upsert_element_interaction,
@@ -37,6 +38,7 @@ from src.services.fatigue import detect_fatigue
 from src.services.interactions import compute_interactions
 from src.services.poller import MetricsPoller, MetricsSnapshot
 from src.services.stats import compare_variants, element_significance, has_sufficient_data
+from src.services.usage import AgentContext
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +107,25 @@ class Orchestrator:
         async with self._session_factory() as session:
             cycle_number = await self._next_cycle_number(session, campaign_id)
             cycle_id = uuid.uuid4()
+
+            # Phase E: resolve the owning user once per cycle so the
+            # generator + any downstream agents can log usage under
+            # the right (user, campaign, cycle) triple. Legacy
+            # campaigns without an owner still run — they'll just
+            # log with user_id = NULL.
+            try:
+                owner_user_id = await get_campaign_owner_id(session, campaign_id)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(
+                    "Couldn't resolve owner for campaign %s: %s", campaign_id, exc
+                )
+                owner_user_id = None
+            self._current_usage_ctx = AgentContext(
+                user_id=owner_user_id,
+                campaign_id=campaign_id,
+                cycle_id=cycle_id,
+            )
+            self._current_usage_session = session
 
             # Create the test_cycles record
             await session.execute(
@@ -643,9 +664,27 @@ class Orchestrator:
             if isinstance(genome, dict) and genome not in existing_genomes:
                 existing_genomes.append(genome)
 
-        # Call the generator agent
+        # Call the generator agent. We pass the current cycle's
+        # usage context + session so the generator can log its
+        # LLM spend against the owning user. Both fall back to
+        # ``None`` for callers that bypass ``run_cycle`` (and for
+        # legacy campaigns without an owner resolved earlier).
         client = anthropic.AsyncAnthropic(api_key=self._settings.anthropic_api_key)
-        generator = GeneratorAgent(client=client, model=self._settings.anthropic_model)
+        generator = GeneratorAgent(
+            client=client,
+            model=self._settings.anthropic_model,
+            usage_session=getattr(self, "_current_usage_session", None),
+            usage_context=(
+                AgentContext(
+                    user_id=self._current_usage_ctx.user_id,
+                    campaign_id=self._current_usage_ctx.campaign_id,
+                    cycle_id=self._current_usage_ctx.cycle_id,
+                    agent="generator",
+                )
+                if getattr(self, "_current_usage_ctx", None) is not None
+                else None
+            ),
+        )
 
         try:
             results = await generator.generate_variants(

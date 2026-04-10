@@ -130,6 +130,13 @@ class Campaign(Base):
         Numeric(4, 3), nullable=False, server_default="0.950"
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
+    # Nullable until Phase F backfills legacy campaigns. Adapter
+    # factory treats NULL as "fall back to global token" during the
+    # transition; Phase F drops that fallback and makes the column
+    # NOT NULL.
+    owner_user_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
@@ -446,9 +453,9 @@ class CycleAction(Base):
 class User(Base):
     """A dashboard user authenticated via email magic link.
 
-    Users are provisioned manually (via the ``grant-access`` CLI) — there
-    is no self-serve sign-up. ``last_login_at`` is refreshed every time
-    the user verifies a magic link.
+    Users self-provision: the first successful magic-link verify for an
+    unknown email creates a user row. ``last_login_at`` is refreshed every
+    time the user verifies a magic link.
     """
 
     __tablename__ = "users"
@@ -500,6 +507,135 @@ class UserCampaign(Base):
 
     def __repr__(self) -> str:
         return f"<UserCampaign user={self.user_id} campaign={self.campaign_id}>"
+
+
+class UserMetaConnection(Base):
+    """Encrypted Meta OAuth access token for a dashboard user.
+
+    One row per app user (``user_id`` is both PK and FK). The
+    ``encrypted_access_token`` column is the output of
+    :func:`src.dashboard.crypto.encrypt_token` — the DB never stores
+    plaintext. Re-OAuth overwrites the row via
+    :func:`src.db.queries.upsert_meta_connection`.
+
+    ``token_expires_at`` is the absolute timestamp computed at exchange
+    time from Meta's relative ``expires_in``. Phase F reads it to
+    reject stale tokens at adapter construction time.
+    """
+
+    __tablename__ = "user_meta_connections"
+
+    user_id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    meta_user_id: Mapped[str] = mapped_column(Text, nullable=False)
+    encrypted_access_token: Mapped[str] = mapped_column(Text, nullable=False)
+    token_expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True)
+    )
+    scopes: Mapped[Optional[list[str]]] = mapped_column(ARRAY(Text))
+    connected_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default="now()"
+    )
+    last_refreshed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True)
+    )
+
+    __table_args__ = (
+        Index("idx_user_meta_connections_meta_user_id", "meta_user_id"),
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<UserMetaConnection user={self.user_id} "
+            f"meta={self.meta_user_id}>"
+        )
+
+
+class UsageLog(Base):
+    """One row per billable event — LLM call, Meta API hit, email.
+
+    Written by ``src.services.usage.log_llm_call`` and
+    ``log_meta_call`` after every external call. Partitioned by
+    ``recorded_at`` via a TimescaleDB hypertable (see migration
+    007) so "usage for this user in the current month" queries
+    stay cheap as row counts scale with traffic.
+
+    FK columns are nullable with ``ON DELETE SET NULL`` —
+    historical cost records survive user or campaign deletion.
+    """
+
+    __tablename__ = "usage_log"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        server_default="uuid_generate_v4()",
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        primary_key=True,
+        nullable=False,
+        server_default="now()",
+    )
+    user_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+    )
+    campaign_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("campaigns.id", ondelete="SET NULL"),
+    )
+    cycle_id: Mapped[Optional[UUID]] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("test_cycles.id", ondelete="SET NULL"),
+    )
+    service: Mapped[str] = mapped_column(Text, nullable=False)
+    agent: Mapped[Optional[str]] = mapped_column(Text)
+    model: Mapped[Optional[str]] = mapped_column(Text)
+    input_units: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    output_units: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default="0"
+    )
+    cost_usd: Mapped[Decimal] = mapped_column(
+        Numeric(12, 6), nullable=False, server_default="0"
+    )
+    metadata_json: Mapped[Optional[dict]] = mapped_column(JSONB)
+
+    def __repr__(self) -> str:
+        return (
+            f"<UsageLog service={self.service} agent={self.agent} "
+            f"cost=${self.cost_usd}>"
+        )
+
+
+class MagicLinkConsumed(Base):
+    """Ledger of already-used magic-link tokens.
+
+    ``api_auth_verify`` inserts a row here keyed by the SHA-256 hash of
+    the raw token before issuing a session cookie. An ``ON CONFLICT DO
+    NOTHING`` insert that returns zero affected rows indicates replay of
+    a previously-consumed link. Storing the hash (not the token) means a
+    leaked DB dump can't be replayed.
+    """
+
+    __tablename__ = "magic_links_consumed"
+
+    token_hash: Mapped[str] = mapped_column(Text, primary_key=True)
+    consumed_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default="now()"
+    )
+
+    __table_args__ = (
+        Index("idx_magic_links_consumed_at", "consumed_at"),
+    )
+
+    def __repr__(self) -> str:
+        return f"<MagicLinkConsumed consumed_at={self.consumed_at}>"
 
 
 class ApprovalQueueItem(Base):
