@@ -5,7 +5,6 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy import (
@@ -20,13 +19,12 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
-    String,
     Text,
     UniqueConstraint,
 )
-from sqlalchemy.dialects.postgresql import JSONB, UUID as PG_UUID
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
-
 
 # ---------------------------------------------------------------------------
 # Enums
@@ -68,6 +66,21 @@ class ActionType(str, enum.Enum):
     queue_for_approval = "queue_for_approval"
 
 
+class ApprovalActionType(str, enum.Enum):
+    """What kind of change an approval_queue row represents.
+
+    Introduced in Phase H — before then every row was implicitly a
+    ``new_variant`` proposal. Kept as a separate enum from
+    ``ActionType`` (which is the audit-log vocabulary on
+    ``cycle_actions``) so the two can evolve independently.
+    """
+
+    new_variant = "new_variant"
+    pause_variant = "pause_variant"
+    scale_budget = "scale_budget"
+    promote_winner = "promote_winner"
+
+
 # ---------------------------------------------------------------------------
 # Base
 # ---------------------------------------------------------------------------
@@ -90,14 +103,14 @@ class GenePoolEntry(Base):
     )
     slot_name: Mapped[str] = mapped_column(Text, nullable=False)
     slot_value: Mapped[str] = mapped_column(Text, nullable=False)
-    description: Mapped[Optional[str]] = mapped_column(Text)
+    description: Mapped[str | None] = mapped_column(Text)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
-    metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSONB)
-    source: Mapped[Optional[str]] = mapped_column(Text)
+    metadata_: Mapped[dict | None] = mapped_column("metadata", JSONB)
+    source: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
-    retired_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (
         UniqueConstraint("slot_name", "slot_value", name="uq_gene_pool_slot_value"),
@@ -118,7 +131,7 @@ class Campaign(Base):
     platform: Mapped[PlatformType] = mapped_column(
         Enum(PlatformType, name="platform_type", create_type=False), nullable=False
     )
-    platform_campaign_id: Mapped[Optional[str]] = mapped_column(Text)
+    platform_campaign_id: Mapped[str | None] = mapped_column(Text)
     daily_budget: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     max_concurrent_variants: Mapped[int] = mapped_column(
         Integer, nullable=False, server_default="10"
@@ -134,7 +147,7 @@ class Campaign(Base):
     # factory treats NULL as "fall back to global token" during the
     # transition; Phase F drops that fallback and makes the column
     # NOT NULL.
-    owner_user_id: Mapped[Optional[UUID]] = mapped_column(
+    owner_user_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )
     # Phase G — per-campaign Meta tenancy. ``meta_ad_account_id`` and
@@ -143,9 +156,9 @@ class Campaign(Base):
     # are nullable on the Python side so future non-Meta platforms
     # aren't dragged in. ``landing_page_url`` is genuinely optional
     # — the import flow treats it as a per-product free-text field.
-    meta_ad_account_id: Mapped[Optional[str]] = mapped_column(Text)
-    meta_page_id: Mapped[Optional[str]] = mapped_column(Text)
-    landing_page_url: Mapped[Optional[str]] = mapped_column(Text)
+    meta_ad_account_id: Mapped[str | None] = mapped_column(Text)
+    meta_page_id: Mapped[str | None] = mapped_column(Text)
+    landing_page_url: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
@@ -154,14 +167,12 @@ class Campaign(Base):
     )
 
     # Relationships
-    variants: Mapped[list["Variant"]] = relationship(back_populates="campaign", lazy="selectin")
-    test_cycles: Mapped[list["TestCycle"]] = relationship(
+    variants: Mapped[list[Variant]] = relationship(back_populates="campaign", lazy="selectin")
+    test_cycles: Mapped[list[TestCycle]] = relationship(back_populates="campaign", lazy="selectin")
+    element_performances: Mapped[list[ElementPerformance]] = relationship(
         back_populates="campaign", lazy="selectin"
     )
-    element_performances: Mapped[list["ElementPerformance"]] = relationship(
-        back_populates="campaign", lazy="selectin"
-    )
-    element_interactions: Mapped[list["ElementInteraction"]] = relationship(
+    element_interactions: Mapped[list[ElementInteraction]] = relationship(
         back_populates="campaign", lazy="selectin"
     )
 
@@ -186,23 +197,21 @@ class Variant(Base):
         server_default="draft",
     )
     generation: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
-    parent_ids: Mapped[Optional[list[UUID]]] = mapped_column(
+    parent_ids: Mapped[list[UUID] | None] = mapped_column(
         ARRAY(PG_UUID(as_uuid=True)), server_default="{}"
     )
-    hypothesis: Mapped[Optional[str]] = mapped_column(Text)
+    hypothesis: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
-    deployed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    paused_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    retired_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    deployed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    retired_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Relationships
     campaign: Mapped[Campaign] = relationship(back_populates="variants")
-    deployments: Mapped[list["Deployment"]] = relationship(
-        back_populates="variant", lazy="selectin"
-    )
-    metrics: Mapped[list["Metric"]] = relationship(back_populates="variant", lazy="selectin")
+    deployments: Mapped[list[Deployment]] = relationship(back_populates="variant", lazy="selectin")
+    metrics: Mapped[list[Metric]] = relationship(back_populates="variant", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("campaign_id", "variant_code", name="uq_variant_campaign_code"),
@@ -227,7 +236,7 @@ class Deployment(Base):
         Enum(PlatformType, name="platform_type", create_type=False), nullable=False
     )
     platform_ad_id: Mapped[str] = mapped_column(Text, nullable=False)
-    platform_adset_id: Mapped[Optional[str]] = mapped_column(Text)
+    platform_adset_id: Mapped[str | None] = mapped_column(Text)
     daily_budget: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
@@ -239,7 +248,7 @@ class Deployment(Base):
 
     # Relationships
     variant: Mapped[Variant] = relationship(back_populates="deployments")
-    metrics: Mapped[list["Metric"]] = relationship(back_populates="deployment", lazy="selectin")
+    metrics: Mapped[list[Metric]] = relationship(back_populates="deployment", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("platform", "platform_ad_id", name="uq_deployment_platform_ad"),
@@ -308,14 +317,14 @@ class ElementPerformance(Base):
     slot_name: Mapped[str] = mapped_column(Text, nullable=False)
     slot_value: Mapped[str] = mapped_column(Text, nullable=False)
     variants_tested: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-    avg_ctr: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 5))
-    avg_cpa: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4))
-    best_ctr: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 5))
-    worst_ctr: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 5))
+    avg_ctr: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    avg_cpa: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
+    best_ctr: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    worst_ctr: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
     total_impressions: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
     total_conversions: Mapped[int] = mapped_column(BigInteger, nullable=False, server_default="0")
-    confidence: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
-    last_tested_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    last_tested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
@@ -348,11 +357,11 @@ class ElementInteraction(Base):
     slot_b_name: Mapped[str] = mapped_column(Text, nullable=False)
     slot_b_value: Mapped[str] = mapped_column(Text, nullable=False)
     variants_tested: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
-    combined_avg_ctr: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 5))
-    solo_a_avg_ctr: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 5))
-    solo_b_avg_ctr: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 5))
-    interaction_lift: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 4))
-    confidence: Mapped[Optional[Decimal]] = mapped_column(Numeric(5, 2))
+    combined_avg_ctr: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    solo_a_avg_ctr: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    solo_b_avg_ctr: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    interaction_lift: Mapped[Decimal | None] = mapped_column(Numeric(8, 4))
+    confidence: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
@@ -402,20 +411,20 @@ class TestCycle(Base):
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
-    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    variants_active: Mapped[Optional[int]] = mapped_column(Integer)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    variants_active: Mapped[int | None] = mapped_column(Integer)
     variants_launched: Mapped[int] = mapped_column(Integer, server_default="0")
     variants_paused: Mapped[int] = mapped_column(Integer, server_default="0")
     variants_promoted: Mapped[int] = mapped_column(Integer, server_default="0")
-    total_spend: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2))
-    avg_ctr: Mapped[Optional[Decimal]] = mapped_column(Numeric(8, 5))
-    avg_cpa: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 4))
-    summary_text: Mapped[Optional[str]] = mapped_column(Text)
-    error_log: Mapped[Optional[str]] = mapped_column(Text)
+    total_spend: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    avg_ctr: Mapped[Decimal | None] = mapped_column(Numeric(8, 5))
+    avg_cpa: Mapped[Decimal | None] = mapped_column(Numeric(10, 4))
+    summary_text: Mapped[str | None] = mapped_column(Text)
+    error_log: Mapped[str | None] = mapped_column(Text)
 
     # Relationships
     campaign: Mapped[Campaign] = relationship(back_populates="test_cycles")
-    actions: Mapped[list["CycleAction"]] = relationship(back_populates="cycle", lazy="selectin")
+    actions: Mapped[list[CycleAction]] = relationship(back_populates="cycle", lazy="selectin")
 
     __table_args__ = (
         UniqueConstraint("campaign_id", "cycle_number", name="uq_cycle_campaign_number"),
@@ -435,20 +444,20 @@ class CycleAction(Base):
     cycle_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("test_cycles.id"), nullable=False
     )
-    variant_id: Mapped[Optional[UUID]] = mapped_column(
+    variant_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("variants.id")
     )
     action: Mapped[ActionType] = mapped_column(
         Enum(ActionType, name="action_type", create_type=False), nullable=False
     )
-    details: Mapped[Optional[dict]] = mapped_column(JSONB)
+    details: Mapped[dict | None] = mapped_column(JSONB)
     executed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
 
     # Relationships
     cycle: Mapped[TestCycle] = relationship(back_populates="actions")
-    variant: Mapped[Optional[Variant]] = relationship()
+    variant: Mapped[Variant | None] = relationship()
 
     __table_args__ = (
         Index("idx_actions_cycle", "cycle_id"),
@@ -476,7 +485,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
-    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
 
     __table_args__ = (
@@ -539,8 +548,8 @@ class UserMetaConnection(Base):
     )
     meta_user_id: Mapped[str] = mapped_column(Text, nullable=False)
     encrypted_access_token: Mapped[str] = mapped_column(Text, nullable=False)
-    token_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    scopes: Mapped[Optional[list[str]]] = mapped_column(ARRAY(Text))
+    token_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    scopes: Mapped[list[str] | None] = mapped_column(ARRAY(Text))
     # Phase G — enumerated at OAuth callback time, one Graph API
     # roundtrip per connection. Stored as JSONB so the shape of
     # ``MetaAdAccountInfo`` / ``MetaPageInfo`` can evolve without a
@@ -555,12 +564,12 @@ class UserMetaConnection(Base):
     )
     # Auto-picked when the user has exactly one account / Page. If
     # they have many, NULL here and the import UI forces a choice.
-    default_ad_account_id: Mapped[Optional[str]] = mapped_column(Text)
-    default_page_id: Mapped[Optional[str]] = mapped_column(Text)
+    default_ad_account_id: Mapped[str | None] = mapped_column(Text)
+    default_page_id: Mapped[str | None] = mapped_column(Text)
     connected_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
-    last_refreshed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
+    last_refreshed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     __table_args__ = (Index("idx_user_meta_connections_meta_user_id", "meta_user_id"),)
 
@@ -594,25 +603,25 @@ class UsageLog(Base):
         nullable=False,
         server_default="now()",
     )
-    user_id: Mapped[Optional[UUID]] = mapped_column(
+    user_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
     )
-    campaign_id: Mapped[Optional[UUID]] = mapped_column(
+    campaign_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("campaigns.id", ondelete="SET NULL"),
     )
-    cycle_id: Mapped[Optional[UUID]] = mapped_column(
+    cycle_id: Mapped[UUID | None] = mapped_column(
         PG_UUID(as_uuid=True),
         ForeignKey("test_cycles.id", ondelete="SET NULL"),
     )
     service: Mapped[str] = mapped_column(Text, nullable=False)
-    agent: Mapped[Optional[str]] = mapped_column(Text)
-    model: Mapped[Optional[str]] = mapped_column(Text)
+    agent: Mapped[str | None] = mapped_column(Text)
+    model: Mapped[str | None] = mapped_column(Text)
     input_units: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     output_units: Mapped[int] = mapped_column(Integer, nullable=False, server_default="0")
     cost_usd: Mapped[Decimal] = mapped_column(Numeric(12, 6), nullable=False, server_default="0")
-    metadata_json: Mapped[Optional[dict]] = mapped_column(JSONB)
+    metadata_json: Mapped[dict | None] = mapped_column(JSONB)
 
     def __repr__(self) -> str:
         return f"<UsageLog service={self.service} agent={self.agent} cost=${self.cost_usd}>"
@@ -647,28 +656,62 @@ class ApprovalQueueItem(Base):
     id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), primary_key=True, server_default="uuid_generate_v4()"
     )
-    variant_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("variants.id"), nullable=False
+    # Phase H: nullable because pause/scale proposals don't own a
+    # variant row — they reference an existing deployment via the
+    # ``action_payload['deployment_id']`` key. The partial CHECK
+    # constraint on the table guarantees variant_id is still
+    # present for ``new_variant`` / ``promote_winner`` rows.
+    variant_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True), ForeignKey("variants.id")
     )
     campaign_id: Mapped[UUID] = mapped_column(
         PG_UUID(as_uuid=True), ForeignKey("campaigns.id"), nullable=False
     )
     genome_snapshot: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    hypothesis: Mapped[Optional[str]] = mapped_column(Text)
+    hypothesis: Mapped[str | None] = mapped_column(Text)
+    # Phase H: what kind of change this row is proposing. Defaults
+    # to ``new_variant`` so pre-Phase-H rows keep their meaning
+    # after the upgrade.
+    action_type: Mapped[ApprovalActionType] = mapped_column(
+        Enum(
+            ApprovalActionType,
+            name="approval_action_type",
+            create_type=False,
+        ),
+        nullable=False,
+        server_default="new_variant",
+    )
+    # Phase H: structured evidence + target pointers for
+    # non-variant actions. Shape is documented per action_type on
+    # the Pydantic models in ``src/models/approvals.py``.
+    action_payload: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
     submitted_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
-    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-    reviewer: Mapped[Optional[str]] = mapped_column(Text)
-    approved: Mapped[Optional[bool]] = mapped_column(Boolean)
-    rejection_reason: Mapped[Optional[str]] = mapped_column(Text)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewer: Mapped[str | None] = mapped_column(Text)
+    approved: Mapped[bool | None] = mapped_column(Boolean)
+    rejection_reason: Mapped[str | None] = mapped_column(Text)
+    # Phase H: stamped by the approval executor once it has
+    # actually pushed the side-effect to Meta. Gap between
+    # ``approved=TRUE`` and ``executed_at IS NOT NULL`` is the
+    # window where the DB says yes but the mutation hasn't
+    # landed; the approve handler uses it for double-click
+    # idempotency.
+    executed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Relationships
-    variant: Mapped[Variant] = relationship()
+    variant: Mapped[Variant | None] = relationship()
     campaign: Mapped[Campaign] = relationship()
 
     __table_args__ = (
         Index("idx_approval_pending", "campaign_id", postgresql_where="approved IS NULL"),
+        Index(
+            "idx_approval_pending_by_type",
+            "campaign_id",
+            "action_type",
+            postgresql_where="approved IS NULL",
+        ),
     )
 
     def __repr__(self) -> str:

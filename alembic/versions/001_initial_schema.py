@@ -5,17 +5,19 @@ Revises: None
 Create Date: 2026-04-05
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "001_initial"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -55,12 +57,19 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     op.create_table(
         "gene_pool",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
+        sa.Column(
+            "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        ),
         sa.Column("slot_name", sa.Text(), nullable=False),
         sa.Column("slot_value", sa.Text(), nullable=False),
         sa.Column("description", sa.Text(), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.Column("retired_at", sa.DateTime(timezone=True), nullable=True),
         sa.UniqueConstraint("slot_name", "slot_value", name="uq_gene_pool_slot_value"),
     )
@@ -76,17 +85,47 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     op.create_table(
         "campaigns",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
+        sa.Column(
+            "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        ),
         sa.Column("name", sa.Text(), nullable=False),
-        sa.Column("platform", sa.Enum("meta", "google_ads", "tiktok", "linkedin", name="platform_type", create_type=False), nullable=False),
+        sa.Column(
+            "platform",
+            sa.Enum(
+                "meta", "google_ads", "tiktok", "linkedin", name="platform_type", create_type=False
+            ),
+            nullable=False,
+        ),
         sa.Column("platform_campaign_id", sa.Text(), nullable=True),
         sa.Column("daily_budget", sa.Numeric(10, 2), nullable=False),
-        sa.Column("max_concurrent_variants", sa.Integer(), nullable=False, server_default=sa.text("10")),
-        sa.Column("min_impressions_for_significance", sa.Integer(), nullable=False, server_default=sa.text("1000")),
-        sa.Column("confidence_threshold", sa.Numeric(4, 3), nullable=False, server_default=sa.text("0.950")),
+        sa.Column(
+            "max_concurrent_variants", sa.Integer(), nullable=False, server_default=sa.text("10")
+        ),
+        sa.Column(
+            "min_impressions_for_significance",
+            sa.Integer(),
+            nullable=False,
+            server_default=sa.text("1000"),
+        ),
+        sa.Column(
+            "confidence_threshold",
+            sa.Numeric(4, 3),
+            nullable=False,
+            server_default=sa.text("0.950"),
+        ),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
     )
 
     # ------------------------------------------------------------------
@@ -94,15 +133,38 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     op.create_table(
         "variants",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
+        sa.Column(
+            "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        ),
         sa.Column("campaign_id", UUID(as_uuid=True), sa.ForeignKey("campaigns.id"), nullable=False),
         sa.Column("variant_code", sa.Text(), nullable=False),
         sa.Column("genome", JSONB(), nullable=False),
-        sa.Column("status", sa.Enum("draft", "pending", "active", "paused", "winner", "retired", name="variant_status", create_type=False), nullable=False, server_default=sa.text("'draft'")),
+        sa.Column(
+            "status",
+            sa.Enum(
+                "draft",
+                "pending",
+                "active",
+                "paused",
+                "winner",
+                "retired",
+                name="variant_status",
+                create_type=False,
+            ),
+            nullable=False,
+            server_default=sa.text("'draft'"),
+        ),
         sa.Column("generation", sa.Integer(), nullable=False, server_default=sa.text("1")),
-        sa.Column("parent_ids", sa.ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'::uuid[]")),
+        sa.Column(
+            "parent_ids", sa.ARRAY(UUID(as_uuid=True)), server_default=sa.text("'{}'::uuid[]")
+        ),
         sa.Column("hypothesis", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.Column("deployed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("paused_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("retired_at", sa.DateTime(timezone=True), nullable=True),
@@ -122,15 +184,33 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     op.create_table(
         "deployments",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
+        sa.Column(
+            "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        ),
         sa.Column("variant_id", UUID(as_uuid=True), sa.ForeignKey("variants.id"), nullable=False),
-        sa.Column("platform", sa.Enum("meta", "google_ads", "tiktok", "linkedin", name="platform_type", create_type=False), nullable=False),
+        sa.Column(
+            "platform",
+            sa.Enum(
+                "meta", "google_ads", "tiktok", "linkedin", name="platform_type", create_type=False
+            ),
+            nullable=False,
+        ),
         sa.Column("platform_ad_id", sa.Text(), nullable=False),
         sa.Column("platform_adset_id", sa.Text(), nullable=True),
         sa.Column("daily_budget", sa.Numeric(10, 2), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.UniqueConstraint("platform", "platform_ad_id", name="uq_deployment_platform_ad"),
     )
     op.create_index("idx_deployments_variant", "deployments", ["variant_id"])
@@ -148,7 +228,9 @@ def upgrade() -> None:
         "metrics",
         sa.Column("recorded_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("variant_id", UUID(as_uuid=True), sa.ForeignKey("variants.id"), nullable=False),
-        sa.Column("deployment_id", UUID(as_uuid=True), sa.ForeignKey("deployments.id"), nullable=False),
+        sa.Column(
+            "deployment_id", UUID(as_uuid=True), sa.ForeignKey("deployments.id"), nullable=False
+        ),
         sa.Column("impressions", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("clicks", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column("conversions", sa.Integer(), nullable=False, server_default=sa.text("0")),
@@ -209,7 +291,9 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     op.create_table(
         "element_performance",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
+        sa.Column(
+            "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        ),
         sa.Column("campaign_id", UUID(as_uuid=True), sa.ForeignKey("campaigns.id"), nullable=False),
         sa.Column("slot_name", sa.Text(), nullable=False),
         sa.Column("slot_value", sa.Text(), nullable=False),
@@ -218,12 +302,23 @@ def upgrade() -> None:
         sa.Column("avg_cpa", sa.Numeric(10, 4), nullable=True),
         sa.Column("best_ctr", sa.Numeric(8, 5), nullable=True),
         sa.Column("worst_ctr", sa.Numeric(8, 5), nullable=True),
-        sa.Column("total_impressions", sa.BigInteger(), nullable=False, server_default=sa.text("0")),
-        sa.Column("total_conversions", sa.BigInteger(), nullable=False, server_default=sa.text("0")),
+        sa.Column(
+            "total_impressions", sa.BigInteger(), nullable=False, server_default=sa.text("0")
+        ),
+        sa.Column(
+            "total_conversions", sa.BigInteger(), nullable=False, server_default=sa.text("0")
+        ),
         sa.Column("confidence", sa.Numeric(5, 2), nullable=True),
         sa.Column("last_tested_at", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
-        sa.UniqueConstraint("campaign_id", "slot_name", "slot_value", name="uq_element_perf_campaign_slot"),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
+        sa.UniqueConstraint(
+            "campaign_id", "slot_name", "slot_value", name="uq_element_perf_campaign_slot"
+        ),
     )
     op.create_index("idx_element_perf_slot", "element_performance", ["campaign_id", "slot_name"])
 
@@ -232,7 +327,9 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     op.create_table(
         "element_interactions",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
+        sa.Column(
+            "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        ),
         sa.Column("campaign_id", UUID(as_uuid=True), sa.ForeignKey("campaigns.id"), nullable=False),
         sa.Column("slot_a_name", sa.Text(), nullable=False),
         sa.Column("slot_a_value", sa.Text(), nullable=False),
@@ -244,9 +341,18 @@ def upgrade() -> None:
         sa.Column("solo_b_avg_ctr", sa.Numeric(8, 5), nullable=True),
         sa.Column("interaction_lift", sa.Numeric(8, 4), nullable=True),
         sa.Column("confidence", sa.Numeric(5, 2), nullable=True),
-        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.UniqueConstraint(
-            "campaign_id", "slot_a_name", "slot_a_value", "slot_b_name", "slot_b_value",
+            "campaign_id",
+            "slot_a_name",
+            "slot_a_value",
+            "slot_b_name",
+            "slot_b_value",
             name="uq_interaction_pair",
         ),
         sa.CheckConstraint(
@@ -265,11 +371,32 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     op.create_table(
         "test_cycles",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
+        sa.Column(
+            "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        ),
         sa.Column("campaign_id", UUID(as_uuid=True), sa.ForeignKey("campaigns.id"), nullable=False),
         sa.Column("cycle_number", sa.Integer(), nullable=False),
-        sa.Column("phase", sa.Enum("monitor", "analyze", "generate", "deploy", "report", "complete", name="cycle_phase", create_type=False), nullable=False, server_default=sa.text("'monitor'")),
-        sa.Column("started_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "phase",
+            sa.Enum(
+                "monitor",
+                "analyze",
+                "generate",
+                "deploy",
+                "report",
+                "complete",
+                name="cycle_phase",
+                create_type=False,
+            ),
+            nullable=False,
+            server_default=sa.text("'monitor'"),
+        ),
+        sa.Column(
+            "started_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.Column("completed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("variants_active", sa.Integer(), nullable=True),
         sa.Column("variants_launched", sa.Integer(), server_default=sa.text("0")),
@@ -282,21 +409,39 @@ def upgrade() -> None:
         sa.Column("error_log", sa.Text(), nullable=True),
         sa.UniqueConstraint("campaign_id", "cycle_number", name="uq_cycle_campaign_number"),
     )
-    op.execute(
-        "CREATE INDEX idx_cycles_campaign ON test_cycles (campaign_id, cycle_number DESC)"
-    )
+    op.execute("CREATE INDEX idx_cycles_campaign ON test_cycles (campaign_id, cycle_number DESC)")
 
     # ------------------------------------------------------------------
     # 10. cycle_actions
     # ------------------------------------------------------------------
     op.create_table(
         "cycle_actions",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
+        sa.Column(
+            "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        ),
         sa.Column("cycle_id", UUID(as_uuid=True), sa.ForeignKey("test_cycles.id"), nullable=False),
         sa.Column("variant_id", UUID(as_uuid=True), sa.ForeignKey("variants.id"), nullable=True),
-        sa.Column("action", sa.Enum("launch", "pause", "increase_budget", "decrease_budget", "retire", "promote_winner", name="action_type", create_type=False), nullable=False),
+        sa.Column(
+            "action",
+            sa.Enum(
+                "launch",
+                "pause",
+                "increase_budget",
+                "decrease_budget",
+                "retire",
+                "promote_winner",
+                name="action_type",
+                create_type=False,
+            ),
+            nullable=False,
+        ),
         sa.Column("details", JSONB(), nullable=True),
-        sa.Column("executed_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "executed_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
     )
     op.create_index("idx_actions_cycle", "cycle_actions", ["cycle_id"])
     op.create_index("idx_actions_variant", "cycle_actions", ["variant_id"])
@@ -306,12 +451,19 @@ def upgrade() -> None:
     # ------------------------------------------------------------------
     op.create_table(
         "approval_queue",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")),
+        sa.Column(
+            "id", UUID(as_uuid=True), primary_key=True, server_default=sa.text("uuid_generate_v4()")
+        ),
         sa.Column("variant_id", UUID(as_uuid=True), sa.ForeignKey("variants.id"), nullable=False),
         sa.Column("campaign_id", UUID(as_uuid=True), sa.ForeignKey("campaigns.id"), nullable=False),
         sa.Column("genome_snapshot", JSONB(), nullable=False),
         sa.Column("hypothesis", sa.Text(), nullable=True),
-        sa.Column("submitted_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.text("now()")),
+        sa.Column(
+            "submitted_at",
+            sa.DateTime(timezone=True),
+            nullable=False,
+            server_default=sa.text("now()"),
+        ),
         sa.Column("reviewed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("reviewer", sa.Text(), nullable=True),
         sa.Column("approved", sa.Boolean(), nullable=True),

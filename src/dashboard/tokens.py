@@ -17,7 +17,7 @@ import base64
 import hashlib
 import hmac
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from src.config import get_settings
@@ -42,7 +42,7 @@ def create_review_token(campaign_id: UUID, ttl_days: int | None = None) -> str:
     """
     settings = get_settings()
     ttl = ttl_days if ttl_days is not None else settings.review_token_ttl_days
-    expires_at = int((datetime.now(timezone.utc) + timedelta(days=ttl)).timestamp())
+    expires_at = int((datetime.now(UTC) + timedelta(days=ttl)).timestamp())
     payload = f"{campaign_id}:{expires_at}"
     signature = _sign(payload, settings.review_token_secret)
     raw = f"{payload}:{signature}"
@@ -79,7 +79,7 @@ def verify_review_token(token: str) -> UUID | None:
         logger.debug("Invalid review token expiry")
         return None
 
-    if datetime.now(timezone.utc).timestamp() > expires_at:
+    if datetime.now(UTC).timestamp() > expires_at:
         logger.debug("Expired review token")
         return None
 

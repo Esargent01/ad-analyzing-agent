@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
@@ -42,7 +42,7 @@ class TestReviewTokens:
         # Create token with TTL of 1 day, then simulate 2 days passing
         token = create_review_token(campaign_id, ttl_days=1)
 
-        future = datetime.now(timezone.utc) + timedelta(days=2)
+        future = datetime.now(UTC) + timedelta(days=2)
 
         class _FakeDatetime(datetime):
             @classmethod

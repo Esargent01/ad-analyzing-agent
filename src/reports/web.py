@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import date, datetime, timezone
-from decimal import Decimal
+from datetime import UTC, date, datetime
 from pathlib import Path
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
@@ -82,7 +81,7 @@ def render_daily_report_v2(report: DailyReport) -> Path:
         campaign_name=report.campaign_name,
         report_date=report.report_date.isoformat(),
         report_date_fmt=report.report_date.strftime("%B %d, %Y"),
-        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+        generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
         base_url=settings.report_base_url,
         day_number=report.day_number,
         cycle_number=report.cycle_number,
@@ -144,7 +143,7 @@ def render_daily_report(report: WeeklyReport, campaign_name: str, report_date: d
         campaign_name=campaign_name,
         report_date=report_date.isoformat(),
         report_date_fmt=report_date.strftime("%B %d, %Y"),
-        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+        generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
         base_url=settings.report_base_url,
         # Metrics
         total_impressions=report.total_impressions,
@@ -196,7 +195,7 @@ def render_weekly_report(report: WeeklyReport, campaign_name: str, week_label: s
         week_label=week_label,
         week_start=report.week_start.isoformat(),
         week_end=report.week_end.isoformat(),
-        generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+        generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
         base_url=settings.report_base_url,
         # Activity
         cycles_run=report.cycles_run,

@@ -8,9 +8,7 @@ session and using the MockAdapter for platform calls.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 

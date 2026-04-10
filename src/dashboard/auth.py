@@ -25,7 +25,7 @@ import hashlib
 import hmac
 import logging
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from src.config import get_settings
@@ -71,7 +71,7 @@ def create_magic_link_token(email: str, ttl_minutes: int | None = None) -> str:
     """
     settings = get_settings()
     ttl = ttl_minutes if ttl_minutes is not None else settings.auth_magic_link_ttl_minutes
-    expires_at = int((datetime.now(timezone.utc) + timedelta(minutes=ttl)).timestamp())
+    expires_at = int((datetime.now(UTC) + timedelta(minutes=ttl)).timestamp())
 
     payload = f"{_MAGIC_LINK_PREFIX}:{email}:{expires_at}"
     signature = _sign(payload, settings.auth_session_secret)
@@ -119,7 +119,7 @@ def verify_magic_link_token(token: str) -> str | None:
         logger.debug("Invalid magic-link token expiry")
         return None
 
-    if datetime.now(timezone.utc).timestamp() > expires_at:
+    if datetime.now(UTC).timestamp() > expires_at:
         logger.debug("Expired magic-link token")
         return None
 
@@ -139,7 +139,7 @@ def create_session_token(user_id: UUID, ttl_days: int | None = None) -> str:
     """
     settings = get_settings()
     ttl = ttl_days if ttl_days is not None else settings.auth_session_ttl_days
-    expires_at = int((datetime.now(timezone.utc) + timedelta(days=ttl)).timestamp())
+    expires_at = int((datetime.now(UTC) + timedelta(days=ttl)).timestamp())
 
     payload = f"{_SESSION_PREFIX}:{user_id}:{expires_at}"
     signature = _sign(payload, settings.auth_session_secret)
@@ -175,7 +175,7 @@ def verify_session_token(token: str) -> UUID | None:
         logger.debug("Invalid session token expiry")
         return None
 
-    if datetime.now(timezone.utc).timestamp() > expires_at:
+    if datetime.now(UTC).timestamp() > expires_at:
         logger.debug("Expired session token")
         return None
 
@@ -224,7 +224,7 @@ def create_oauth_state_token(user_id: UUID, ttl_minutes: int = 10) -> str:
     open for an hour.
     """
     settings = get_settings()
-    expires_at = int((datetime.now(timezone.utc) + timedelta(minutes=ttl_minutes)).timestamp())
+    expires_at = int((datetime.now(UTC) + timedelta(minutes=ttl_minutes)).timestamp())
     payload = f"{_OAUTH_STATE_PREFIX}:{user_id}:{expires_at}"
     signature = _sign(payload, settings.auth_session_secret)
     return _encode(f"{payload}:{signature}")
@@ -260,7 +260,7 @@ def verify_oauth_state_token(token: str) -> UUID | None:
         logger.debug("Invalid oauth state expiry")
         return None
 
-    if datetime.now(timezone.utc).timestamp() > expires_at:
+    if datetime.now(UTC).timestamp() > expires_at:
         logger.debug("Expired oauth state")
         return None
 

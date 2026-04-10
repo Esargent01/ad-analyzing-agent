@@ -26,7 +26,6 @@ from src.dashboard.auth import verify_session_token
 from src.db.engine import get_session
 from src.db.tables import User, UserCampaign
 
-
 # ---------------------------------------------------------------------------
 # DB session
 # ---------------------------------------------------------------------------

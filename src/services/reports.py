@@ -17,7 +17,7 @@ and are reused here — do not duplicate them.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -76,10 +76,10 @@ async def build_weekly_report(
     if week_end is None:
         week_end = week_start + timedelta(days=6)
 
-    week_start_ts = datetime(week_start.year, week_start.month, week_start.day, tzinfo=timezone.utc)
-    week_end_ts = datetime(
-        week_end.year, week_end.month, week_end.day, tzinfo=timezone.utc
-    ) + timedelta(days=1)
+    week_start_ts = datetime(week_start.year, week_start.month, week_start.day, tzinfo=UTC)
+    week_end_ts = datetime(week_end.year, week_end.month, week_end.day, tzinfo=UTC) + timedelta(
+        days=1
+    )
 
     campaign_name = await _get_campaign_name(session, campaign_id)
 
@@ -160,7 +160,7 @@ async def build_daily_report(
         Fully populated ``DailyReport`` including the best-variant spotlight
         (funnel, diagnostics, projection) and previous-day trend comparisons.
     """
-    day_start = datetime(report_day.year, report_day.month, report_day.day, tzinfo=timezone.utc)
+    day_start = datetime(report_day.year, report_day.month, report_day.day, tzinfo=UTC)
     day_end = day_start + timedelta(days=1)
 
     campaign_name = await _get_campaign_name(session, campaign_id)
@@ -174,7 +174,7 @@ async def build_daily_report(
     genome_map = await _variant_genome_map(session, campaign_id)
 
     prev_day = report_day - timedelta(days=1)
-    prev_start = datetime(prev_day.year, prev_day.month, prev_day.day, tzinfo=timezone.utc)
+    prev_start = datetime(prev_day.year, prev_day.month, prev_day.day, tzinfo=UTC)
     prev_end = prev_start + timedelta(days=1)
     prev_totals = await _previous_day_totals(session, campaign_id, prev_start, prev_end)
 

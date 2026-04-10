@@ -13,7 +13,7 @@ import logging
 import traceback
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 
 import anthropic
@@ -27,6 +27,8 @@ from src.db.queries import (
     get_campaign_owner_id,
     get_element_rankings,
     get_top_interactions,
+    queue_pause_proposal,
+    queue_scale_proposal,
     upsert_element_interaction,
     upsert_element_performance,
 )
@@ -135,7 +137,7 @@ class Orchestrator:
                     "id": cycle_id,
                     "campaign_id": campaign_id,
                     "cycle_number": cycle_number,
-                    "started_at": datetime.now(timezone.utc),
+                    "started_at": datetime.now(UTC),
                 },
             )
             await session.flush()
@@ -415,7 +417,23 @@ class Orchestrator:
         campaign_id: uuid.UUID,
         variant_data: list[_VariantData],
     ) -> list[CycleAction]:
-        """Pause losers, promote winners, and reallocate budgets via Thompson sampling."""
+        """Propose pause/scale/promote actions — never mutate Meta directly.
+
+        Phase H: this function used to call ``self._adapter.pause_ad``
+        and ``self._adapter.update_budget`` inline. Those calls are
+        gone. Every would-be mutation is now queued as a row in
+        ``approval_queue`` and the user has to approve it from the
+        ``/experiments`` page before the deployer service actually
+        pushes anything to Meta. The only side-effects this function
+        has are DB writes (approval_queue + cycle_actions audit log).
+
+        Every propose-step also writes a ``queue_for_approval``
+        cycle_action row via the returned ``CycleAction`` list so the
+        audit trail shows "at 12:00 UTC the agent thought variant V7
+        was a statistically significant loser and queued a pause
+        proposal for human review". No mysterious Meta state changes
+        without a trail.
+        """
         actions: list[CycleAction] = []
 
         if len(variant_data) < 2:
@@ -444,6 +462,12 @@ class Orchestrator:
             else self._settings.confidence_threshold
         )
 
+        # Track which variants we've already queued a pause proposal for
+        # so the fatigue branch doesn't stack a second proposal on top
+        # of the stats branch in the same cycle. has_open_proposal()
+        # would dedupe eventually but we'd rather not even insert.
+        proposed_pauses: set[uuid.UUID] = set()
+
         # Run significance tests
         for variant in variant_data:
             if variant.variant_id == baseline.variant_id:
@@ -464,7 +488,11 @@ class Orchestrator:
             baseline_ctr = baseline.clicks / baseline.impressions if baseline.impressions > 0 else 0
 
             if is_significant and variant_ctr > baseline_ctr:
-                # Winner: promote
+                # Winner: this is a pure DB state flip (mark winner)
+                # — promoting doesn't touch Meta on its own, so it's
+                # safe to do inline. If we later add "pause losers
+                # when a winner is promoted" as a side-effect, that
+                # gets queued too.
                 await session.execute(
                     text("UPDATE variants SET status = 'winner' WHERE id = :id"),
                     {"id": variant.variant_id},
@@ -482,60 +510,81 @@ class Orchestrator:
                     )
                 )
             elif is_significant and variant_ctr < baseline_ctr:
-                # Significant loser: pause
-                await session.execute(
-                    text("UPDATE variants SET status = 'paused', paused_at = NOW() WHERE id = :id"),
-                    {"id": variant.variant_id},
+                # Significant loser: queue a pause proposal (NOT an
+                # immediate pause). The user must approve from the
+                # dashboard before the deployer actually hits Meta.
+                evidence = {
+                    "reason": "statistically_significant_loser",
+                    "z_score": round(z_score, 4),
+                    "p_value": round(p_value, 6),
+                    "variant_ctr": round(variant_ctr, 5),
+                    "baseline_ctr": round(baseline_ctr, 5),
+                    "impressions": variant.impressions,
+                    "clicks": variant.clicks,
+                }
+                proposal_id = await self._queue_pause_for_variant(
+                    session,
+                    campaign_id=campaign_id,
+                    variant=variant,
+                    reason="statistically_significant_loser",
+                    evidence=evidence,
                 )
-                await self._adapter.pause_ad(
-                    await self._get_platform_ad_id(session, variant.variant_id)
-                )
-                actions.append(
-                    CycleAction(
-                        variant_id=variant.variant_id,
-                        action="pause",
-                        details={
-                            "reason": "statistically_significant_underperformer",
-                            "z_score": round(z_score, 4),
-                            "p_value": round(p_value, 6),
-                            "variant_ctr": round(variant_ctr, 5),
-                            "baseline_ctr": round(baseline_ctr, 5),
-                        },
-                    )
-                )
-
-            # Check for fatigue on variants with enough data
-            if has_sufficient_data(variant.impressions, min_impressions):
-                daily_ctrs = await self._get_daily_ctrs(session, variant.variant_id)
-                fatigue_result = detect_fatigue(daily_ctrs)
-                if fatigue_result.is_fatigued:
-                    await session.execute(
-                        text(
-                            "UPDATE variants SET status = 'paused', paused_at = NOW() WHERE id = :id"
-                        ),
-                        {"id": variant.variant_id},
-                    )
-                    await self._adapter.pause_ad(
-                        await self._get_platform_ad_id(session, variant.variant_id)
-                    )
+                if proposal_id is not None:
+                    proposed_pauses.add(variant.variant_id)
                     actions.append(
                         CycleAction(
                             variant_id=variant.variant_id,
-                            action="pause",
+                            action="queue_for_approval",
                             details={
-                                "reason": "audience_fatigue",
-                                "consecutive_decline_days": fatigue_result.consecutive_decline_days,
-                                "trend_slope": round(fatigue_result.trend_slope, 6),
+                                "proposal_id": str(proposal_id),
+                                "action_type": "pause_variant",
+                                **evidence,
                             },
                         )
                     )
 
-        # Reallocate budgets for remaining active variants via Thompson sampling
-        still_active = [
-            v
-            for v in variant_data
-            if v.variant_id not in {a.variant_id for a in actions if a.action == "pause"}
-        ]
+            # Check for fatigue on variants with enough data — but only
+            # if we haven't already queued a pause proposal for this
+            # variant in the stats branch above.
+            if (
+                has_sufficient_data(variant.impressions, min_impressions)
+                and variant.variant_id not in proposed_pauses
+            ):
+                daily_ctrs = await self._get_daily_ctrs(session, variant.variant_id)
+                fatigue_result = detect_fatigue(daily_ctrs)
+                if fatigue_result.is_fatigued:
+                    evidence = {
+                        "reason": "audience_fatigue",
+                        "consecutive_decline_days": fatigue_result.consecutive_decline_days,
+                        "trend_slope": round(fatigue_result.trend_slope, 6),
+                    }
+                    proposal_id = await self._queue_pause_for_variant(
+                        session,
+                        campaign_id=campaign_id,
+                        variant=variant,
+                        reason="audience_fatigue",
+                        evidence=evidence,
+                    )
+                    if proposal_id is not None:
+                        proposed_pauses.add(variant.variant_id)
+                        actions.append(
+                            CycleAction(
+                                variant_id=variant.variant_id,
+                                action="queue_for_approval",
+                                details={
+                                    "proposal_id": str(proposal_id),
+                                    "action_type": "pause_variant",
+                                    **evidence,
+                                },
+                            )
+                        )
+
+        # Thompson sampling budget reallocation — also propose-only
+        # now. We compute the new allocations, skip variants with a
+        # pending pause proposal (no point proposing to scale
+        # something we're proposing to pause), and queue a scale
+        # proposal per meaningful change.
+        still_active = [v for v in variant_data if v.variant_id not in proposed_pauses]
 
         if len(still_active) >= 2:
             campaign_budget_row = await session.execute(
@@ -549,28 +598,113 @@ class Orchestrator:
                 allocations = allocate_budgets(thompson_input, total_budget)
 
                 for variant_id, new_budget in allocations.items():
-                    platform_ad_id = await self._get_platform_ad_id(session, variant_id)
-                    await self._adapter.update_budget(platform_ad_id, float(new_budget))
-                    await session.execute(
-                        text(
-                            "UPDATE deployments SET daily_budget = :budget, updated_at = NOW() WHERE variant_id = :vid AND is_active = TRUE"
-                        ),
-                        {"budget": new_budget, "vid": variant_id},
+                    variant = next((v for v in still_active if v.variant_id == variant_id), None)
+                    if variant is None:
+                        continue
+
+                    deployment_info = await self._get_deployment_for_variant(session, variant_id)
+                    if deployment_info is None:
+                        continue
+                    deployment_id, platform_ad_id, current_budget = deployment_info
+
+                    # Skip if the new budget is within 5% of the current
+                    # — not worth pinging the user with a trivial change.
+                    current = Decimal(str(current_budget))
+                    delta = abs(new_budget - current)
+                    if current > 0 and delta / current < Decimal("0.05"):
+                        continue
+
+                    evidence = {
+                        "allocation_method": "thompson_sampling",
+                        "impressions": variant.impressions,
+                        "clicks": variant.clicks,
+                    }
+                    proposal_id = await queue_scale_proposal(
+                        session,
+                        campaign_id=campaign_id,
+                        deployment_id=deployment_id,
+                        platform_ad_id=platform_ad_id,
+                        current_budget=current,
+                        proposed_budget=new_budget,
+                        evidence=evidence,
+                        genome_snapshot=variant.genome,
                     )
-                    actions.append(
-                        CycleAction(
-                            variant_id=variant_id,
-                            action="increase_budget"
-                            if new_budget > Decimal("0")
-                            else "decrease_budget",
-                            details={
-                                "new_budget": float(new_budget),
-                                "allocation_method": "thompson_sampling",
-                            },
+                    if proposal_id is not None:
+                        actions.append(
+                            CycleAction(
+                                variant_id=variant_id,
+                                action="queue_for_approval",
+                                details={
+                                    "proposal_id": str(proposal_id),
+                                    "action_type": "scale_budget",
+                                    "current_budget": float(current),
+                                    "proposed_budget": float(new_budget),
+                                    **evidence,
+                                },
+                            )
                         )
-                    )
 
         return actions
+
+    async def _queue_pause_for_variant(
+        self,
+        session: AsyncSession,
+        *,
+        campaign_id: uuid.UUID,
+        variant: _VariantData,
+        reason: str,
+        evidence: dict,
+    ) -> uuid.UUID | None:
+        """Look up the variant's live deployment and queue a pause proposal.
+
+        Returns the new approval_queue row id, or ``None`` if the
+        variant has no active deployment (shouldn't happen for an
+        active variant but we'd rather skip cleanly than raise) or if
+        an open pause proposal already exists (dedupe).
+        """
+        deployment_info = await self._get_deployment_for_variant(session, variant.variant_id)
+        if deployment_info is None:
+            logger.warning(
+                "Variant %s has no active deployment; skipping pause proposal",
+                variant.variant_id,
+            )
+            return None
+        deployment_id, platform_ad_id, _ = deployment_info
+        return await queue_pause_proposal(
+            session,
+            campaign_id=campaign_id,
+            deployment_id=deployment_id,
+            platform_ad_id=platform_ad_id,
+            reason=reason,
+            evidence=evidence,
+            genome_snapshot=variant.genome,
+        )
+
+    async def _get_deployment_for_variant(
+        self, session: AsyncSession, variant_id: uuid.UUID
+    ) -> tuple[uuid.UUID, str, float] | None:
+        """Return (deployment_id, platform_ad_id, daily_budget) for the variant's active deployment.
+
+        Phase H replacement for ``_get_platform_ad_id`` — callers now
+        want the deployment row id (so the approval payload can
+        reference it) *and* the current budget (so scale proposals can
+        record old → new). Returns ``None`` if the variant has no
+        active deployment.
+        """
+        result = await session.execute(
+            text(
+                """
+                SELECT id, platform_ad_id, daily_budget FROM deployments
+                WHERE variant_id = :variant_id AND is_active = TRUE
+                LIMIT 1
+                """
+            ),
+            {"variant_id": variant_id},
+        )
+        row = result.fetchone()
+        if row is None:
+            return None
+        return (row[0], str(row[1]), float(row[2] or 0))
 
     async def _phase_generate(
         self,
@@ -945,7 +1079,6 @@ class Orchestrator:
 
     async def _load_gene_pool(self, session: AsyncSession) -> GenePool:
         """Load the gene pool from the database and build a GenePool model."""
-        from src.models.genome import GenePoolEntry as GenePoolEntryModel
 
         rows = await session.execute(
             text(

@@ -23,10 +23,10 @@ import pytest
 
 from src.db.tables import UsageLog
 from src.services.usage import (
+    PRICING,
     SERVICE_LLM,
     SERVICE_META,
     AgentContext,
-    PRICING,
     calculate_llm_cost,
     log_llm_call,
     log_meta_call,

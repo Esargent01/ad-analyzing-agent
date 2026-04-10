@@ -283,7 +283,7 @@ class AnalystAgent:
         self,
         client: anthropic.AsyncAnthropic,
         model: str,
-        usage_session: "AsyncSession | None" = None,
+        usage_session: AsyncSession | None = None,
         usage_context: AgentContext | None = None,
     ) -> None:
         self._client = client

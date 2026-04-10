@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from src.agents.generator import GenomeWithHypothesis
+from src.db.tables import ApprovalActionType
 from src.exceptions import LLMError
 from src.models.genome import GenePool
 from src.services.weekly import (
@@ -162,12 +163,14 @@ class TestRunWeeklyGeneration:
         missing_res.fetchone.return_value = None
         session.execute = AsyncMock(return_value=missing_res)
 
-        with patch(
-            "src.services.weekly.expire_stale_proposals",
-            new=AsyncMock(return_value=0),
+        with (
+            patch(
+                "src.services.weekly.expire_stale_proposals",
+                new=AsyncMock(return_value=0),
+            ),
+            patch("src.services.weekly.get_settings", return_value=_make_settings()),
         ):
-            with patch("src.services.weekly.get_settings", return_value=_make_settings()):
-                expired, paused = await run_weekly_generation(session, campaign_id)
+            expired, paused = await run_weekly_generation(session, campaign_id)
 
         assert expired == 0
         assert paused is False
@@ -325,7 +328,7 @@ class TestLoadProposedVariants:
     @pytest.mark.asyncio
     async def test_classifies_fresh_as_new_and_old_as_expiring(self) -> None:
         campaign_id = uuid.uuid4()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         v_new = uuid.uuid4()
         v_old = uuid.uuid4()
 
@@ -336,6 +339,8 @@ class TestLoadProposedVariants:
                 submitted_at=now - timedelta(days=2),
                 genome_snapshot=_valid_genome(),
                 hypothesis="recent",
+                action_type=ApprovalActionType.new_variant,
+                action_payload={},
             ),
             SimpleNamespace(
                 id=uuid.uuid4(),
@@ -343,6 +348,8 @@ class TestLoadProposedVariants:
                 submitted_at=now - timedelta(days=10),
                 genome_snapshot=_valid_genome(),
                 hypothesis="stale",
+                action_type=ApprovalActionType.new_variant,
+                action_payload={},
             ),
         ]
 

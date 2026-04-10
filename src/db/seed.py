@@ -6,7 +6,6 @@ import json
 import logging
 from pathlib import Path
 
-from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 

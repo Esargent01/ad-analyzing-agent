@@ -57,22 +57,26 @@ class TestEncryptRoundTrip:
 
 class TestFailureModes:
     def test_missing_key_raises(self) -> None:
-        with patch.object(
-            crypto,
-            "get_settings",
-            return_value=type("S", (), {"meta_token_encryption_key": ""})(),
+        with (
+            patch.object(
+                crypto,
+                "get_settings",
+                return_value=type("S", (), {"meta_token_encryption_key": ""})(),
+            ),
+            pytest.raises(crypto.MetaTokenCryptoError, match="not set"),
         ):
-            with pytest.raises(crypto.MetaTokenCryptoError, match="not set"):
-                crypto.encrypt_token("anything")
+            crypto.encrypt_token("anything")
 
     def test_malformed_key_raises(self) -> None:
-        with patch.object(
-            crypto,
-            "get_settings",
-            return_value=type("S", (), {"meta_token_encryption_key": "not-a-fernet-key"})(),
+        with (
+            patch.object(
+                crypto,
+                "get_settings",
+                return_value=type("S", (), {"meta_token_encryption_key": "not-a-fernet-key"})(),
+            ),
+            pytest.raises(crypto.MetaTokenCryptoError, match="not a valid"),
         ):
-            with pytest.raises(crypto.MetaTokenCryptoError, match="not a valid"):
-                crypto.encrypt_token("anything")
+            crypto.encrypt_token("anything")
 
     def test_decrypt_with_wrong_key_raises(self) -> None:
         key_a = _fresh_key()
@@ -87,13 +91,15 @@ class TestFailureModes:
         crypto._get_fernet.cache_clear()
         key_b = _fresh_key()
         assert key_a != key_b
-        with patch.object(
-            crypto,
-            "get_settings",
-            return_value=type("S", (), {"meta_token_encryption_key": key_b})(),
+        with (
+            patch.object(
+                crypto,
+                "get_settings",
+                return_value=type("S", (), {"meta_token_encryption_key": key_b})(),
+            ),
+            pytest.raises(crypto.MetaTokenCryptoError, match="failed to decrypt"),
         ):
-            with pytest.raises(crypto.MetaTokenCryptoError, match="failed to decrypt"):
-                crypto.decrypt_token(cipher)
+            crypto.decrypt_token(cipher)
 
     def test_empty_plaintext_rejected(self) -> None:
         key = _fresh_key()

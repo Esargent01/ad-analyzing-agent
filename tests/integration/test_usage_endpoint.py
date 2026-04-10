@@ -16,11 +16,11 @@ a Postgres / TimescaleDB instance.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
@@ -28,7 +28,6 @@ from fastapi.testclient import TestClient
 from src.dashboard import app as dashboard_app
 from src.dashboard.auth import create_session_token
 from src.dashboard.deps import get_db_session
-
 
 # ---------------------------------------------------------------------------
 # Test client + session-stub helpers
@@ -295,7 +294,7 @@ class TestDefaultWindow:
         assert response.status_code == 200
         body = response.json()
 
-        today = datetime.now(timezone.utc).date()
+        today = datetime.now(UTC).date()
         expected_from = today - timedelta(days=29)
         assert body["from_date"] == expected_from.isoformat()
         assert body["to_date"] == today.isoformat()

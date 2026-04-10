@@ -6,6 +6,7 @@ import asyncio
 import json
 import logging
 import sys
+from datetime import UTC
 from decimal import Decimal
 from uuid import UUID
 
@@ -172,16 +173,31 @@ def run_cycle(campaign_id: str, with_generate: bool, legacy_no_generate: bool) -
     default=False,
     help="Also run the generate + deploy phases for each campaign.",
 )
-def run_all_user_campaigns(dry_run: bool, with_generate: bool) -> None:
+@click.option(
+    "--concurrency",
+    default=3,
+    type=int,
+    help="Max number of campaigns to process concurrently (default 3).",
+)
+def run_all_user_campaigns(dry_run: bool, with_generate: bool, concurrency: int) -> None:
     """Run a monitoring cycle for every active, user-owned campaign.
 
-    This is the daily cron entry point for the self-serve era — it
-    fans out across every campaign that has an ``owner_user_id``
-    and is still ``is_active = TRUE``, running them sequentially
-    with per-campaign error isolation.
+    This is the daily cron entry point for the self-serve era. Fans
+    out across every ``owner_user_id IS NOT NULL`` campaign that is
+    still ``is_active = TRUE``, with per-campaign error isolation so
+    one failure never stops the batch.
 
-    One failed campaign does not stop the batch. At the end a
-    concise summary is printed: attempted / succeeded / failed.
+    Phase H: the loop is bounded by ``asyncio.Semaphore(concurrency)``
+    so we don't hammer Meta's rate limits during fan-out, and the
+    orchestrator now runs propose-only — the "act" phase queues
+    proposals to ``approval_queue`` instead of mutating Meta. Users
+    approve from the dashboard; the cron never pauses an ad.
+
+    Expired-token handling: campaigns whose owner's Meta token has
+    expired are skipped with a clear "skipped" log line and the user
+    receives a "reconnect Meta" email from the next
+    ``send-approval-digests`` pass. We don't spam them from this
+    command directly.
     """
 
     async def _run() -> None:
@@ -226,38 +242,53 @@ def run_all_user_campaigns(dry_run: bool, with_generate: bool) -> None:
             return
 
         session_factory = _get_session_factory()
-        attempted = 0
-        succeeded = 0
-        failed: list[tuple[str, str]] = []
+        sem = asyncio.Semaphore(max(1, concurrency))
+        logger = logging.getLogger(__name__)
 
-        for campaign in campaigns:
-            attempted += 1
-            click.echo(f"\n→ Running cycle for {campaign.name} ({campaign.id})")
-            try:
-                async with get_session() as adapter_session:
-                    try:
-                        adapter = await get_meta_adapter_for_campaign(adapter_session, campaign.id)
-                    except (MetaConnectionMissing, MetaTokenExpired) as exc:
-                        click.echo(f"  ! skipped: {exc}")
-                        failed.append((str(campaign.id), str(exc)))
-                        continue
+        async def _one(campaign: Campaign) -> tuple[str, str | None]:
+            """Run one campaign under the semaphore. Never raises.
 
-                orchestrator = Orchestrator(
-                    adapter=adapter,
-                    session_factory=session_factory,
-                    settings=settings,
-                )
-                report = await orchestrator.run_cycle(campaign.id, skip_generate=not with_generate)
-                succeeded += 1
-                click.echo(f"  ✓ cycle #{report.cycle_number} phase={report.phase_reached}")
-                if report.errors:
-                    for phase, err in report.errors.items():
-                        click.echo(f"    warning in {phase}: {err[:140]}")
-            except Exception as exc:  # noqa: BLE001
-                logger = logging.getLogger(__name__)
-                logger.exception("run-all-user-campaigns: cycle failed for %s", campaign.id)
-                click.echo(f"  ✗ error: {exc}")
-                failed.append((str(campaign.id), str(exc)))
+            Returns ``(campaign_id, error_message or None)`` so the
+            gather caller can tally successes/failures.
+            """
+            async with sem:
+                click.echo(f"\n→ Running cycle for {campaign.name} ({campaign.id})")
+                try:
+                    async with get_session() as adapter_session:
+                        try:
+                            adapter = await get_meta_adapter_for_campaign(
+                                adapter_session, campaign.id
+                            )
+                        except (MetaConnectionMissing, MetaTokenExpired) as exc:
+                            click.echo(f"  ! skipped: {exc}")
+                            return (str(campaign.id), f"skipped: {exc}")
+
+                    orchestrator = Orchestrator(
+                        adapter=adapter,
+                        session_factory=session_factory,
+                        settings=settings,
+                    )
+                    report = await orchestrator.run_cycle(
+                        campaign.id, skip_generate=not with_generate
+                    )
+                    click.echo(
+                        f"  ✓ {campaign.name}: cycle #{report.cycle_number} "
+                        f"phase={report.phase_reached}"
+                    )
+                    if report.errors:
+                        for phase, err in report.errors.items():
+                            click.echo(f"    warning in {phase}: {err[:140]}")
+                    return (str(campaign.id), None)
+                except Exception as exc:  # noqa: BLE001
+                    logger.exception("run-all-user-campaigns: cycle failed for %s", campaign.id)
+                    click.echo(f"  ✗ {campaign.name}: {exc}")
+                    return (str(campaign.id), str(exc))
+
+        results = await asyncio.gather(*(_one(c) for c in campaigns))
+
+        attempted = len(results)
+        failed = [(cid, err) for cid, err in results if err is not None]
+        succeeded = attempted - len(failed)
 
         click.echo(
             f"\nSummary: {attempted} attempted, {succeeded} succeeded, {len(failed)} failed."
@@ -462,7 +493,7 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
         click.echo(f"Period: {report.week_start} to {report.week_end}")
         click.echo(f"Cycles completed: {report.cycles_run}")
         click.echo(f"Variants launched: {report.variants_launched}")
-        click.echo(f"\nFull-Funnel Metrics:")
+        click.echo("\nFull-Funnel Metrics:")
         click.echo(f"  Impressions: {report.total_impressions:,}")
         click.echo(f"  Reach: {report.total_reach:,}")
         click.echo(
@@ -476,14 +507,14 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
         click.echo(f"  Add to Carts: {report.total_add_to_carts:,}")
         click.echo(f"  Purchases: {report.total_purchases:,}")
         click.echo(f"  Revenue: ${report.total_purchase_value:,.2f}")
-        click.echo(f"\nEfficiency:")
+        click.echo("\nEfficiency:")
         click.echo(f"  Spend: ${report.total_spend:,.2f}")
         click.echo(f"  CPM: ${report.avg_cpm:,.2f}")
-        click.echo(f"  CPA: {'${:,.2f}'.format(report.avg_cpa) if report.avg_cpa else 'N/A'}")
+        click.echo(f"  CPA: {f'${report.avg_cpa:,.2f}' if report.avg_cpa else 'N/A'}")
         click.echo(
-            f"  Cost/Purchase: {'${:,.2f}'.format(report.avg_cost_per_purchase) if report.avg_cost_per_purchase else 'N/A'}"
+            f"  Cost/Purchase: {f'${report.avg_cost_per_purchase:,.2f}' if report.avg_cost_per_purchase else 'N/A'}"
         )
-        click.echo(f"  ROAS: {'{:.2f}x'.format(report.avg_roas) if report.avg_roas else 'N/A'}")
+        click.echo(f"  ROAS: {f'{report.avg_roas:.2f}x' if report.avg_roas else 'N/A'}")
         click.echo(f"  Frequency: {report.avg_frequency:.1f}")
 
         best_variant = report.best_variant
@@ -504,7 +535,7 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
             click.echo(f"Worst: {worst_variant.variant_code} — {roas_str}")
 
         if report.top_elements:
-            click.echo(f"\nTop Elements:")
+            click.echo("\nTop Elements:")
             for el in report.top_elements[:10]:
                 roas_str = f" ROAS {el.avg_roas:.2f}x" if el.avg_roas else ""
                 click.echo(
@@ -572,7 +603,8 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
             click.echo("\nSlack report sent.")
 
         # Generate static HTML report
-        from src.reports.web import render_weekly_report as render_weekly_html, render_index
+        from src.reports.web import render_index
+        from src.reports.web import render_weekly_report as render_weekly_html
 
         html_path = render_weekly_html(report, campaign_name, week_label)
         click.echo(f"\nWeb report: {html_path}")
@@ -671,7 +703,7 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
         )
         avg_frequency_f = total_impressions / total_reach if total_reach > 0 else 0.0
 
-        click.echo(f"\nFull-Funnel Metrics:")
+        click.echo("\nFull-Funnel Metrics:")
         click.echo(f"  Impressions: {total_impressions:,}")
         click.echo(f"  Reach: {total_reach:,}")
         click.echo(
@@ -685,16 +717,14 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
         click.echo(f"  Add to Carts: {total_add_to_carts:,}")
         click.echo(f"  Purchases: {v2_report.total_purchases:,}")
         click.echo(f"  Revenue: ${total_purchase_value:,.2f}")
-        click.echo(f"\nEfficiency:")
+        click.echo("\nEfficiency:")
         click.echo(f"  Spend: ${v2_report.total_spend:,.2f}")
         click.echo(f"  CPM: ${avg_cpm_f:,.2f}")
         cpa_str = (
             f"${v2_report.avg_cost_per_purchase:,.2f}" if v2_report.avg_cost_per_purchase else "N/A"
         )
         click.echo(f"  Cost/Purchase: {cpa_str}")
-        click.echo(
-            f"  ROAS: {'{:.2f}x'.format(v2_report.avg_roas) if v2_report.avg_roas else 'N/A'}"
-        )
+        click.echo(f"  ROAS: {f'{v2_report.avg_roas:.2f}x' if v2_report.avg_roas else 'N/A'}")
         click.echo(f"  Frequency: {avg_frequency_f:.1f}")
 
         if v2_report.best_variant:
@@ -914,7 +944,7 @@ def import_meta_ads(
     async def _run() -> None:
         import json
         import uuid
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         from sqlalchemy import text as sa_text
 
@@ -1044,7 +1074,7 @@ def import_meta_ads(
                                     continue
                                 day_ts = datetime.strptime(
                                     str(day["date_start"]), "%Y-%m-%d"
-                                ).replace(hour=23, minute=59, tzinfo=timezone.utc)
+                                ).replace(hour=23, minute=59, tzinfo=UTC)
 
                                 await session.execute(
                                     sa_text("""
@@ -1176,7 +1206,7 @@ def import_meta_ads(
                             continue
                         # Parse the date into a timestamp
                         day_ts = datetime.strptime(str(day["date_start"]), "%Y-%m-%d").replace(
-                            hour=23, minute=59, tzinfo=timezone.utc
+                            hour=23, minute=59, tzinfo=UTC
                         )
 
                         await session.execute(
@@ -1494,7 +1524,7 @@ def pool_add(slot: str, value: str, description: str | None, meta_audience_id: s
     """Add a new entry to the gene pool."""
 
     async def _run() -> None:
-        from src.db.engine import get_session, close_db
+        from src.db.engine import close_db, get_session
         from src.db.queries import add_gene_pool_entry
 
         metadata = None
@@ -1532,7 +1562,7 @@ def pool_list(slot: str | None) -> None:
     """List gene pool entries."""
 
     async def _run() -> None:
-        from src.db.engine import get_session, close_db
+        from src.db.engine import close_db, get_session
         from src.db.queries import list_gene_pool_entries
 
         async with get_session() as session:
@@ -1570,7 +1600,7 @@ def pool_retire(slot: str, value: str) -> None:
     """Retire a gene pool entry (prevents future use, does not affect active variants)."""
 
     async def _run() -> None:
-        from src.db.engine import get_session, close_db
+        from src.db.engine import close_db, get_session
         from src.db.queries import deactivate_gene_pool_entry
 
         async with get_session() as session:
@@ -1610,7 +1640,7 @@ def pool_suggest(
 
     async def _run() -> None:
         from src.agents.copywriter import CopywriterAgent
-        from src.db.engine import get_session, close_db
+        from src.db.engine import close_db, get_session
         from src.db.queries import add_gene_pool_entry, get_element_rankings, list_gene_pool_entries
 
         settings = get_settings()
@@ -1673,7 +1703,7 @@ def pool_review() -> None:
     """List pending LLM-suggested gene pool entries awaiting approval."""
 
     async def _run() -> None:
-        from src.db.engine import get_session, close_db
+        from src.db.engine import close_db, get_session
         from src.db.queries import get_pending_suggestions
 
         async with get_session() as session:
@@ -1690,7 +1720,7 @@ def pool_review() -> None:
             desc = f" — {s.description}" if s.description else ""
             click.echo(f"  [{s.id}] {s.slot_name}: {s.slot_value}{desc}")
 
-        click.echo(f"\nRun 'adagent pool approve --id <UUID>' to activate.")
+        click.echo("\nRun 'adagent pool approve --id <UUID>' to activate.")
 
         await close_db()
 
@@ -1706,7 +1736,7 @@ def pool_approve(entry_id: str | None, approve_all: bool) -> None:
     """Approve pending LLM-suggested gene pool entries."""
 
     async def _run() -> None:
-        from src.db.engine import get_session, close_db
+        from src.db.engine import close_db, get_session
         from src.db.queries import approve_suggestion, get_pending_suggestions
 
         async with get_session() as session:
@@ -1740,7 +1770,7 @@ def pool_reject(entry_id: str) -> None:
     """Reject a pending LLM-suggested gene pool entry."""
 
     async def _run() -> None:
-        from src.db.engine import get_session, close_db
+        from src.db.engine import close_db, get_session
         from src.db.queries import reject_suggestion
 
         async with get_session() as session:
@@ -1772,7 +1802,7 @@ def approve_list(campaign_id: str | None) -> None:
     """Show variants pending approval."""
 
     async def _run() -> None:
-        from src.db.engine import get_session, close_db
+        from src.db.engine import close_db, get_session
         from src.db.queries import get_pending_approvals
 
         cid = UUID(campaign_id) if campaign_id else None
@@ -1801,7 +1831,7 @@ def approve_list(campaign_id: str | None) -> None:
                     click.echo(f"    {k}: {v}")
             click.echo("-" * 70)
 
-        click.echo(f"\nRun 'adagent approve yes --id <UUID>' to approve.")
+        click.echo("\nRun 'adagent approve yes --id <UUID>' to approve.")
 
         await close_db()
 
@@ -1823,8 +1853,9 @@ def approve_yes(
     """Approve pending variant(s) for deployment."""
 
     async def _run() -> None:
-        from src.db.engine import get_session, close_db
-        from src.db.queries import approve_variant as approve_variant_q, get_pending_approvals
+        from src.db.engine import close_db, get_session
+        from src.db.queries import approve_variant as approve_variant_q
+        from src.db.queries import get_pending_approvals
 
         cid = UUID(campaign_id) if campaign_id else None
 
@@ -1906,7 +1937,7 @@ def approve_no(approval_id: str, reason: str) -> None:
     """Reject a pending variant."""
 
     async def _run() -> None:
-        from src.db.engine import get_session, close_db
+        from src.db.engine import close_db, get_session
         from src.db.queries import reject_variant as reject_variant_q
 
         async with get_session() as session:
@@ -1990,6 +2021,428 @@ def grant_access(email: str, campaign_id: str) -> None:
                 click.echo(f"Granted {user.email} access to campaign {campaign.name!r}.")
         finally:
             await close_db()
+
+    asyncio.run(_run())
+
+
+@cli.command(name="send-daily-reports")
+@click.option(
+    "--report-date",
+    default=None,
+    type=str,
+    help="Date to report on (YYYY-MM-DD). Defaults to yesterday.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="List campaigns + owners without rendering or sending email.",
+)
+def send_daily_reports(report_date: str | None, dry_run: bool) -> None:
+    """Phase H: send a daily report to every user-owned campaign's owner.
+
+    Fans out across every active, user-owned campaign and renders a
+    per-campaign daily report that's emailed to the owner's address
+    (``users.email``) rather than the pre-Phase-H hardcoded
+    ``settings.report_email_to`` inbox. Per-campaign errors are
+    caught so one user's SendGrid failure can't block the batch.
+
+    Intended to be called by the daily cron right after
+    ``run-all-user-campaigns`` so fresh metrics land in inboxes.
+    """
+
+    async def _run() -> None:
+        from datetime import date, timedelta
+
+        from sqlalchemy import select
+
+        from src.db.engine import close_db, get_session, init_db
+        from src.db.tables import Campaign, User
+        from src.services.reports import build_daily_report
+
+        settings = get_settings()
+        await init_db()
+
+        if report_date:
+            report_day = date.fromisoformat(report_date)
+        else:
+            report_day = date.today() - timedelta(days=1)
+
+        async with get_session() as session:
+            stmt = (
+                select(Campaign, User.email)
+                .join(User, User.id == Campaign.owner_user_id)
+                .where(
+                    Campaign.is_active.is_(True),
+                    Campaign.owner_user_id.is_not(None),
+                )
+                .order_by(Campaign.name)
+            )
+            rows = (await session.execute(stmt)).all()
+
+        if not rows:
+            click.echo("No user-owned active campaigns found.")
+            await close_db()
+            return
+
+        click.echo(f"Sending daily reports for {report_day.isoformat()} to {len(rows)} owner(s):")
+        for campaign, email in rows:
+            click.echo(f"  - {campaign.name} → {email}")
+
+        if dry_run:
+            click.echo("Dry run — no emails sent.")
+            await close_db()
+            return
+
+        if not settings.sendgrid_api_key or settings.sendgrid_api_key.startswith("placeholder"):
+            click.echo("Error: SENDGRID_API_KEY not configured in .env")
+            await close_db()
+            return
+
+        from src.reports.email import EmailReporter
+
+        sent = 0
+        failed: list[tuple[str, str]] = []
+        for campaign, owner_email in rows:
+            try:
+                async with get_session() as session:
+                    report = await build_daily_report(session, campaign.id, report_day)
+                reporter = EmailReporter(
+                    api_key=settings.sendgrid_api_key,
+                    from_email=settings.report_email_from,
+                    to_email=owner_email,
+                )
+                ok = await reporter.send_daily_report(report, base_url=settings.report_base_url)
+                if ok:
+                    sent += 1
+                    click.echo(f"  ✓ {campaign.name} → {owner_email}")
+                else:
+                    failed.append((str(campaign.id), "sendgrid returned non-2xx"))
+                    click.echo(f"  ✗ {campaign.name} → {owner_email}: sendgrid failed")
+            except Exception as exc:  # noqa: BLE001 — isolate per-campaign failures
+                failed.append((str(campaign.id), str(exc)))
+                click.echo(f"  ✗ {campaign.name} → {owner_email}: {exc}")
+
+        click.echo(f"\nSummary: {sent}/{len(rows)} daily reports sent, {len(failed)} failed.")
+        if failed:
+            for cid, err in failed:
+                click.echo(f"  {cid}: {err[:200]}")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@cli.command(name="send-weekly-reports")
+@click.option(
+    "--week-start",
+    default=None,
+    type=str,
+    help="Monday of the target week (YYYY-MM-DD). Defaults to last full week.",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="List campaigns + owners without rendering or sending email.",
+)
+def send_weekly_reports(week_start: str | None, dry_run: bool) -> None:
+    """Phase H: send a weekly report to every user-owned campaign's owner.
+
+    Mirrors :func:`send_daily_reports` but for the weekly digest. Runs
+    :func:`src.services.weekly.run_weekly_generation` first so each
+    campaign gets a fresh batch of proposed variants before its owner
+    receives the email. Per-campaign errors are isolated.
+    """
+
+    async def _run() -> None:
+        from datetime import date
+
+        from sqlalchemy import select
+        from sqlalchemy import text as sa_text
+
+        from src.dashboard.tokens import create_review_token
+        from src.db.engine import close_db, get_session, init_db
+        from src.db.tables import Campaign, User
+        from src.services.reports import build_weekly_report, default_last_full_week
+        from src.services.weekly import run_weekly_generation
+
+        settings = get_settings()
+        await init_db()
+
+        if week_start:
+            ws = date.fromisoformat(week_start)
+            from datetime import timedelta as _td
+
+            we = ws + _td(days=6)
+        else:
+            ws, we = default_last_full_week()
+
+        async with get_session() as session:
+            stmt = (
+                select(Campaign, User.email)
+                .join(User, User.id == Campaign.owner_user_id)
+                .where(
+                    Campaign.is_active.is_(True),
+                    Campaign.owner_user_id.is_not(None),
+                )
+                .order_by(Campaign.name)
+            )
+            rows = (await session.execute(stmt)).all()
+
+        if not rows:
+            click.echo("No user-owned active campaigns found.")
+            await close_db()
+            return
+
+        click.echo(
+            f"Sending weekly reports for {ws.isoformat()} – {we.isoformat()} "
+            f"to {len(rows)} owner(s):"
+        )
+        for campaign, email in rows:
+            click.echo(f"  - {campaign.name} → {email}")
+
+        if dry_run:
+            click.echo("Dry run — no generation, no emails sent.")
+            await close_db()
+            return
+
+        if not settings.sendgrid_api_key or settings.sendgrid_api_key.startswith("placeholder"):
+            click.echo("Error: SENDGRID_API_KEY not configured in .env")
+            await close_db()
+            return
+
+        from src.reports.email import EmailReporter
+
+        sent = 0
+        failed: list[tuple[str, str]] = []
+        for campaign, owner_email in rows:
+            try:
+                async with get_session() as session:
+                    # Run generation pass so this week's proposals
+                    # land in the email. Swallow generation errors —
+                    # the report can still go out without new proposals.
+                    expired_count = 0
+                    generation_paused = False
+                    try:
+                        expired_count, generation_paused = await run_weekly_generation(
+                            session, campaign.id
+                        )
+                    except Exception as exc:  # noqa: BLE001
+                        click.echo(f"    warning: generation failed for {campaign.name}: {exc}")
+
+                    pending_row = await session.execute(
+                        sa_text(
+                            "SELECT COUNT(*) FROM approval_queue "
+                            "WHERE campaign_id = :id AND approved IS NULL "
+                            "AND reviewed_at IS NULL"
+                        ),
+                        {"id": str(campaign.id)},
+                    )
+                    pending_count = int(pending_row.scalar_one() or 0)
+                    review_url = (
+                        f"{settings.report_base_url.rstrip('/')}/review/"
+                        f"{create_review_token(campaign.id)}"
+                        if pending_count > 0
+                        else None
+                    )
+
+                    report = await build_weekly_report(
+                        session,
+                        campaign.id,
+                        ws,
+                        week_end=we,
+                        expired_count=expired_count,
+                        generation_paused=generation_paused,
+                        review_url=review_url,
+                    )
+                    await session.commit()
+
+                week_label = f"{ws.isocalendar()[0]}-W{ws.isocalendar()[1]:02d}"
+                reporter = EmailReporter(
+                    api_key=settings.sendgrid_api_key,
+                    from_email=settings.report_email_from,
+                    to_email=owner_email,
+                )
+                ok = await reporter.send_weekly_report_v2(
+                    report,
+                    campaign_name=report.campaign_name,
+                    week_label=week_label,
+                    base_url=settings.report_base_url,
+                    review_url=report.review_url,
+                )
+                if ok:
+                    sent += 1
+                    click.echo(f"  ✓ {campaign.name} → {owner_email}")
+                else:
+                    failed.append((str(campaign.id), "sendgrid returned non-2xx"))
+                    click.echo(f"  ✗ {campaign.name} → {owner_email}: sendgrid failed")
+            except Exception as exc:  # noqa: BLE001
+                failed.append((str(campaign.id), str(exc)))
+                click.echo(f"  ✗ {campaign.name} → {owner_email}: {exc}")
+
+        click.echo(f"\nSummary: {sent}/{len(rows)} weekly reports sent, {len(failed)} failed.")
+        if failed:
+            for cid, err in failed:
+                click.echo(f"  {cid}: {err[:200]}")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
+@cli.command(name="send-approval-digests")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="Print the digest payload per owner without sending email.",
+)
+def send_approval_digests(dry_run: bool) -> None:
+    """Phase H: nudge each owner about their pending approvals.
+
+    Runs daily (regardless of whether a cycle fired) to prevent a
+    silent failure mode where stale proposals sit unreviewed. One
+    digest email per user with >0 pending rows, counting by
+    ``action_type`` so the user knows *what kind* of review is
+    waiting.
+
+    Query is one grouped JOIN against
+    ``approval_queue × campaigns × users`` with ``approved IS NULL``
+    — sorted/capped client-side so we stay under SendGrid payload
+    limits even for users with dozens of outstanding items.
+    """
+
+    async def _run() -> None:
+        from sqlalchemy import text as sa_text
+
+        from src.db.engine import close_db, get_session, init_db
+
+        settings = get_settings()
+        await init_db()
+
+        async with get_session() as session:
+            rows = await session.execute(
+                sa_text(
+                    """
+                    SELECT c.owner_user_id,
+                           u.email,
+                           aq.action_type::text AS action_type,
+                           COUNT(*) AS cnt
+                    FROM approval_queue aq
+                    JOIN campaigns c ON c.id = aq.campaign_id
+                    JOIN users u ON u.id = c.owner_user_id
+                    WHERE aq.approved IS NULL
+                      AND aq.reviewed_at IS NULL
+                    GROUP BY c.owner_user_id, u.email, aq.action_type
+                    ORDER BY u.email, aq.action_type
+                    """
+                )
+            )
+            per_user: dict[str, dict[str, object]] = {}
+            for owner_id, email, action_type, cnt in rows.fetchall():
+                entry = per_user.setdefault(
+                    str(owner_id),
+                    {"email": email, "by_action_type": {}, "total": 0},
+                )
+                by_action = entry["by_action_type"]
+                assert isinstance(by_action, dict)
+                by_action[str(action_type)] = int(cnt)
+                entry["total"] = int(entry["total"]) + int(cnt)  # type: ignore[arg-type]
+
+        if not per_user:
+            click.echo("No owners have pending approvals. Nothing to send.")
+            await close_db()
+            return
+
+        click.echo(f"{len(per_user)} owner(s) have pending approvals:")
+        for _, entry in per_user.items():
+            by_action = entry["by_action_type"]
+            assert isinstance(by_action, dict)
+            parts = ", ".join(f"{k}={v}" for k, v in by_action.items())
+            click.echo(f"  - {entry['email']}: {entry['total']} pending ({parts})")
+
+        if dry_run:
+            click.echo("Dry run — no emails sent.")
+            await close_db()
+            return
+
+        if not settings.sendgrid_api_key or settings.sendgrid_api_key.startswith("placeholder"):
+            click.echo("Error: SENDGRID_API_KEY not configured in .env")
+            await close_db()
+            return
+
+        import httpx
+
+        review_url = f"{settings.frontend_base_url.rstrip('/')}/experiments"
+
+        sent = 0
+        failed: list[tuple[str, str]] = []
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for _, entry in per_user.items():
+                owner_email = str(entry["email"])
+                by_action = entry["by_action_type"]
+                assert isinstance(by_action, dict)
+                total = int(entry["total"])  # type: ignore[arg-type]
+
+                # One line per action_type category — deliberately
+                # compact (see Phase H red flag #7: digests must not
+                # enumerate each pending row for users 30+ behind).
+                lines = [
+                    "<p>You have pending ad optimization proposals waiting for your review.</p>",
+                    "<ul>",
+                ]
+                human_labels = {
+                    "new_variant": "new variant(s) to launch",
+                    "pause_variant": "ad(s) to pause",
+                    "scale_budget": "budget change(s) to confirm",
+                    "promote_winner": "winner(s) to promote",
+                }
+                for action, cnt in by_action.items():
+                    label = human_labels.get(action, action)
+                    lines.append(f"<li><b>{cnt}</b> {label}</li>")
+                lines.append("</ul>")
+                lines.append(f'<p><a href="{review_url}">Review in dashboard →</a></p>')
+                html = "".join(lines)
+
+                subject = (
+                    f"[Ad Agent] {total} pending approval"
+                    f"{'' if total == 1 else 's'} awaiting your review"
+                )
+                payload: dict[str, object] = {
+                    "personalizations": [
+                        {
+                            "to": [{"email": owner_email}],
+                            "subject": subject,
+                        }
+                    ],
+                    "from": {"email": settings.report_email_from},
+                    "content": [{"type": "text/html", "value": html}],
+                }
+                headers = {
+                    "Authorization": f"Bearer {settings.sendgrid_api_key}",
+                    "Content-Type": "application/json",
+                }
+
+                try:
+                    resp = await client.post(
+                        "https://api.sendgrid.com/v3/mail/send",
+                        json=payload,
+                        headers=headers,
+                    )
+                    if resp.status_code in (200, 202):
+                        sent += 1
+                        click.echo(f"  ✓ {owner_email}")
+                    else:
+                        failed.append((owner_email, f"HTTP {resp.status_code}"))
+                        click.echo(f"  ✗ {owner_email}: HTTP {resp.status_code} {resp.text[:200]}")
+                except Exception as exc:  # noqa: BLE001
+                    failed.append((owner_email, str(exc)))
+                    click.echo(f"  ✗ {owner_email}: {exc}")
+
+        click.echo(f"\nSummary: {sent}/{len(per_user)} digests sent, {len(failed)} failed.")
+
+        await close_db()
 
     asyncio.run(_run())
 

@@ -70,6 +70,7 @@ from src.dashboard.tokens import verify_review_token
 from src.db.engine import get_session
 from src.db.queries import (
     add_gene_pool_entry,
+    approve_proposal,
     approve_variant,
     consume_magic_link_token,
     count_active_campaigns_for_user,
@@ -83,6 +84,7 @@ from src.db.queries import (
     get_user_by_email,
     get_user_campaigns,
     list_gene_pool_entries,
+    reject_proposal,
     reject_variant,
     touch_last_login,
     upsert_meta_connection,
@@ -96,6 +98,7 @@ from src.exceptions import (
     MetaTokenExpired,
     MultipleAdAccountsNoDefault,
 )
+from src.models.approvals import PendingApproval
 from src.models.campaigns import (
     CampaignImportFailure,
     CampaignImportRequest,
@@ -105,12 +108,13 @@ from src.models.campaigns import (
 from src.models.oauth import MetaAdAccountInfo, MetaPageInfo
 from src.models.reports import DailyReport, ProposedVariant, WeeklyReport
 from src.reports.auth_email import send_magic_link
+from src.services.approval_executor import execute_approved_action
 from src.services.campaign_import import (
     import_campaign,
     list_importable_campaigns,
 )
 from src.services.reports import build_daily_report, build_weekly_report
-from src.services.weekly import load_proposed_variants
+from src.services.weekly import load_pending_approvals, load_proposed_variants
 
 logger = logging.getLogger(__name__)
 
@@ -658,7 +662,18 @@ class GenePoolEntryOut(BaseModel):
 
 
 class ExperimentsResponse(BaseModel):
+    """Payload for the ``/experiments`` page.
+
+    Phase H: ``pending_approvals`` is the new unified discriminated
+    union covering new variants + pause/scale/promote proposals, and
+    is what the updated frontend renders. ``proposed_variants`` is
+    kept in the response purely for the weekly-email report code path
+    that still imports ``ProposedVariant`` directly; it's a filtered
+    subset of ``pending_approvals`` and the dashboard UI ignores it.
+    """
+
     proposed_variants: list[ProposedVariant]
+    pending_approvals: list[PendingApproval]
     gene_pool_by_slot: dict[str, list[GenePoolEntryOut]]
     allowed_suggestion_slots: list[str]
 
@@ -1561,7 +1576,15 @@ async def api_experiments(
     campaign_id: UUID = Depends(require_campaign_access),
     session: AsyncSession = Depends(get_db_session),
 ) -> ExperimentsResponse:
-    """Return pending proposals + the gene pool + allowed suggestion slots."""
+    """Return pending proposals + the gene pool + allowed suggestion slots.
+
+    Phase H: the dashboard now shows a unified feed of proposals —
+    new variants, pause requests, and budget changes. We build
+    ``pending_approvals`` (the discriminated union the new UI
+    renders) and keep ``proposed_variants`` populated for any
+    back-compat caller that still wants the new_variant-only list.
+    """
+    pending = await load_pending_approvals(session, campaign_id)
     proposed = await load_proposed_variants(session, campaign_id)
     entries = await list_gene_pool_entries(session)
 
@@ -1579,6 +1602,7 @@ async def api_experiments(
 
     return ExperimentsResponse(
         proposed_variants=proposed,
+        pending_approvals=pending,
         gene_pool_by_slot=gene_pool_by_slot,
         allowed_suggestion_slots=sorted(_ALLOWED_SUGGESTION_SLOTS),
     )
@@ -1595,15 +1619,35 @@ async def api_experiment_approve(
     session: AsyncSession = Depends(get_db_session),
     user: User = Depends(get_current_user),
 ) -> ApproveResponse:
-    """Approve a pending proposal for this campaign."""
+    """Approve a pending proposal for this campaign.
+
+    Phase H: the approve click is the user's verification. After
+    flipping the DB flag we immediately hand off to
+    :func:`execute_approved_action`, which resolves the per-campaign
+    Meta adapter and pushes the side-effect (pause, scale, or — for
+    new_variant rows — nothing; weekly deployer picks those up).
+
+    If Meta rejects the change the executor rolls the approval back
+    to rejected state and we return 502. The UI shows an error
+    toast, the ad stays in its prior state, and the next cycle will
+    re-queue a fresh proposal.
+    """
     await _load_approval_or_404(session, approval_id, campaign_id)
-    item = await approve_variant(
+    item = await approve_proposal(
         session,
         approval_id=approval_id,
         reviewer=f"user:{user.email}",
     )
     if item is None:
         raise HTTPException(status_code=404, detail="not found")
+
+    result = await execute_approved_action(
+        session,
+        approval_id=approval_id,
+        reviewer_user_id=user.id,
+    )
+    if not result.ok:
+        raise HTTPException(status_code=502, detail=result.message)
     return ApproveResponse(status="approved", approval_id=approval_id)
 
 
@@ -1619,9 +1663,15 @@ async def api_experiment_reject(
     session: AsyncSession = Depends(get_db_session),
     user: User = Depends(get_current_user),
 ) -> ApproveResponse:
-    """Reject a pending proposal for this campaign."""
+    """Reject a pending proposal for this campaign.
+
+    Phase H: uses the generalised ``reject_proposal`` so pause/scale
+    rows reject cleanly (no variant retirement) while
+    new_variant/promote_winner rows retire their associated variant
+    as before.
+    """
     await _load_approval_or_404(session, approval_id, campaign_id)
-    item = await reject_variant(
+    item = await reject_proposal(
         session,
         approval_id=approval_id,
         reason=body.reason,

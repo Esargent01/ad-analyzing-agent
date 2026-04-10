@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.services.interactions import InteractionResult, _canonicalize_pair, compute_interactions
 
 

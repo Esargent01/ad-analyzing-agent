@@ -3,18 +3,18 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
 import pytest
 
-from src.agents.analyst import AnalystAgent, _compute_element_insights, _detect_fatigued_variants
+from src.agents.analyst import AnalystAgent, _detect_fatigued_variants
 from src.models.analysis import AnalysisResult
 from src.models.metrics import DailyRollup
 from src.models.variant import VariantResponse, VariantStatus
-from tests.factories import build_daily_rollup, build_variant_data
+from tests.factories import build_variant_data
 
 
 def _make_summary_response(summary_text: str) -> SimpleNamespace:

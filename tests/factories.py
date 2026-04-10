@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import random
 import uuid
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime
 from decimal import Decimal
 
 from src.models.genome import GenomeSchema
@@ -101,7 +101,7 @@ def build_metrics(
 ) -> MetricsSnapshot:
     """Build a MetricsSnapshot with sensible defaults."""
     return MetricsSnapshot(
-        recorded_at=recorded_at or datetime.now(timezone.utc),
+        recorded_at=recorded_at or datetime.now(UTC),
         variant_id=variant_id or uuid.uuid4(),
         deployment_id=deployment_id or uuid.uuid4(),
         impressions=impressions,
@@ -151,7 +151,7 @@ def build_variant_data(
         generation=generation,
         parent_ids=[],
         hypothesis="Test hypothesis",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         deployed_at=None,
         paused_at=None,
         retired_at=None,

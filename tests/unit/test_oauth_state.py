@@ -8,7 +8,7 @@ to a different app user.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -50,7 +50,7 @@ class TestOAuthStateRoundTrip:
         token = create_oauth_state_token(user_id, ttl_minutes=10)
 
         # Fast-forward time 11 minutes via patching datetime.now
-        future = datetime.now(timezone.utc) + timedelta(minutes=11)
+        future = datetime.now(UTC) + timedelta(minutes=11)
 
         class _FakeDT(datetime):
             @classmethod

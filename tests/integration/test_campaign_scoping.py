@@ -14,16 +14,15 @@ wiring, not real queries.
 
 from __future__ import annotations
 
-from datetime import date
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
-from uuid import UUID, uuid4
+from unittest.mock import AsyncMock
+from uuid import uuid4
 
 import pytest
 from fastapi.testclient import TestClient
 
 from src.dashboard import app as dashboard_app
-from src.dashboard.auth import create_session_token, generate_csrf_token
+from src.dashboard.auth import create_session_token
 from src.dashboard.deps import get_db_session
 
 

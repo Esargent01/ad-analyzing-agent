@@ -207,8 +207,98 @@ export interface GenePoolEntry {
   source: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// Phase H: discriminated union for the experiments page.
+//
+// The backend returns a single ``pending_approvals`` list where every
+// item carries a literal ``kind`` tag so the frontend can render the
+// right card without inspecting payload shapes. Pause and scale cards
+// don't own a ``variant_id``; new_variant rows keep the pre-Phase-H
+// fields on ``PendingNewVariant``.
+// ---------------------------------------------------------------------------
+
+export interface PauseEvidence {
+  reason: "statistically_significant_loser" | "audience_fatigue";
+  variant_ctr?: number | null;
+  baseline_ctr?: number | null;
+  p_value?: number | null;
+  z_score?: number | null;
+  impressions?: number | null;
+  clicks?: number | null;
+  consecutive_decline_days?: number | null;
+  trend_slope?: number | null;
+}
+
+export interface ScaleEvidence {
+  allocation_method?: string;
+  impressions?: number | null;
+  clicks?: number | null;
+  posterior_mean?: number | null;
+  share_of_allocation?: number | null;
+}
+
+export interface PendingNewVariant {
+  kind: "new_variant";
+  approval_id: string;
+  variant_id: string | null;
+  variant_code: string;
+  genome: Record<string, string>;
+  genome_summary: string;
+  hypothesis: string | null;
+  submitted_at: string;
+  classification: string; // "new" | "expiring_soon"
+  days_until_expiry: number;
+}
+
+export interface PendingPauseVariant {
+  kind: "pause_variant";
+  approval_id: string;
+  campaign_id: string;
+  deployment_id: string;
+  platform_ad_id: string;
+  variant_code: string | null;
+  genome_snapshot: Record<string, string>;
+  reason: "statistically_significant_loser" | "audience_fatigue";
+  evidence: PauseEvidence;
+  submitted_at: string;
+}
+
+export interface PendingScaleBudget {
+  kind: "scale_budget";
+  approval_id: string;
+  campaign_id: string;
+  deployment_id: string;
+  platform_ad_id: string;
+  variant_code: string | null;
+  genome_snapshot: Record<string, string>;
+  current_budget: string | number;
+  proposed_budget: string | number;
+  reason: string;
+  evidence: ScaleEvidence;
+  submitted_at: string;
+}
+
+export interface PendingPromoteWinner {
+  kind: "promote_winner";
+  approval_id: string;
+  variant_id: string | null;
+  variant_code: string;
+  submitted_at: string;
+}
+
+export type PendingApproval =
+  | PendingNewVariant
+  | PendingPauseVariant
+  | PendingScaleBudget
+  | PendingPromoteWinner;
+
 export interface ExperimentsResponse {
+  /** Phase H: back-compat subset — still populated for any consumer
+   * that hasn't switched to the discriminated union yet. */
   proposed_variants: ProposedVariant[];
+  /** Phase H: unified discriminated union — new_variant + pause +
+   * scale + promote. Sorted server-side pause → scale → new_variant. */
+  pending_approvals: PendingApproval[];
   gene_pool_by_slot: Record<string, GenePoolEntry[]>;
   allowed_suggestion_slots: string[];
 }

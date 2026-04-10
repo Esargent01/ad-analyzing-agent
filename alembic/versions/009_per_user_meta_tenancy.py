@@ -56,6 +56,7 @@ Revises: 008_migrate_legacy_campaigns
 Create Date: 2026-04-10
 
 """
+
 from collections.abc import Sequence
 
 import sqlalchemy as sa
@@ -164,15 +165,12 @@ def upgrade() -> None:
     op.create_check_constraint(
         "campaigns_meta_tenancy_check",
         "campaigns",
-        "platform <> 'meta' OR "
-        "(meta_ad_account_id IS NOT NULL AND meta_page_id IS NOT NULL)",
+        "platform <> 'meta' OR (meta_ad_account_id IS NOT NULL AND meta_page_id IS NOT NULL)",
     )
 
 
 def downgrade() -> None:
-    op.drop_constraint(
-        "campaigns_meta_tenancy_check", "campaigns", type_="check"
-    )
+    op.drop_constraint("campaigns_meta_tenancy_check", "campaigns", type_="check")
     op.drop_column("campaigns", "landing_page_url")
     op.drop_column("campaigns", "meta_page_id")
     op.drop_column("campaigns", "meta_ad_account_id")

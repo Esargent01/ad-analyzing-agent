@@ -22,18 +22,19 @@ Revises: 006_campaign_owner
 Create Date: 2026-04-09
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision: str = "007_usage_log"
-down_revision: Union[str, None] = "006_campaign_owner"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "006_campaign_owner"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -66,12 +67,8 @@ def upgrade() -> None:
         sa.Column("service", sa.Text(), nullable=False),
         sa.Column("agent", sa.Text(), nullable=True),
         sa.Column("model", sa.Text(), nullable=True),
-        sa.Column(
-            "input_units", sa.Integer(), nullable=False, server_default=sa.text("0")
-        ),
-        sa.Column(
-            "output_units", sa.Integer(), nullable=False, server_default=sa.text("0")
-        ),
+        sa.Column("input_units", sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column("output_units", sa.Integer(), nullable=False, server_default=sa.text("0")),
         sa.Column(
             "cost_usd",
             sa.Numeric(12, 6),
@@ -91,16 +88,9 @@ def upgrade() -> None:
     op.execute("ALTER TABLE usage_log ADD PRIMARY KEY (recorded_at, id)")
     op.execute("SELECT create_hypertable('usage_log', 'recorded_at')")
 
-    op.execute(
-        "CREATE INDEX idx_usage_log_user ON usage_log (user_id, recorded_at DESC)"
-    )
-    op.execute(
-        "CREATE INDEX idx_usage_log_campaign "
-        "ON usage_log (campaign_id, recorded_at DESC)"
-    )
-    op.execute(
-        "CREATE INDEX idx_usage_log_service ON usage_log (service, recorded_at DESC)"
-    )
+    op.execute("CREATE INDEX idx_usage_log_user ON usage_log (user_id, recorded_at DESC)")
+    op.execute("CREATE INDEX idx_usage_log_campaign ON usage_log (campaign_id, recorded_at DESC)")
+    op.execute("CREATE INDEX idx_usage_log_service ON usage_log (service, recorded_at DESC)")
 
 
 def downgrade() -> None:

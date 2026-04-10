@@ -7,10 +7,10 @@ and imports all ORM models so autogenerate can detect schema changes.
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
+from alembic import context
 from src.config import get_settings
 from src.db.tables import Base  # noqa: F401 — imported for autogenerate metadata
 

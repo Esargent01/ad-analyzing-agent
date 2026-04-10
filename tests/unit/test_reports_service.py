@@ -11,10 +11,8 @@ The service has two layers:
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date
 from decimal import Decimal
-from types import SimpleNamespace
-from unittest.mock import AsyncMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -29,7 +27,6 @@ from src.services.reports import (
     build_weekly_report,
     default_last_full_week,
 )
-
 
 # ---------------------------------------------------------------------------
 # default_last_full_week

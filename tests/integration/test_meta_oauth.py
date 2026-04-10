@@ -9,7 +9,7 @@ thin functions rather than a class — cleaner than stubbing httpx.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
@@ -145,12 +145,12 @@ class TestMetaCallback:
         short = MetaTokenResponse(
             access_token="short-lived-abc",
             token_type="bearer",
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
         )
         long_lived = MetaTokenResponse(
             access_token="long-lived-xyz",
             token_type="bearer",
-            expires_at=datetime.now(timezone.utc) + timedelta(days=60),
+            expires_at=datetime.now(UTC) + timedelta(days=60),
         )
 
         session = AsyncMock()
@@ -268,8 +268,8 @@ class TestMetaStatus:
         _override_session(session)
         _signed_in_client(client, user)
 
-        expires = datetime.now(timezone.utc) + timedelta(days=60)
-        connected = datetime.now(timezone.utc)
+        expires = datetime.now(UTC) + timedelta(days=60)
+        connected = datetime.now(UTC)
         fake_conn = SimpleNamespace(
             user_id=user.id,
             meta_user_id="9876543210",

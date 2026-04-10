@@ -6,16 +6,17 @@ SQLAlchemy's select() construct. No raw SQL.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Integer, func, select, update
+from sqlalchemy import Integer, case, func, select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.db.tables import (
     ActionType,
+    ApprovalActionType,
     ApprovalQueueItem,
     Campaign,
     CycleAction,
@@ -32,7 +33,6 @@ from src.db.tables import (
     Variant,
     VariantStatus,
 )
-
 
 # ---------------------------------------------------------------------------
 # Gene pool
@@ -658,6 +658,15 @@ async def get_recent_cycles(
 # ---------------------------------------------------------------------------
 # Approval queue
 # ---------------------------------------------------------------------------
+#
+# Phase H note: this queue used to hold only "proposed new variant" rows.
+# It now holds four kinds of proposals: ``new_variant``, ``pause_variant``,
+# ``scale_budget``, and ``promote_winner``. The variant-scoped helpers
+# (``submit_for_approval``, ``approve_variant``, ``reject_variant``) stay
+# for backwards compatibility with callers that still think in variants,
+# and call through to the generalized ``approve_proposal`` /
+# ``reject_proposal`` underneath. New callers should prefer the
+# generalized helpers.
 
 
 async def submit_for_approval(
@@ -667,27 +676,177 @@ async def submit_for_approval(
     genome: dict[str, str],
     hypothesis: str | None = None,
 ) -> ApprovalQueueItem:
-    """Insert a variant into the approval queue for human review."""
+    """Insert a ``new_variant`` proposal into the approval queue.
+
+    Phase-H shim: existing callers (the orchestrator's generate phase,
+    the weekly flow) still think of approvals as "a new variant wants a
+    review". This helper preserves that spelling. Under the hood every
+    row carries ``action_type='new_variant'`` and an empty payload.
+    """
     item = ApprovalQueueItem(
         variant_id=variant_id,
         campaign_id=campaign_id,
         genome_snapshot=genome,
         hypothesis=hypothesis,
+        action_type=ApprovalActionType.new_variant,
+        action_payload={},
     )
     session.add(item)
     await session.flush()
     return item
 
 
+async def has_open_proposal(
+    session: AsyncSession,
+    *,
+    deployment_id: UUID,
+    action_type: ApprovalActionType,
+) -> bool:
+    """Return True if a pending proposal already exists for this (deployment, action_type).
+
+    Used by the orchestrator to stay idempotent across cycles — if the
+    stats say "pause ad X" twice in a row, we shouldn't queue the same
+    proposal each time. Checks via JSONB containment on
+    ``action_payload->>'deployment_id'`` because deployment references
+    for non-variant actions live in the payload, not in a dedicated
+    column.
+    """
+    stmt = (
+        select(ApprovalQueueItem.id)
+        .where(ApprovalQueueItem.action_type == action_type)
+        .where(ApprovalQueueItem.approved.is_(None))
+        .where(ApprovalQueueItem.action_payload["deployment_id"].astext == str(deployment_id))
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none() is not None
+
+
+async def queue_pause_proposal(
+    session: AsyncSession,
+    *,
+    campaign_id: UUID,
+    deployment_id: UUID,
+    platform_ad_id: str,
+    reason: str,
+    evidence: dict,
+    genome_snapshot: dict[str, str] | None = None,
+    hypothesis: str | None = None,
+) -> UUID | None:
+    """Queue a pause proposal for a currently-running deployment.
+
+    Returns the new approval_queue row id, or ``None`` if an open pause
+    proposal already exists for this deployment (idempotent dedupe).
+
+    ``genome_snapshot`` is accepted but optional — the column is still
+    NOT NULL from the pre-Phase-H schema, so we fall back to an empty
+    dict rather than change the column. Callers that have the variant's
+    current genome handy (the orchestrator does) should pass it so the
+    approval card can show "pause this ad: <copy>" without a second
+    lookup.
+    """
+    if await has_open_proposal(
+        session,
+        deployment_id=deployment_id,
+        action_type=ApprovalActionType.pause_variant,
+    ):
+        return None
+
+    payload = {
+        "deployment_id": str(deployment_id),
+        "platform_ad_id": platform_ad_id,
+        "reason": reason,
+        "evidence": evidence,
+    }
+    item = ApprovalQueueItem(
+        variant_id=None,
+        campaign_id=campaign_id,
+        genome_snapshot=genome_snapshot or {},
+        hypothesis=hypothesis,
+        action_type=ApprovalActionType.pause_variant,
+        action_payload=payload,
+    )
+    session.add(item)
+    await session.flush()
+    return item.id
+
+
+async def queue_scale_proposal(
+    session: AsyncSession,
+    *,
+    campaign_id: UUID,
+    deployment_id: UUID,
+    platform_ad_id: str,
+    current_budget: Decimal,
+    proposed_budget: Decimal,
+    evidence: dict,
+    reason: str = "thompson_sampling",
+    genome_snapshot: dict[str, str] | None = None,
+    hypothesis: str | None = None,
+) -> UUID | None:
+    """Queue a budget-change proposal for a currently-running deployment.
+
+    Returns the new approval_queue row id, or ``None`` if an open scale
+    proposal already exists for this deployment. If a prior scale
+    proposal exists but its ``proposed_budget`` is identical to the new
+    one, we still dedupe — the user hasn't acted yet and re-queuing
+    wouldn't change anything. Callers that need to override the
+    existing proposal (e.g. a follow-up cycle computed a meaningfully
+    different number) should reject the stale row first.
+    """
+    if await has_open_proposal(
+        session,
+        deployment_id=deployment_id,
+        action_type=ApprovalActionType.scale_budget,
+    ):
+        return None
+
+    payload = {
+        "deployment_id": str(deployment_id),
+        "platform_ad_id": platform_ad_id,
+        "current_budget": float(current_budget),
+        "proposed_budget": float(proposed_budget),
+        "reason": reason,
+        "evidence": evidence,
+    }
+    item = ApprovalQueueItem(
+        variant_id=None,
+        campaign_id=campaign_id,
+        genome_snapshot=genome_snapshot or {},
+        hypothesis=hypothesis,
+        action_type=ApprovalActionType.scale_budget,
+        action_payload=payload,
+    )
+    session.add(item)
+    await session.flush()
+    return item.id
+
+
 async def get_pending_approvals(
     session: AsyncSession,
     campaign_id: UUID | None = None,
 ) -> list[ApprovalQueueItem]:
-    """Return approval queue items awaiting review (approved IS NULL)."""
+    """Return approval queue items awaiting review (approved IS NULL).
+
+    Phase H: ordered so pause proposals surface first (they're blocking
+    bad ads), then scale proposals, then new variants / promotions.
+    Within each action_type the oldest row wins — a proposal sitting
+    longer deserves attention sooner.
+    """
+    # Rank action types so pause > scale > new_variant > promote_winner.
+    # Using a CASE expression keeps the sort in the DB rather than
+    # re-sorting in Python, and avoids casting the enum column.
+    type_rank = case(
+        (ApprovalQueueItem.action_type == ApprovalActionType.pause_variant, 0),
+        (ApprovalQueueItem.action_type == ApprovalActionType.scale_budget, 1),
+        (ApprovalQueueItem.action_type == ApprovalActionType.new_variant, 2),
+        (ApprovalQueueItem.action_type == ApprovalActionType.promote_winner, 3),
+        else_=4,
+    )
     stmt = (
         select(ApprovalQueueItem)
         .where(ApprovalQueueItem.approved.is_(None))
-        .order_by(ApprovalQueueItem.submitted_at)
+        .order_by(type_rank, ApprovalQueueItem.submitted_at)
     )
     if campaign_id is not None:
         stmt = stmt.where(ApprovalQueueItem.campaign_id == campaign_id)
@@ -695,22 +854,106 @@ async def get_pending_approvals(
     return list(result.scalars().all())
 
 
-async def approve_variant(
+async def approve_proposal(
     session: AsyncSession,
     approval_id: UUID,
     reviewer: str = "cli",
 ) -> ApprovalQueueItem | None:
-    """Approve a queued variant. Returns None if not found."""
-    stmt = select(ApprovalQueueItem).where(ApprovalQueueItem.id == approval_id)
-    result = await session.execute(stmt)
-    item = result.scalar_one_or_none()
+    """Mark a queued proposal as approved and return the row.
+
+    This does **not** perform the Meta mutation — the HTTP handler calls
+    ``src.services.approval_executor.execute_approved_action`` after
+    this returns to actually pause/scale/deploy. Splitting flip-flag
+    from side-effect lets the executor roll back the approval if Meta
+    rejects the change.
+
+    Idempotency: if the row is already approved **and** ``executed_at``
+    is set, returns the row unchanged (double-click protection). If
+    approved but ``executed_at`` is NULL we return it as-is too, so the
+    caller can re-run the executor for the pending-execution case.
+    """
+    item = await session.get(ApprovalQueueItem, approval_id)
     if item is None:
         return None
+    if item.approved is True:
+        # Already approved — let the caller decide whether to re-execute.
+        return item
     item.approved = True
     item.reviewed_at = func.now()
     item.reviewer = reviewer
     await session.flush()
     return item
+
+
+async def mark_proposal_executed(
+    session: AsyncSession,
+    approval_id: UUID,
+) -> None:
+    """Stamp ``executed_at`` once the Meta side-effect has landed.
+
+    Called from the approval executor after a successful adapter call.
+    Separate from ``approve_proposal`` so approval can persist while
+    execution is in-flight and the DB reflects that gap.
+    """
+    stmt = (
+        update(ApprovalQueueItem)
+        .where(ApprovalQueueItem.id == approval_id)
+        .values(executed_at=func.now())
+    )
+    await session.execute(stmt)
+    await session.flush()
+
+
+async def reject_proposal(
+    session: AsyncSession,
+    approval_id: UUID,
+    reason: str,
+    reviewer: str = "cli",
+) -> ApprovalQueueItem | None:
+    """Reject a queued proposal. Only retires a variant for variant-scoped rows.
+
+    For ``pause_variant`` / ``scale_budget`` proposals there's no
+    variant row to retire — the running ad stays running, we're just
+    telling the system "don't do this". For ``new_variant`` /
+    ``promote_winner`` we still retire the associated variant so it
+    doesn't sit as a zombie draft.
+    """
+    item = await session.get(ApprovalQueueItem, approval_id)
+    if item is None:
+        return None
+    item.approved = False
+    item.reviewed_at = func.now()
+    item.reviewer = reviewer
+    item.rejection_reason = reason
+
+    variant_scoped = item.action_type in (
+        ApprovalActionType.new_variant,
+        ApprovalActionType.promote_winner,
+    )
+    if variant_scoped and item.variant_id is not None:
+        variant = await session.get(Variant, item.variant_id)
+        if variant is not None:
+            variant.status = VariantStatus.retired
+            variant.retired_at = func.now()
+
+    await session.flush()
+    return item
+
+
+# Back-compat shims ---------------------------------------------------------
+#
+# Older callers (CLI, existing tests) still use ``approve_variant`` /
+# ``reject_variant``. Keep them as thin wrappers around the generalized
+# helpers so we don't churn every site in this PR.
+
+
+async def approve_variant(
+    session: AsyncSession,
+    approval_id: UUID,
+    reviewer: str = "cli",
+) -> ApprovalQueueItem | None:
+    """Back-compat wrapper for ``approve_proposal``."""
+    return await approve_proposal(session, approval_id, reviewer=reviewer)
 
 
 async def reject_variant(
@@ -719,25 +962,8 @@ async def reject_variant(
     reason: str,
     reviewer: str = "cli",
 ) -> ApprovalQueueItem | None:
-    """Reject a queued variant and retire it. Returns None if not found."""
-    stmt = select(ApprovalQueueItem).where(ApprovalQueueItem.id == approval_id)
-    result = await session.execute(stmt)
-    item = result.scalar_one_or_none()
-    if item is None:
-        return None
-    item.approved = False
-    item.reviewed_at = func.now()
-    item.reviewer = reviewer
-    item.rejection_reason = reason
-
-    # Also retire the variant
-    variant = await session.get(Variant, item.variant_id)
-    if variant is not None:
-        variant.status = VariantStatus.retired
-        variant.retired_at = func.now()
-
-    await session.flush()
-    return item
+    """Back-compat wrapper for ``reject_proposal``."""
+    return await reject_proposal(session, approval_id, reason, reviewer=reviewer)
 
 
 async def expire_stale_proposals(
@@ -748,10 +974,11 @@ async def expire_stale_proposals(
     """Auto-reject pending approval queue items older than ttl_days.
 
     Called at the start of the weekly flow to prevent stale proposals
-    (with out-of-date hypotheses) from piling up. Returns the count of
-    items that were expired.
+    from piling up. Phase H: only retires the associated variant for
+    variant-scoped rows — pause/scale expirations are a no-op against
+    the running ad (we just drop the stale proposal).
     """
-    cutoff = datetime.now(timezone.utc) - timedelta(days=ttl_days)
+    cutoff = datetime.now(UTC) - timedelta(days=ttl_days)
     stmt = (
         select(ApprovalQueueItem)
         .where(ApprovalQueueItem.campaign_id == campaign_id)
@@ -767,10 +994,15 @@ async def expire_stale_proposals(
         item.reviewer = "system"
         item.rejection_reason = "expired_no_review"
 
-        variant = await session.get(Variant, item.variant_id)
-        if variant is not None:
-            variant.status = VariantStatus.retired
-            variant.retired_at = func.now()
+        variant_scoped = item.action_type in (
+            ApprovalActionType.new_variant,
+            ApprovalActionType.promote_winner,
+        )
+        if variant_scoped and item.variant_id is not None:
+            variant = await session.get(Variant, item.variant_id)
+            if variant is not None:
+                variant.status = VariantStatus.retired
+                variant.retired_at = func.now()
 
     await session.flush()
     return len(stale_items)

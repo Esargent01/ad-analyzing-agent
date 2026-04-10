@@ -3,27 +3,32 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from src.db.queries import expire_stale_proposals
-from src.db.tables import VariantStatus
+from src.db.tables import ApprovalActionType, VariantStatus
 
 
-def _make_item(days_old: int) -> SimpleNamespace:
+def _make_item(
+    days_old: int,
+    action_type: ApprovalActionType = ApprovalActionType.new_variant,
+) -> SimpleNamespace:
     """Build a mock ApprovalQueueItem that behaves like the ORM row."""
     return SimpleNamespace(
         id=uuid.uuid4(),
         variant_id=uuid.uuid4(),
         campaign_id=uuid.uuid4(),
-        submitted_at=datetime.now(timezone.utc) - timedelta(days=days_old),
+        submitted_at=datetime.now(UTC) - timedelta(days=days_old),
         approved=None,
         reviewed_at=None,
         reviewer=None,
         rejection_reason=None,
+        action_type=action_type,
+        action_payload={},
     )
 
 

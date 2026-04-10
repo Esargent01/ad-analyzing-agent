@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
@@ -280,7 +280,7 @@ class EmailReporter:
             campaign_name=report.campaign_name,
             report_date=report.report_date.isoformat(),
             report_date_fmt=report.report_date.strftime("%B %d, %Y"),
-            generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+            generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
             base_url=base_url,
             day_number=report.day_number,
             cycle_number=report.cycle_number,
@@ -333,7 +333,7 @@ class EmailReporter:
             week_label=week_label,
             week_start=report.week_start.isoformat(),
             week_end=report.week_end.isoformat(),
-            generated_at=datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M"),
+            generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
             base_url=base_url,
             # Activity
             cycles_run=report.cycles_run,

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 
+import { ProposedPauseCard } from "@/components/ProposedPauseCard";
+import { ProposedScaleCard } from "@/components/ProposedScaleCard";
 import { ProposedVariantCard } from "@/components/ProposedVariantCard";
 import { SuggestGenomeForm } from "@/components/SuggestGenomeForm";
 import { Card, CardContent } from "@/components/ui/Card";
@@ -11,6 +13,11 @@ import {
   useMe,
   useRejectProposal,
 } from "@/lib/api/hooks";
+import type {
+  PendingApproval,
+  PendingNewVariant,
+  ProposedVariant,
+} from "@/lib/api/types";
 
 /**
  * Authed replacement for the tokenized /review/{token} page.
@@ -144,9 +151,29 @@ function ExperimentsBody({
   onApprove,
   onReject,
 }: ExperimentsBodyProps) {
-  const pending = data.proposed_variants.filter(
-    (pv) => !resolved.has(pv.approval_id),
-  );
+  // Phase H: prefer the discriminated union from ``pending_approvals``
+  // when the backend returned one; fall back to the legacy
+  // ``proposed_variants`` list for old responses so the page keeps
+  // working during rollout.
+  const approvals: PendingApproval[] =
+    data.pending_approvals && data.pending_approvals.length > 0
+      ? data.pending_approvals
+      : (data.proposed_variants ?? []).map(
+          (pv: ProposedVariant): PendingNewVariant => ({
+            kind: "new_variant",
+            approval_id: pv.approval_id,
+            variant_id: pv.variant_id ?? null,
+            variant_code: pv.variant_code,
+            genome: pv.genome,
+            genome_summary: pv.genome_summary,
+            hypothesis: pv.hypothesis,
+            submitted_at: pv.submitted_at,
+            classification: pv.classification,
+            days_until_expiry: pv.days_until_expiry,
+          }),
+        );
+
+  const visible = approvals.filter((a) => !resolved.has(a.approval_id));
   const resolvedCount = resolved.size;
 
   return (
@@ -155,32 +182,84 @@ function ExperimentsBody({
         <div className="mb-3 flex items-baseline gap-2">
           <h2 className="text-[15px] font-medium">Pending proposals</h2>
           <span className="text-[11px] text-[var(--text-tertiary)]">
-            {pending.length} pending
+            {visible.length} pending
             {resolvedCount > 0 ? ` · ${resolvedCount} resolved` : ""}
           </span>
         </div>
 
-        {data.proposed_variants.length === 0 ? (
+        {approvals.length === 0 ? (
           <Card>
             <CardContent className="text-center text-[var(--text-secondary)]">
               <p>No pending proposals right now.</p>
               <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-                The next weekly report will bring fresh variants to review.
+                The next cycle will surface pause and scale recommendations
+                here for your review.
               </p>
             </CardContent>
           </Card>
         ) : (
           <div className="flex flex-col gap-3">
-            {data.proposed_variants.map((pv) => (
-              <ProposedVariantCard
-                key={pv.approval_id}
-                variant={pv}
-                onApprove={onApprove}
-                onReject={onReject}
-                busy={busy}
-                resolved={resolved.has(pv.approval_id)}
-              />
-            ))}
+            {approvals.map((a) => {
+              const isResolved = resolved.has(a.approval_id);
+              if (a.kind === "pause_variant") {
+                return (
+                  <ProposedPauseCard
+                    key={a.approval_id}
+                    proposal={a}
+                    onApprove={onApprove}
+                    onReject={onReject}
+                    busy={busy}
+                    resolved={isResolved}
+                  />
+                );
+              }
+              if (a.kind === "scale_budget") {
+                return (
+                  <ProposedScaleCard
+                    key={a.approval_id}
+                    proposal={a}
+                    onApprove={onApprove}
+                    onReject={onReject}
+                    busy={busy}
+                    resolved={isResolved}
+                  />
+                );
+              }
+              if (a.kind === "new_variant") {
+                // Re-use the existing card; it takes the legacy
+                // ``ProposedVariant`` shape, which is structurally
+                // identical to ``PendingNewVariant`` minus ``kind``.
+                const legacy: ProposedVariant = {
+                  approval_id: a.approval_id,
+                  variant_id: a.variant_id ?? "",
+                  variant_code: a.variant_code,
+                  genome: a.genome,
+                  genome_summary: a.genome_summary,
+                  hypothesis: a.hypothesis,
+                  submitted_at: a.submitted_at,
+                  classification: a.classification,
+                  days_until_expiry: a.days_until_expiry,
+                };
+                return (
+                  <ProposedVariantCard
+                    key={a.approval_id}
+                    variant={legacy}
+                    onApprove={onApprove}
+                    onReject={onReject}
+                    busy={busy}
+                    resolved={isResolved}
+                  />
+                );
+              }
+              // promote_winner — placeholder branch (Phase H plan note)
+              return (
+                <Card key={a.approval_id}>
+                  <CardContent className="text-[var(--text-secondary)]">
+                    Promote-winner review coming soon.
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </section>

@@ -11,7 +11,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
@@ -27,7 +27,17 @@ from src.db.queries import (
     get_pending_approvals,
     get_top_interactions,
 )
+from src.db.tables import ApprovalActionType
 from src.models.analysis import ElementInsight, InteractionInsight
+from src.models.approvals import (
+    PauseEvidence,
+    PendingApproval,
+    PendingNewVariant,
+    PendingPauseVariant,
+    PendingPromoteWinner,
+    PendingScaleBudget,
+    ScaleEvidence,
+)
 from src.models.genome import GenePool
 from src.models.reports import ProposedVariant
 
@@ -256,7 +266,14 @@ async def load_proposed_variants(
     session: AsyncSession,
     campaign_id: UUID,
 ) -> list[ProposedVariant]:
-    """Load all pending proposed variants for a campaign, classified for the report.
+    """Load pending ``new_variant`` proposals for a campaign (weekly report path).
+
+    Phase H: the ``approval_queue`` now holds pause/scale proposals
+    too. The weekly email report only cares about proposed new
+    variants (the creative pipeline) so this loader filters down to
+    ``action_type='new_variant'`` rows. The richer experiments page
+    uses :func:`load_pending_approvals` to get the full discriminated
+    union.
 
     Classification:
     - "new": submitted within the last 7 days
@@ -264,10 +281,15 @@ async def load_proposed_variants(
     """
     settings = get_settings()
     ttl_days = settings.proposal_ttl_days
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     expiring_threshold = now - timedelta(days=7)
 
     pending = await get_pending_approvals(session, campaign_id=campaign_id)
+    pending = [
+        p
+        for p in pending
+        if p.action_type == ApprovalActionType.new_variant and p.variant_id is not None
+    ]
 
     # Pull variant codes in a single query
     variant_ids = [item.variant_id for item in pending]
@@ -284,7 +306,7 @@ async def load_proposed_variants(
     for item in pending:
         submitted_at = item.submitted_at
         if submitted_at.tzinfo is None:
-            submitted_at = submitted_at.replace(tzinfo=timezone.utc)
+            submitted_at = submitted_at.replace(tzinfo=UTC)
 
         age_days = (now - submitted_at).days
         classification = "expiring_soon" if submitted_at < expiring_threshold else "new"
@@ -311,3 +333,143 @@ async def load_proposed_variants(
         key=lambda p: (0 if p.classification == "expiring_soon" else 1, -p.submitted_at.timestamp())
     )
     return proposed
+
+
+async def load_pending_approvals(
+    session: AsyncSession,
+    campaign_id: UUID,
+) -> list[PendingApproval]:
+    """Return every pending approval for a campaign as a discriminated union.
+
+    Phase H: the ``/experiments`` page renders a unified list of
+    proposals — new variants, pause requests, budget changes — with
+    different cards per kind. Each row is converted to the matching
+    :class:`PendingApproval` branch so the frontend can discriminate
+    on the ``kind`` literal.
+
+    Sort order matches the DB query (pause → scale → new_variant →
+    promote_winner), which is what ``get_pending_approvals`` already
+    returns, so we preserve it rather than re-sorting here.
+    """
+    settings = get_settings()
+    ttl_days = settings.proposal_ttl_days
+    now = datetime.now(UTC)
+    expiring_threshold = now - timedelta(days=7)
+
+    pending = await get_pending_approvals(session, campaign_id=campaign_id)
+    if not pending:
+        return []
+
+    # Resolve variant codes for rows that have one. pause/scale rows
+    # don't own a variant_id but may reference a deployment — we
+    # resolve those codes via a second query so the UI can still show
+    # "pausing V7" rather than a raw deployment id.
+    direct_variant_ids = [p.variant_id for p in pending if p.variant_id is not None]
+    deployment_ids: list[str] = []
+    for p in pending:
+        payload = p.action_payload or {}
+        did = payload.get("deployment_id")
+        if did:
+            deployment_ids.append(str(did))
+
+    code_map: dict[UUID, str] = {}
+    if direct_variant_ids:
+        rows = await session.execute(
+            text("SELECT id, variant_code FROM variants WHERE id = ANY(:ids)"),
+            {"ids": direct_variant_ids},
+        )
+        for row in rows.fetchall():
+            code_map[row[0]] = str(row[1])
+
+    deployment_variant_code: dict[str, str] = {}
+    if deployment_ids:
+        rows = await session.execute(
+            text(
+                """
+                SELECT d.id::text, v.variant_code
+                FROM deployments d
+                JOIN variants v ON v.id = d.variant_id
+                WHERE d.id = ANY(:ids)
+                """
+            ),
+            {"ids": deployment_ids},
+        )
+        for row in rows.fetchall():
+            deployment_variant_code[str(row[0])] = str(row[1])
+
+    items: list[PendingApproval] = []
+    for p in pending:
+        submitted_at = p.submitted_at
+        if submitted_at.tzinfo is None:
+            submitted_at = submitted_at.replace(tzinfo=UTC)
+        payload = p.action_payload or {}
+        genome = p.genome_snapshot if isinstance(p.genome_snapshot, dict) else {}
+
+        if p.action_type == ApprovalActionType.new_variant:
+            age_days = (now - submitted_at).days
+            classification = "expiring_soon" if submitted_at < expiring_threshold else "new"
+            days_until_expiry = max(0, ttl_days - age_days)
+            items.append(
+                PendingNewVariant(
+                    approval_id=p.id,
+                    variant_id=p.variant_id,
+                    variant_code=code_map.get(p.variant_id, "—") if p.variant_id else "—",
+                    genome=genome,
+                    genome_summary=_summarize_genome(genome),
+                    hypothesis=p.hypothesis,
+                    submitted_at=submitted_at,
+                    classification=classification,
+                    days_until_expiry=days_until_expiry,
+                )
+            )
+        elif p.action_type == ApprovalActionType.pause_variant:
+            deployment_id = payload.get("deployment_id")
+            platform_ad_id = payload.get("platform_ad_id", "")
+            reason = payload.get("reason", "statistically_significant_loser")
+            evidence_raw = payload.get("evidence") or {}
+            evidence_raw = {**evidence_raw, "reason": reason}
+            items.append(
+                PendingPauseVariant(
+                    approval_id=p.id,
+                    campaign_id=p.campaign_id,
+                    deployment_id=deployment_id,
+                    platform_ad_id=platform_ad_id,
+                    variant_code=deployment_variant_code.get(str(deployment_id)),
+                    genome_snapshot=genome,
+                    reason=reason,
+                    evidence=PauseEvidence.model_validate(evidence_raw),
+                    submitted_at=submitted_at,
+                )
+            )
+        elif p.action_type == ApprovalActionType.scale_budget:
+            deployment_id = payload.get("deployment_id")
+            platform_ad_id = payload.get("platform_ad_id", "")
+            current_budget = payload.get("current_budget", 0)
+            proposed_budget = payload.get("proposed_budget", 0)
+            evidence_raw = payload.get("evidence") or {}
+            items.append(
+                PendingScaleBudget(
+                    approval_id=p.id,
+                    campaign_id=p.campaign_id,
+                    deployment_id=deployment_id,
+                    platform_ad_id=platform_ad_id,
+                    variant_code=deployment_variant_code.get(str(deployment_id)),
+                    genome_snapshot=genome,
+                    current_budget=Decimal(str(current_budget)),
+                    proposed_budget=Decimal(str(proposed_budget)),
+                    reason=payload.get("reason", "thompson_sampling"),
+                    evidence=ScaleEvidence.model_validate(evidence_raw),
+                    submitted_at=submitted_at,
+                )
+            )
+        elif p.action_type == ApprovalActionType.promote_winner:
+            items.append(
+                PendingPromoteWinner(
+                    approval_id=p.id,
+                    variant_id=p.variant_id,
+                    variant_code=code_map.get(p.variant_id, "—") if p.variant_id else "—",
+                    submitted_at=submitted_at,
+                )
+            )
+
+    return items

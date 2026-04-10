@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import os
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -48,7 +47,7 @@ def sample_metrics() -> list[MetricsSnapshot]:
     """Return a list of realistic MetricsSnapshot objects for testing."""
     variant_id = uuid.UUID("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
     deployment_id = uuid.UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     return [
         MetricsSnapshot(

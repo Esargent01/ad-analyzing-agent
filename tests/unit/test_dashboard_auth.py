@@ -11,11 +11,9 @@ Covers:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 from uuid import uuid4
-
-import pytest
 
 from src.dashboard.auth import (
     create_magic_link_token,
@@ -24,7 +22,6 @@ from src.dashboard.auth import (
     verify_magic_link_token,
     verify_session_token,
 )
-
 
 # ---------------------------------------------------------------------------
 # Magic-link tokens
@@ -58,7 +55,7 @@ class TestMagicLinkTokens:
 
     def test_expired_token_returns_none(self):
         token = create_magic_link_token("a@b.com", ttl_minutes=1)
-        future = datetime.now(timezone.utc) + timedelta(minutes=5)
+        future = datetime.now(UTC) + timedelta(minutes=5)
 
         class _FakeDatetime(datetime):
             @classmethod
@@ -98,7 +95,7 @@ class TestSessionTokens:
 
     def test_expired_token_returns_none(self):
         token = create_session_token(uuid4(), ttl_days=1)
-        future = datetime.now(timezone.utc) + timedelta(days=2)
+        future = datetime.now(UTC) + timedelta(days=2)
 
         class _FakeDatetime(datetime):
             @classmethod

@@ -10,7 +10,6 @@ from pydantic import BaseModel, ConfigDict
 
 from src.models.analysis import ElementInsight, InteractionInsight
 
-
 # ---------------------------------------------------------------------------
 # New daily-report models (v2)
 # ---------------------------------------------------------------------------

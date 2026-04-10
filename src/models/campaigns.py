@@ -13,7 +13,6 @@ from __future__ import annotations
 
 from datetime import datetime
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -35,9 +34,9 @@ class ImportableCampaign(BaseModel):
     meta_campaign_id: str
     name: str
     status: str
-    daily_budget: Optional[float] = None
-    created_time: Optional[datetime] = None
-    objective: Optional[str] = None
+    daily_budget: float | None = None
+    created_time: datetime | None = None
+    objective: str | None = None
     already_imported: bool = False
 
 
@@ -58,13 +57,13 @@ class ImportableCampaignsResponse(BaseModel):
     # lists are valid (brand-new Facebook account with nothing set up).
     available_ad_accounts: list[MetaAdAccountInfo] = Field(default_factory=list)
     available_pages: list[MetaPageInfo] = Field(default_factory=list)
-    default_ad_account_id: Optional[str] = None
-    default_page_id: Optional[str] = None
+    default_ad_account_id: str | None = None
+    default_page_id: str | None = None
     # The account the ``importable`` list was actually fetched against.
     # When this is NULL the caller passed ``ad_account_id=None`` *and*
     # the user has no default, which means the UI should prompt for
     # an account before showing any campaigns.
-    selected_ad_account_id: Optional[str] = None
+    selected_ad_account_id: str | None = None
 
 
 class CampaignImportOverrides(BaseModel):
@@ -72,9 +71,9 @@ class CampaignImportOverrides(BaseModel):
 
     model_config = ConfigDict(strict=True)
 
-    daily_budget: Optional[Decimal] = Field(default=None, ge=0)
-    max_concurrent_variants: Optional[int] = Field(default=None, ge=1, le=50)
-    confidence_threshold: Optional[Decimal] = Field(
+    daily_budget: Decimal | None = Field(default=None, ge=0)
+    max_concurrent_variants: int | None = Field(default=None, ge=1, le=50)
+    confidence_threshold: Decimal | None = Field(
         default=None, ge=Decimal("0.5"), le=Decimal("0.999")
     )
 
@@ -99,7 +98,7 @@ class CampaignImportRequest(BaseModel):
     overrides: CampaignImportOverrides = Field(default_factory=CampaignImportOverrides)
     ad_account_id: str = Field(min_length=1)
     page_id: str = Field(min_length=1)
-    landing_page_url: Optional[str] = None
+    landing_page_url: str | None = None
 
 
 class ImportedCampaignSummary(BaseModel):

@@ -10,17 +10,19 @@ Revises: 002_gene_pool_meta
 Create Date: 2026-04-09
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects.postgresql import UUID
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "003_auth_tables"
-down_revision: Union[str, None] = "002_gene_pool_meta"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "002_gene_pool_meta"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -78,9 +80,7 @@ def upgrade() -> None:
         ),
     )
     op.create_index("idx_user_campaigns_user", "user_campaigns", ["user_id"])
-    op.create_index(
-        "idx_user_campaigns_campaign", "user_campaigns", ["campaign_id"]
-    )
+    op.create_index("idx_user_campaigns_campaign", "user_campaigns", ["campaign_id"])
 
 
 def downgrade() -> None:

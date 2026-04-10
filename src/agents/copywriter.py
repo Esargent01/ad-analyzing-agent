@@ -83,7 +83,7 @@ class CopywriterAgent:
         self,
         api_key: str,
         model: str = "claude-sonnet-4-20250514",
-        usage_session: "AsyncSession | None" = None,
+        usage_session: AsyncSession | None = None,
         usage_context: AgentContext | None = None,
     ) -> None:
         self._client = anthropic.Anthropic(api_key=api_key)

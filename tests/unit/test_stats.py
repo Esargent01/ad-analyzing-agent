@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from src.services.stats import compare_variants, element_significance, has_sufficient_data
 
 

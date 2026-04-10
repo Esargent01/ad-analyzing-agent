@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import datetime
 
-import pytest
-
-from src.services.fatigue import FatigueResult, detect_fatigue
+from src.services.fatigue import detect_fatigue
 
 
 class TestDetectFatigue:

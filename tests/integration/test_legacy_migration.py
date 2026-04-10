@@ -36,7 +36,6 @@ from uuid import uuid4
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Import the migration module directly (it's not on the Python path).
 # ---------------------------------------------------------------------------

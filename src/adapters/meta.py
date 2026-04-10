@@ -10,11 +10,9 @@ from __future__ import annotations
 import asyncio
 import logging
 from functools import partial
-from typing import TYPE_CHECKING
 
 from facebook_business.adobjects.ad import Ad
 from facebook_business.adobjects.adaccount import AdAccount
-from facebook_business.adobjects.adcreative import AdCreative
 from facebook_business.adobjects.adimage import AdImage
 from facebook_business.adobjects.adset import AdSet
 from facebook_business.adobjects.advideo import AdVideo
@@ -23,9 +21,6 @@ from facebook_business.exceptions import FacebookRequestError
 
 from src.adapters.base import AdMetrics, BaseAdapter, MediaAsset
 from src.exceptions import PlatformAPIError
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 

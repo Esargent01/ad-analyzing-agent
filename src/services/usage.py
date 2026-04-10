@@ -30,9 +30,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -140,10 +139,10 @@ class AgentContext:
     level aggregate.
     """
 
-    user_id: Optional[UUID] = None
-    campaign_id: Optional[UUID] = None
-    cycle_id: Optional[UUID] = None
-    agent: Optional[str] = None
+    user_id: UUID | None = None
+    campaign_id: UUID | None = None
+    cycle_id: UUID | None = None
+    agent: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -157,7 +156,7 @@ async def log_llm_call(
     model: str,
     input_tokens: int,
     output_tokens: int,
-    metadata: Optional[dict[str, object]] = None,
+    metadata: dict[str, object] | None = None,
 ) -> UsageLog:
     """Insert a ``usage_log`` row for a single LLM API call.
 
@@ -171,7 +170,7 @@ async def log_llm_call(
     """
     cost = calculate_llm_cost(model, input_tokens, output_tokens)
     row = UsageLog(
-        recorded_at=datetime.now(timezone.utc),
+        recorded_at=datetime.now(UTC),
         user_id=ctx.user_id,
         campaign_id=ctx.campaign_id,
         cycle_id=ctx.cycle_id,
@@ -200,7 +199,7 @@ async def log_meta_call(
     ctx: AgentContext,
     method: str,
     cost_usd: Decimal = Decimal("0"),
-    metadata: Optional[dict[str, object]] = None,
+    metadata: dict[str, object] | None = None,
 ) -> UsageLog:
     """Insert a ``usage_log`` row for a single Meta API method call.
 
@@ -214,7 +213,7 @@ async def log_meta_call(
     wants to attribute a known unit cost.
     """
     row = UsageLog(
-        recorded_at=datetime.now(timezone.utc),
+        recorded_at=datetime.now(UTC),
         user_id=ctx.user_id,
         campaign_id=ctx.campaign_id,
         cycle_id=ctx.cycle_id,
