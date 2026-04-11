@@ -36,7 +36,14 @@ export function CampaignDetailRoute() {
 
   const dailyCount = daily.data?.dates.length ?? 0;
   const weeklyCount = weekly.data?.weeks.length ?? 0;
-  const pendingCount = experiments.data?.proposed_variants.length ?? 0;
+  // Phase H: prefer the unified ``pending_approvals`` list so
+  // pause_variant and scale_budget proposals are counted alongside
+  // new variants. Fall back to the legacy ``proposed_variants`` field
+  // for back-compat during rollout (pre-Phase-H backend).
+  const pendingCount =
+    experiments.data?.pending_approvals?.length ??
+    experiments.data?.proposed_variants.length ??
+    0;
   const latestDaily = daily.data?.dates[0];
   const latestWeek = weekly.data?.weeks[0];
 
