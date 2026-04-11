@@ -181,8 +181,21 @@ class BaseAdapter(ABC):
         """
 
     @abstractmethod
-    async def get_metrics(self, platform_ad_id: str) -> AdMetrics:
-        """Fetch the latest metrics for an ad.
+    async def get_metrics(
+        self,
+        platform_ad_id: str,
+        *,
+        time_range: tuple[str, str] | None = None,
+    ) -> AdMetrics:
+        """Fetch metrics for an ad.
+
+        Args:
+            platform_ad_id: Platform-native ad ID.
+            time_range: Optional ``(since, until)`` pair of ``YYYY-MM-DD``
+                strings. When provided, the adapter queries the platform
+                for that exact date range (inclusive on both ends) instead
+                of the default current-day snapshot. Used by the daily
+                report path to fetch yesterday's settled numbers.
 
         Returns:
             An ``AdMetrics`` dataclass with impressions, clicks, conversions, spend.

@@ -233,8 +233,17 @@ class MockAdapter(BaseAdapter):
         ad.daily_budget = new_budget
         return True
 
-    async def get_metrics(self, platform_ad_id: str) -> AdMetrics:
-        self._record("get_metrics", platform_ad_id=platform_ad_id)
+    async def get_metrics(
+        self,
+        platform_ad_id: str,
+        *,
+        time_range: tuple[str, str] | None = None,
+    ) -> AdMetrics:
+        self._record(
+            "get_metrics",
+            platform_ad_id=platform_ad_id,
+            time_range=time_range,
+        )
         self._maybe_fail("get_metrics")
 
         ad = self._ensure_ad(platform_ad_id)

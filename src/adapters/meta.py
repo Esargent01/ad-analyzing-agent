@@ -344,8 +344,17 @@ class MetaAdapter(BaseAdapter):
         result: bool = await self._run_sync(partial(_update_budget))  # type: ignore[assignment]
         return result
 
-    async def get_metrics(self, platform_ad_id: str) -> AdMetrics:
-        logger.debug("Fetching metrics for Meta ad %s", platform_ad_id)
+    async def get_metrics(
+        self,
+        platform_ad_id: str,
+        *,
+        time_range: tuple[str, str] | None = None,
+    ) -> AdMetrics:
+        logger.debug(
+            "Fetching metrics for Meta ad %s (time_range=%s)",
+            platform_ad_id,
+            time_range,
+        )
 
         # Full-funnel insight fields requested from Meta API
         _INSIGHT_FIELDS = [
@@ -364,11 +373,22 @@ class MetaAdapter(BaseAdapter):
             "outbound_clicks",
         ]
 
+        # When ``time_range`` is provided, ask Meta for that exact window
+        # so the daily-report path can fetch yesterday's settled numbers
+        # instead of the partial current-day snapshot.
+        if time_range is not None:
+            since, until = time_range
+            params: dict[str, object] = {
+                "time_range": {"since": since, "until": until},
+            }
+        else:
+            params = {"date_preset": "today"}
+
         def _get_metrics() -> dict[str, object]:
             ad = Ad(platform_ad_id)
             insights = ad.get_insights(
                 fields=_INSIGHT_FIELDS,
-                params={"date_preset": "today"},
+                params=params,
             )
             if not insights:
                 return {}

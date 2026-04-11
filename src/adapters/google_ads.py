@@ -277,8 +277,23 @@ class GoogleAdsAdapter(BaseAdapter):
         result: bool = await self._run_sync(partial(_update))  # type: ignore[assignment]
         return result
 
-    async def get_metrics(self, platform_ad_id: str) -> AdMetrics:
-        logger.debug("Fetching metrics for Google ad %s", platform_ad_id)
+    async def get_metrics(
+        self,
+        platform_ad_id: str,
+        *,
+        time_range: tuple[str, str] | None = None,
+    ) -> AdMetrics:
+        logger.debug(
+            "Fetching metrics for Google ad %s (time_range=%s)",
+            platform_ad_id,
+            time_range,
+        )
+
+        if time_range is not None:
+            since, until = time_range
+            date_clause = f"AND segments.date BETWEEN '{since}' AND '{until}'"
+        else:
+            date_clause = "AND segments.date DURING TODAY"
 
         def _get_metrics() -> dict[str, int | float]:
             ga_service = self._client.get_service("GoogleAdsService")
@@ -290,7 +305,7 @@ class GoogleAdsAdapter(BaseAdapter):
                 "  metrics.cost_micros "
                 "FROM ad_group_ad "
                 f"WHERE ad_group_ad.resource_name = '{platform_ad_id}' "
-                "AND segments.date DURING TODAY"
+                f"{date_clause}"
             )
             response = ga_service.search(customer_id=self._customer_id, query=query)
             rows = list(response)

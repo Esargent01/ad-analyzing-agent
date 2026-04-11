@@ -913,7 +913,9 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
     async def _run() -> None:
         from datetime import date, timedelta
 
+        from src.adapters.meta_factory import get_meta_adapter_for_campaign
         from src.db.engine import close_db, get_session, init_db
+        from src.services.poller import MetricsPoller
         from src.services.reports import build_daily_report
 
         settings = get_settings()
@@ -926,6 +928,21 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
             report_day = date.today() - timedelta(days=1)
 
         campaign_uuid = UUID(campaign_id)
+
+        # Re-poll Meta for the report day's settled numbers before building
+        # the aggregate. Without this, the report only sees whatever partial
+        # current-day snapshot the live cron wrote. Non-fatal on failure.
+        try:
+            async with get_session() as session:
+                adapter = await get_meta_adapter_for_campaign(session, campaign_uuid)
+                poller = MetricsPoller(adapter=adapter, session=session)
+                await poller.poll_campaign_for_date(campaign_uuid, report_day)
+                await session.commit()
+        except Exception as poll_exc:  # noqa: BLE001
+            click.echo(
+                f"Warning: settled-metrics backfill for {report_day.isoformat()} "
+                f"failed ({poll_exc}); rendering from existing data"
+            )
 
         v2_report = None
         async with get_session() as session:
@@ -2362,12 +2379,34 @@ def send_daily_reports(report_date: str | None, dry_run: bool) -> None:
             await close_db()
             return
 
+        from src.adapters.meta_factory import get_meta_adapter_for_campaign
         from src.reports.email import EmailReporter
+        from src.services.poller import MetricsPoller
 
         sent = 0
         failed: list[tuple[str, str]] = []
         for campaign, owner_email in rows:
             try:
+                # Step 1: re-poll settled metrics for ``report_day`` so the
+                # aggregate sees yesterday's *final* numbers. Without this,
+                # the report only reflects whatever partial-day snapshot the
+                # live optimization cron happened to write during the day —
+                # which is how ``public/daily/*.html`` ended up with $0 spend
+                # cards even though Meta had real spend for that date.
+                try:
+                    async with get_session() as session:
+                        adapter = await get_meta_adapter_for_campaign(session, campaign.id)
+                        poller = MetricsPoller(adapter=adapter, session=session)
+                        await poller.poll_campaign_for_date(campaign.id, report_day)
+                        await session.commit()
+                except Exception as poll_exc:  # noqa: BLE001
+                    # Polling failure shouldn't block the email — we still
+                    # render from whatever's in the DB, just warn loudly.
+                    click.echo(
+                        f"  ! {campaign.name}: settled-metrics backfill failed "
+                        f"({poll_exc}); rendering from existing data"
+                    )
+
                 async with get_session() as session:
                     report = await build_daily_report(session, campaign.id, report_day)
                 reporter = EmailReporter(
