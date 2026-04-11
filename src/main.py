@@ -413,6 +413,8 @@ def seed_dummy_approvals(
             submit_for_approval,
         )
         from src.db.tables import (
+            ApprovalActionType,
+            ApprovalQueueItem,
             Campaign,
             Deployment,
             PlatformType,
@@ -436,15 +438,22 @@ def seed_dummy_approvals(
 
             click.echo(f"Using campaign {campaign.id} ({campaign.name})")
 
-            # Find or create an active deployment for the campaign so the
-            # pause/scale rows reference real foreign keys.
+            # Find or create an active deployment for the campaign so
+            # the pause/scale rows reference real foreign keys. Exclude
+            # V_DUMMY2 and prefer the oldest deployment so re-runs after
+            # the secondary-dummy block is seeded keep targeting the
+            # same primary deployment (otherwise the LIMIT 1 ordering
+            # can flip between runs).
             existing = await session.execute(
                 sa_text(
                     """
                     SELECT d.id, d.platform_ad_id, d.daily_budget, v.id, v.variant_code, v.genome
                     FROM deployments d
                     JOIN variants v ON v.id = d.variant_id
-                    WHERE v.campaign_id = :cid AND d.is_active = TRUE
+                    WHERE v.campaign_id = :cid
+                      AND d.is_active = TRUE
+                      AND v.variant_code <> 'V_DUMMY2'
+                    ORDER BY d.created_at ASC
                     LIMIT 1
                     """
                 ),
@@ -484,10 +493,12 @@ def seed_dummy_approvals(
                 platform_ad_id = deployment.platform_ad_id
                 current_budget = deployment.daily_budget
                 genome = dummy_genome
+                primary_variant_id = variant.id
             else:
                 deployment_id = row[0]
                 platform_ad_id = str(row[1])
                 current_budget = Decimal(str(row[2]))
+                primary_variant_id = row[3]
                 genome = row[5] if isinstance(row[5], dict) else {}
                 click.echo(f"Reusing deployment {deployment_id} ({platform_ad_id})")
 
@@ -625,6 +636,160 @@ def seed_dummy_approvals(
                     click.echo("Copy suggestions: skipped (already seeded)")
                 else:
                     click.echo(f"Copy suggestions queued: {queued}")
+
+            # ---- Secondary dummy: fatigue pause + scale-DOWN on a
+            # distinct deployment so we can show the other half of the
+            # state space (audience-fatigue vs stat-sig, scale-down vs
+            # scale-up). The pause/scale queue helpers dedupe per
+            # (deployment_id, action_type), so we need a second
+            # deployment rather than reusing V_DUMMY.
+            secondary_code = "V_DUMMY2"
+            secondary_stmt = select(Variant).where(
+                Variant.campaign_id == campaign.id,
+                Variant.variant_code == secondary_code,
+            )
+            secondary_variant = (await session.execute(secondary_stmt)).scalar_one_or_none()
+            if secondary_variant is None:
+                secondary_genome = {
+                    "headline": "Fresh arrivals — see what's new",
+                    "subhead": "Curated weekly drops",
+                    "cta_text": "Shop new arrivals",
+                    "media_asset": "placeholder_lifestyle",
+                    "audience": "broad_interest",
+                }
+                secondary_variant = Variant(
+                    campaign_id=campaign.id,
+                    variant_code=secondary_code,
+                    genome=secondary_genome,
+                    status=VariantStatus.active,
+                    hypothesis="Secondary dummy variant — fatigue + scale-down demos.",
+                )
+                session.add(secondary_variant)
+                await session.flush()
+
+                secondary_deployment = Deployment(
+                    variant_id=secondary_variant.id,
+                    platform=PlatformType(campaign.platform.value),
+                    platform_ad_id=f"dummy_ad_{secondary_variant.id.hex[:8]}",
+                    daily_budget=Decimal("40.00"),
+                    is_active=True,
+                )
+                session.add(secondary_deployment)
+                await session.flush()
+                secondary_deployment_id = secondary_deployment.id
+                secondary_platform_ad_id = secondary_deployment.platform_ad_id
+                secondary_budget = secondary_deployment.daily_budget
+                secondary_genome_used: dict = secondary_genome
+            else:
+                dep_row = await session.execute(
+                    sa_text(
+                        """
+                        SELECT id, platform_ad_id, daily_budget
+                        FROM deployments
+                        WHERE variant_id = :vid AND is_active = TRUE
+                        LIMIT 1
+                        """
+                    ),
+                    {"vid": secondary_variant.id},
+                )
+                dep = dep_row.fetchone()
+                if dep is None:
+                    backfill_deployment = Deployment(
+                        variant_id=secondary_variant.id,
+                        platform=PlatformType(campaign.platform.value),
+                        platform_ad_id=f"dummy_ad_{secondary_variant.id.hex[:8]}",
+                        daily_budget=Decimal("40.00"),
+                        is_active=True,
+                    )
+                    session.add(backfill_deployment)
+                    await session.flush()
+                    secondary_deployment_id = backfill_deployment.id
+                    secondary_platform_ad_id = backfill_deployment.platform_ad_id
+                    secondary_budget = backfill_deployment.daily_budget
+                else:
+                    secondary_deployment_id = dep[0]
+                    secondary_platform_ad_id = str(dep[1])
+                    secondary_budget = Decimal(str(dep[2]))
+                secondary_genome_used = (
+                    secondary_variant.genome if isinstance(secondary_variant.genome, dict) else {}
+                )
+
+            fatigue_id = await queue_pause_proposal(
+                session,
+                campaign_id=campaign.id,
+                deployment_id=secondary_deployment_id,
+                platform_ad_id=secondary_platform_ad_id,
+                reason="audience_fatigue",
+                evidence={
+                    "reason": "audience_fatigue",
+                    "consecutive_decline_days": 4,
+                    "trend_slope": -0.0012,
+                    "impressions": 8120,
+                    "clicks": 98,
+                },
+                genome_snapshot=secondary_genome_used,
+            )
+            if fatigue_id is None:
+                click.echo("Fatigue pause proposal: skipped (open proposal already exists)")
+            else:
+                click.echo(f"Fatigue pause proposal: {fatigue_id}")
+
+            scale_down_id = await queue_scale_proposal(
+                session,
+                campaign_id=campaign.id,
+                deployment_id=secondary_deployment_id,
+                platform_ad_id=secondary_platform_ad_id,
+                current_budget=secondary_budget,
+                proposed_budget=secondary_budget * Decimal("0.55"),
+                evidence={
+                    "allocation_method": "thompson_sampling",
+                    "impressions": 3140,
+                    "clicks": 41,
+                    "posterior_mean": 0.0131,
+                    "share_of_allocation": 0.08,
+                },
+                genome_snapshot=secondary_genome_used,
+            )
+            if scale_down_id is None:
+                click.echo("Scale-down proposal: skipped (open proposal already exists)")
+            else:
+                click.echo(f"Scale-down proposal: {scale_down_id}")
+
+            # ---- Promote-winner proposal on the primary V_DUMMY variant.
+            # ``src.db.queries`` doesn't have a helper for this yet — the
+            # orchestrator currently flips winner status directly rather
+            # than queueing a proposal — so we insert the row inline and
+            # dedupe with a manual SELECT on open promote_winner rows.
+            existing_promote = await session.execute(
+                sa_text(
+                    """
+                    SELECT id FROM approval_queue
+                    WHERE campaign_id = :cid
+                      AND action_type = 'promote_winner'
+                      AND approved IS NULL
+                    LIMIT 1
+                    """
+                ),
+                {"cid": campaign.id},
+            )
+            if existing_promote.first() is None:
+                promote_item = ApprovalQueueItem(
+                    variant_id=primary_variant_id,
+                    campaign_id=campaign.id,
+                    genome_snapshot=genome or {},
+                    hypothesis=(
+                        "[dummy-seed] Promote this variant to winner — "
+                        "CTR has held above baseline for 6 consecutive "
+                        "days with p < 0.01 on the significance test."
+                    ),
+                    action_type=ApprovalActionType.promote_winner,
+                    action_payload={},
+                )
+                session.add(promote_item)
+                await session.flush()
+                click.echo(f"Promote-winner proposal: {promote_item.id}")
+            else:
+                click.echo("Promote-winner proposal: skipped (open proposal already exists)")
 
             await session.commit()
 
