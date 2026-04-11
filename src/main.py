@@ -382,20 +382,36 @@ def create_campaign(
     type=str,
     help="Optional campaign UUID — overrides --campaign-name when provided.",
 )
-def seed_dummy_approvals(campaign_name: str, campaign_id: str | None) -> None:
-    """Seed one pause + one scale_budget proposal for layout debugging.
+@click.option(
+    "--copy-suggestions/--no-copy-suggestions",
+    default=True,
+    help="Also queue three dummy new_variant proposals with fresh copy.",
+)
+def seed_dummy_approvals(
+    campaign_name: str,
+    campaign_id: str | None,
+    copy_suggestions: bool,
+) -> None:
+    """Seed pause + scale_budget + copy-suggestion proposals for layout debugging.
 
     Creates a dummy variant + deployment if the campaign has none, then
-    queues two approval_queue rows so the /experiments page renders the
-    Phase H pause and scale cards. Safe to run multiple times — the
-    queue helpers dedupe per (deployment_id, action_type).
+    queues approval_queue rows so the /experiments page renders the
+    Phase H pause, scale, and new-variant cards. Safe to run multiple
+    times — the pause/scale helpers dedupe per (deployment_id,
+    action_type), and copy suggestions are tagged with a deterministic
+    hypothesis prefix so re-runs skip them.
     """
 
     async def _run() -> None:
-        from sqlalchemy import select, text as sa_text
+        from sqlalchemy import select
+        from sqlalchemy import text as sa_text
 
         from src.db.engine import close_db, get_session, init_db
-        from src.db.queries import queue_pause_proposal, queue_scale_proposal
+        from src.db.queries import (
+            queue_pause_proposal,
+            queue_scale_proposal,
+            submit_for_approval,
+        )
         from src.db.tables import (
             Campaign,
             Deployment,
@@ -517,6 +533,98 @@ def seed_dummy_approvals(campaign_name: str, campaign_id: str | None) -> None:
                 click.echo("Scale proposal: skipped (open proposal already exists)")
             else:
                 click.echo(f"Scale proposal: {scale_id}")
+
+            if copy_suggestions:
+                # Three plausible copy variations the "generator" might
+                # propose — each changes exactly one slot (headline /
+                # subhead / cta_text) from the running genome so the UI
+                # shows one-element-at-a-time hypotheses.
+                base = (
+                    genome
+                    if isinstance(genome, dict) and genome
+                    else {
+                        "headline": "Limited time: 40% off today only",
+                        "subhead": "Join 12,000+ happy customers",
+                        "cta_text": "Claim my discount",
+                        "media_asset": "placeholder_lifestyle",
+                        "audience": "retargeting_30d",
+                    }
+                )
+                suggestions = [
+                    {
+                        "genome": {**base, "headline": "Only 24 hours left — 40% off everything"},
+                        "hypothesis": (
+                            "[dummy-seed] Time-boxed urgency language should "
+                            "lift CTR over the evergreen 'limited time' phrasing."
+                        ),
+                    },
+                    {
+                        "genome": {**base, "subhead": "Rated 4.9★ by 12,000+ customers"},
+                        "hypothesis": (
+                            "[dummy-seed] Replacing the raw count with a star "
+                            "rating adds trust signal density on the subhead."
+                        ),
+                    },
+                    {
+                        "genome": {**base, "cta_text": "Start saving today"},
+                        "hypothesis": (
+                            "[dummy-seed] Outcome-focused CTA ('start saving') "
+                            "tests better than transaction-focused ('claim')."
+                        ),
+                    },
+                ]
+
+                # Dedupe on the hypothesis prefix so re-running the
+                # command doesn't stack up duplicate copy suggestions.
+                existing_hypotheses = await session.execute(
+                    sa_text(
+                        """
+                        SELECT hypothesis FROM approval_queue
+                        WHERE campaign_id = :cid
+                          AND action_type = 'new_variant'
+                          AND approved IS NULL
+                          AND hypothesis LIKE '[dummy-seed]%'
+                        """
+                    ),
+                    {"cid": campaign.id},
+                )
+                existing_set = {str(r[0]) for r in existing_hypotheses.fetchall()}
+
+                queued = 0
+                for suggestion in suggestions:
+                    if suggestion["hypothesis"] in existing_set:
+                        continue
+                    code_row = await session.execute(
+                        sa_text("SELECT next_variant_code(:id)"),
+                        {"id": campaign.id},
+                    )
+                    variant_code = str(code_row.scalar_one())
+                    proposal_variant = Variant(
+                        campaign_id=campaign.id,
+                        variant_code=variant_code,
+                        genome=suggestion["genome"],
+                        status=VariantStatus.pending,
+                        hypothesis=suggestion["hypothesis"],
+                    )
+                    session.add(proposal_variant)
+                    await session.flush()
+
+                    item = await submit_for_approval(
+                        session,
+                        variant_id=proposal_variant.id,
+                        campaign_id=campaign.id,
+                        genome=suggestion["genome"],
+                        hypothesis=suggestion["hypothesis"],
+                    )
+                    click.echo(
+                        f"Copy suggestion {variant_code}: {item.id} "
+                        f"({suggestion['hypothesis'][:60]}…)"
+                    )
+                    queued += 1
+                if queued == 0:
+                    click.echo("Copy suggestions: skipped (already seeded)")
+                else:
+                    click.echo(f"Copy suggestions queued: {queued}")
 
             await session.commit()
 
