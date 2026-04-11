@@ -370,6 +370,161 @@ def create_campaign(
     asyncio.run(_run())
 
 
+@cli.command(name="seed-dummy-approvals")
+@click.option(
+    "--campaign-name",
+    default="Q2 Product Launch",
+    help="Campaign name to attach the dummy proposals to.",
+)
+@click.option(
+    "--campaign-id",
+    default=None,
+    type=str,
+    help="Optional campaign UUID — overrides --campaign-name when provided.",
+)
+def seed_dummy_approvals(campaign_name: str, campaign_id: str | None) -> None:
+    """Seed one pause + one scale_budget proposal for layout debugging.
+
+    Creates a dummy variant + deployment if the campaign has none, then
+    queues two approval_queue rows so the /experiments page renders the
+    Phase H pause and scale cards. Safe to run multiple times — the
+    queue helpers dedupe per (deployment_id, action_type).
+    """
+
+    async def _run() -> None:
+        from sqlalchemy import select, text as sa_text
+
+        from src.db.engine import close_db, get_session, init_db
+        from src.db.queries import queue_pause_proposal, queue_scale_proposal
+        from src.db.tables import (
+            Campaign,
+            Deployment,
+            PlatformType,
+            Variant,
+            VariantStatus,
+        )
+
+        await init_db()
+        async with get_session() as session:
+            if campaign_id:
+                stmt = select(Campaign).where(Campaign.id == UUID(campaign_id))
+            else:
+                stmt = select(Campaign).where(Campaign.name == campaign_name)
+            campaign = (await session.execute(stmt)).scalar_one_or_none()
+            if campaign is None:
+                click.echo(
+                    f"Error: campaign {'id ' + campaign_id if campaign_id else 'name ' + repr(campaign_name)} not found."
+                )
+                await close_db()
+                return
+
+            click.echo(f"Using campaign {campaign.id} ({campaign.name})")
+
+            # Find or create an active deployment for the campaign so the
+            # pause/scale rows reference real foreign keys.
+            existing = await session.execute(
+                sa_text(
+                    """
+                    SELECT d.id, d.platform_ad_id, d.daily_budget, v.id, v.variant_code, v.genome
+                    FROM deployments d
+                    JOIN variants v ON v.id = d.variant_id
+                    WHERE v.campaign_id = :cid AND d.is_active = TRUE
+                    LIMIT 1
+                    """
+                ),
+                {"cid": campaign.id},
+            )
+            row = existing.fetchone()
+            if row is None:
+                click.echo("No active deployment found — creating dummy variant + deployment.")
+                dummy_genome = {
+                    "headline": "Limited time: 40% off today only",
+                    "subhead": "Join 12,000+ happy customers",
+                    "cta_text": "Claim my discount",
+                    "media_asset": "placeholder_lifestyle",
+                    "audience": "retargeting_30d",
+                }
+                variant = Variant(
+                    campaign_id=campaign.id,
+                    variant_code="V_DUMMY",
+                    genome=dummy_genome,
+                    status=VariantStatus.active,
+                    hypothesis="Dummy variant seeded for layout debugging.",
+                )
+                session.add(variant)
+                await session.flush()
+
+                deployment = Deployment(
+                    variant_id=variant.id,
+                    platform=PlatformType(campaign.platform.value),
+                    platform_ad_id=f"dummy_ad_{variant.id.hex[:8]}",
+                    daily_budget=Decimal("25.00"),
+                    is_active=True,
+                )
+                session.add(deployment)
+                await session.flush()
+
+                deployment_id = deployment.id
+                platform_ad_id = deployment.platform_ad_id
+                current_budget = deployment.daily_budget
+                genome = dummy_genome
+            else:
+                deployment_id = row[0]
+                platform_ad_id = str(row[1])
+                current_budget = Decimal(str(row[2]))
+                genome = row[5] if isinstance(row[5], dict) else {}
+                click.echo(f"Reusing deployment {deployment_id} ({platform_ad_id})")
+
+            pause_id = await queue_pause_proposal(
+                session,
+                campaign_id=campaign.id,
+                deployment_id=deployment_id,
+                platform_ad_id=platform_ad_id,
+                reason="statistically_significant_loser",
+                evidence={
+                    "reason": "statistically_significant_loser",
+                    "variant_ctr": 0.0142,
+                    "baseline_ctr": 0.0238,
+                    "p_value": 0.0031,
+                    "z_score": -2.96,
+                    "impressions": 4820,
+                    "clicks": 68,
+                },
+                genome_snapshot=genome,
+            )
+            if pause_id is None:
+                click.echo("Pause proposal: skipped (open proposal already exists)")
+            else:
+                click.echo(f"Pause proposal: {pause_id}")
+
+            scale_id = await queue_scale_proposal(
+                session,
+                campaign_id=campaign.id,
+                deployment_id=deployment_id,
+                platform_ad_id=platform_ad_id,
+                current_budget=current_budget,
+                proposed_budget=current_budget * Decimal("1.45"),
+                evidence={
+                    "allocation_method": "thompson_sampling",
+                    "impressions": 6210,
+                    "clicks": 184,
+                    "posterior_mean": 0.0312,
+                    "share_of_allocation": 0.42,
+                },
+                genome_snapshot=genome,
+            )
+            if scale_id is None:
+                click.echo("Scale proposal: skipped (open proposal already exists)")
+            else:
+                click.echo(f"Scale proposal: {scale_id}")
+
+            await session.commit()
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
 @cli.command()
 def health_check() -> None:
     """Check database connectivity and system health."""
