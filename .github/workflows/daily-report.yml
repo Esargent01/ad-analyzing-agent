@@ -51,6 +51,12 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           REPORT_EMAIL_FROM: ${{ secrets.REPORT_EMAIL_FROM }}
+          # The settled-metrics backfill polls Meta before rendering so
+          # daily reports reflect yesterday's final numbers instead of
+          # the partial-day snapshot from run-all-user-campaigns.
+          META_APP_ID: ${{ secrets.META_APP_ID }}
+          META_APP_SECRET: ${{ secrets.META_APP_SECRET }}
+          META_TOKEN_ENCRYPTION_KEY: ${{ secrets.META_TOKEN_ENCRYPTION_KEY }}
 
       - name: Send approval digest to every owner with pending items
         # Runs regardless of upstream failures — a failed cycle is
