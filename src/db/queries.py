@@ -20,6 +20,7 @@ from src.db.tables import (
     ApprovalQueueItem,
     Campaign,
     CycleAction,
+    DataDeletionRequest,
     Deployment,
     ElementInteraction,
     ElementPerformance,
@@ -1306,6 +1307,59 @@ async def delete_meta_connection(session: AsyncSession, user_id: UUID) -> bool:
     await session.delete(row)
     await session.flush()
     return True
+
+
+async def delete_meta_connection_by_meta_user_id(
+    session: AsyncSession, meta_user_id: str
+) -> UUID | None:
+    """Delete a Meta connection by the Meta-side user ID.
+
+    Used by the deauthorization webhook when Meta tells us a user
+    removed the app — we only know their Meta ID, not our internal
+    user ID.
+
+    Returns the internal ``user_id`` if a row was found and deleted,
+    or None if no matching connection existed.
+    """
+    stmt = select(UserMetaConnection).where(UserMetaConnection.meta_user_id == meta_user_id)
+    result = await session.execute(stmt)
+    row = result.scalar_one_or_none()
+    if row is None:
+        return None
+    user_id = row.user_id
+    await session.delete(row)
+    await session.flush()
+    return user_id
+
+
+async def create_data_deletion_request(
+    session: AsyncSession,
+    *,
+    confirmation_code: str,
+    meta_user_id: str,
+    user_id: UUID | None,
+) -> DataDeletionRequest:
+    """Record a Meta data-deletion callback for audit + status page."""
+    row = DataDeletionRequest(
+        confirmation_code=confirmation_code,
+        meta_user_id=meta_user_id,
+        user_id=user_id,
+        status="completed",
+    )
+    session.add(row)
+    await session.flush()
+    return row
+
+
+async def get_data_deletion_request(
+    session: AsyncSession, confirmation_code: str
+) -> DataDeletionRequest | None:
+    """Look up a data-deletion request by its confirmation code."""
+    stmt = select(DataDeletionRequest).where(
+        DataDeletionRequest.confirmation_code == confirmation_code
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 async def get_campaign_owner_id(session: AsyncSession, campaign_id: UUID) -> UUID | None:

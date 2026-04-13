@@ -74,8 +74,11 @@ from src.db.queries import (
     approve_variant,
     consume_magic_link_token,
     count_active_campaigns_for_user,
+    create_data_deletion_request,
     create_user,
     delete_meta_connection,
+    delete_meta_connection_by_meta_user_id,
+    get_data_deletion_request,
     get_element_rankings,
     get_meta_connection,
     get_pending_approvals,
@@ -486,6 +489,104 @@ async def review_page(request: Request, token: str) -> HTMLResponse:
             "allowed_suggestion_slots": sorted(_ALLOWED_SUGGESTION_SLOTS),
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# Public compliance pages (no auth required — Meta App Review)
+# ---------------------------------------------------------------------------
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_page(request: Request) -> HTMLResponse:
+    """Public privacy policy page required by Meta App Review."""
+    settings = get_settings()
+    return templates.TemplateResponse(
+        request,
+        "privacy.html",
+        {"contact_email": settings.report_email_from},
+    )
+
+
+@app.get("/data-deletion/{confirmation_code}", response_class=HTMLResponse)
+async def data_deletion_status_page(request: Request, confirmation_code: str) -> HTMLResponse:
+    """Public data-deletion status page returned to Meta after deauth.
+
+    Meta (or the user) can visit this URL to verify that the data
+    deletion was completed. The ``confirmation_code`` is returned
+    in the webhook response JSON.
+    """
+    async with get_session() as session:
+        deletion = await get_data_deletion_request(session, confirmation_code)
+    if deletion is None:
+        raise HTTPException(status_code=404, detail="Deletion request not found")
+
+    settings = get_settings()
+    return templates.TemplateResponse(
+        request,
+        "data_deletion.html",
+        {
+            "deletion": deletion,
+            "contact_email": settings.report_email_from,
+        },
+    )
+
+
+@app.post("/api/webhooks/meta/deauthorize")
+async def meta_deauthorize_webhook(request: Request) -> JSONResponse:
+    """Meta data-deletion / deauthorization callback.
+
+    When a user removes the app from Facebook Settings → Business
+    Integrations, Meta POSTs a ``signed_request`` form field here.
+    We verify the HMAC signature, delete the connection, and return
+    the required JSON with a status URL + confirmation code.
+
+    Reference:
+    https://developers.facebook.com/docs/development/create-an-app/app-dashboard/data-deletion-callback
+    """
+    from src.dashboard.meta_webhooks import (
+        generate_confirmation_code,
+        parse_signed_request,
+    )
+
+    settings = get_settings()
+    if not settings.meta_app_secret:
+        logger.error("META_APP_SECRET not configured — cannot verify deauth webhook")
+        raise HTTPException(status_code=500, detail="Server misconfigured")
+
+    form = await request.form()
+    signed_request = form.get("signed_request")
+    if not signed_request or not isinstance(signed_request, str):
+        raise HTTPException(status_code=400, detail="Missing signed_request")
+
+    try:
+        payload = parse_signed_request(signed_request, settings.meta_app_secret)
+    except ValueError:
+        logger.warning("Invalid signed_request in deauthorize webhook")
+        raise HTTPException(status_code=403, detail="Invalid signature")
+
+    confirmation_code = generate_confirmation_code()
+
+    async with get_session() as session:
+        user_id = await delete_meta_connection_by_meta_user_id(session, payload.user_id)
+        await create_data_deletion_request(
+            session,
+            confirmation_code=confirmation_code,
+            meta_user_id=payload.user_id,
+            user_id=user_id,
+        )
+
+    status_url = f"{settings.api_base_url}/data-deletion/{confirmation_code}"
+    logger.info(
+        "Meta deauthorize: meta_user=%s user=%s code=%s",
+        payload.user_id,
+        user_id,
+        confirmation_code,
+    )
+
+    return JSONResponse({"url": status_url, "confirmation_code": confirmation_code})
+
+
+# ---------------------------------------------------------------------------
 
 
 async def _load_approval_or_404(session, approval_id: UUID, campaign_id: UUID) -> None:

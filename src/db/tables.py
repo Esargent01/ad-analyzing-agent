@@ -577,6 +577,44 @@ class UserMetaConnection(Base):
         return f"<UserMetaConnection user={self.user_id} meta={self.meta_user_id}>"
 
 
+class DataDeletionRequest(Base):
+    """Tracks Meta data-deletion callback confirmations.
+
+    When Meta POSTs to the deauthorization webhook, we delete the user's
+    ``UserMetaConnection`` and create one of these rows. Meta requires
+    us to return a JSON body with ``url`` (status page) and
+    ``confirmation_code``.  The status page at
+    ``/data-deletion/{confirmation_code}`` lets Meta (or the user)
+    verify that the deletion completed.
+    """
+
+    __tablename__ = "data_deletion_requests"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        server_default="uuid_generate_v4()",
+    )
+    confirmation_code: Mapped[str] = mapped_column(Text, nullable=False, unique=True, index=True)
+    meta_user_id: Mapped[str] = mapped_column(Text, nullable=False)
+    # user_id is nullable — if the Meta user ID doesn't match any
+    # connection we still log the request for audit purposes.
+    user_id: Mapped[UUID | None] = mapped_column(
+        PG_UUID(as_uuid=True),
+        ForeignKey("users.id", ondelete="SET NULL"),
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default="'completed'")
+    requested_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default="now()"
+    )
+
+    def __repr__(self) -> str:
+        return (
+            f"<DataDeletionRequest code={self.confirmation_code} "
+            f"meta_user={self.meta_user_id} status={self.status}>"
+        )
+
+
 class UsageLog(Base):
     """One row per billable event — LLM call, Meta API hit, email.
 

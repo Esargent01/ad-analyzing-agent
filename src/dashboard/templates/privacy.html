@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Privacy Policy — Ad Creative Agent</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+    <style>
+        :root { --pico-font-size: 15px; }
+        h2 { margin-top: 2rem; }
+        .effective-date { opacity: 0.6; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header style="margin-bottom: 1.5rem;">
+            <h1 style="margin-bottom: 4px;">Privacy Policy</h1>
+            <p class="effective-date">Effective date: April 13, 2026</p>
+        </header>
+
+        <section>
+            <h2>1. What we do</h2>
+            <p>
+                Ad Creative Agent ("the Service") is an ad optimization platform
+                that helps advertisers test creative variants across Meta (Facebook/Instagram)
+                and Google Ads. The Service monitors campaign performance, analyzes
+                results, and generates optimized creative combinations.
+            </p>
+        </section>
+
+        <section>
+            <h2>2. Data we collect</h2>
+            <p>When you use the Service, we collect and store:</p>
+            <ul>
+                <li><strong>Account information</strong> — your email address, used for
+                    authentication via magic-link sign-in.</li>
+                <li><strong>Meta connection data</strong> — when you connect your Meta account,
+                    we receive an OAuth access token, your Meta user ID, and a list of
+                    ad accounts and Pages you have access to. We use this to manage
+                    ads on your behalf.</li>
+                <li><strong>Ad campaign metrics</strong> — impressions, reach, clicks,
+                    spend, CTR, CPC, and CPM for campaigns you import into the Service.</li>
+                <li><strong>Creative elements</strong> — headlines, subheads, CTAs,
+                    media asset references, and audience segments that make up your
+                    ad creative variants.</li>
+            </ul>
+            <p>We do <strong>not</strong> collect or store:</p>
+            <ul>
+                <li>Personal data about people who see or interact with your ads</li>
+                <li>Payment or billing information from ad platforms</li>
+                <li>Data from your Meta account beyond what is needed to manage ad campaigns</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>3. How we store and protect your data</h2>
+            <ul>
+                <li><strong>OAuth tokens</strong> are encrypted at rest using Fernet
+                    symmetric encryption before being stored in our database. The
+                    encryption key is stored separately from the database and is never
+                    committed to source control.</li>
+                <li><strong>Session cookies</strong> are HttpOnly, Secure, and
+                    SameSite-protected. Mutating API requests require a matching
+                    CSRF token (double-submit cookie pattern).</li>
+                <li><strong>Database access</strong> is restricted to the application
+                    service and is not publicly accessible.</li>
+                <li><strong>Magic-link tokens</strong> are single-use, time-limited
+                    (15 minutes), and hashed before storage.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>4. How we use your data</h2>
+            <p>We use the data we collect solely to:</p>
+            <ul>
+                <li>Authenticate you and manage your account session</li>
+                <li>Read ad campaign metrics from connected platforms</li>
+                <li>Analyze creative performance and generate optimization insights</li>
+                <li>Propose new creative variants for your review and approval</li>
+                <li>Execute approved actions (pause, scale, launch) on your ad campaigns</li>
+                <li>Send you daily and weekly performance reports</li>
+            </ul>
+            <p>We do <strong>not</strong> sell, rent, or share your data with third
+                parties for advertising or marketing purposes.</p>
+        </section>
+
+        <section>
+            <h2>5. Third-party services</h2>
+            <p>The Service integrates with:</p>
+            <ul>
+                <li><strong>Meta (Facebook) Marketing API</strong> — to read metrics and
+                    manage ad campaigns. Governed by
+                    <a href="https://www.facebook.com/privacy/policy/" target="_blank" rel="noopener">Meta's Privacy Policy</a>.</li>
+                <li><strong>Anthropic (Claude API)</strong> — to generate creative
+                    variant suggestions. Prompts sent to the LLM contain creative
+                    elements and anonymized performance data; no personally
+                    identifiable information is sent.</li>
+                <li><strong>SendGrid</strong> — to send authentication emails and
+                    performance reports to your email address.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>6. Data retention</h2>
+            <ul>
+                <li><strong>Campaign metrics</strong> are retained for the lifetime of
+                    the campaign plus 90 days after deletion.</li>
+                <li><strong>Meta OAuth tokens</strong> expire after approximately 60 days.
+                    Expired tokens are not usable and are overwritten when you reconnect.</li>
+                <li><strong>Session data</strong> expires after 30 days of inactivity.</li>
+                <li><strong>Magic-link tokens</strong> expire after 15 minutes and are
+                    deleted after use.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>7. Data deletion</h2>
+            <p>You can delete your data at any time:</p>
+            <ul>
+                <li><strong>Disconnect Meta</strong> — click "Disconnect" in the dashboard
+                    to immediately delete your stored OAuth token and connection data.</li>
+                <li><strong>Remove from Facebook</strong> — remove this app from your
+                    <a href="https://www.facebook.com/settings?tab=business_tools" target="_blank" rel="noopener">Facebook Business Integrations</a>
+                    settings. We will automatically receive a deauthorization callback
+                    and delete your connection data.</li>
+                <li><strong>Account deletion</strong> — contact us at the email below
+                    to request full deletion of your account and all associated data.</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>8. Your rights</h2>
+            <p>You have the right to:</p>
+            <ul>
+                <li>Access the data we hold about you</li>
+                <li>Request correction of inaccurate data</li>
+                <li>Request deletion of your data</li>
+                <li>Disconnect third-party integrations at any time</li>
+                <li>Export your campaign data</li>
+            </ul>
+        </section>
+
+        <section>
+            <h2>9. Contact</h2>
+            <p>
+                For privacy-related questions or data requests, contact us at:
+                <br>
+                <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>
+            </p>
+        </section>
+
+        <section>
+            <h2>10. Changes to this policy</h2>
+            <p>
+                We may update this policy from time to time. If we make material
+                changes, we will notify you via the email address associated with
+                your account.
+            </p>
+        </section>
+    </main>
+</body>
+</html>
