@@ -4,9 +4,11 @@ import { AuthedLayout } from "@/routes/_layout";
 import { CampaignDetailRoute } from "@/routes/campaign-detail";
 import { DailyReportDetailRoute } from "@/routes/daily-report-detail";
 import { DashboardRoute } from "@/routes/dashboard";
+import { DataDeletionRoute } from "@/routes/data-deletion";
 import { ExperimentsRoute } from "@/routes/experiments";
 import { ImportMetaCampaignsRoute } from "@/routes/import-meta-campaigns";
 import { MagicLinkSentRoute } from "@/routes/magic-link-sent";
+import { PrivacyRoute } from "@/routes/privacy";
 import { ReportsDailyListRoute } from "@/routes/reports-daily-list";
 import { ReportsWeeklyListRoute } from "@/routes/reports-weekly-list";
 import { SignInRoute } from "@/routes/sign-in";
@@ -28,6 +30,14 @@ export const router = createBrowserRouter([
   {
     path: "/magic-link-sent",
     element: <MagicLinkSentRoute />,
+  },
+  {
+    path: "/privacy",
+    element: <PrivacyRoute />,
+  },
+  {
+    path: "/data-deletion/:confirmationCode",
+    element: <DataDeletionRoute />,
   },
   {
     element: <AuthedLayout />,

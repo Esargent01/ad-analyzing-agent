@@ -531,6 +531,21 @@ async def data_deletion_status_page(request: Request, confirmation_code: str) ->
     )
 
 
+@app.get("/api/data-deletion/{confirmation_code}/status")
+async def api_data_deletion_status(confirmation_code: str) -> JSONResponse:
+    """JSON endpoint for the React data-deletion status page."""
+    async with get_session() as session:
+        deletion = await get_data_deletion_request(session, confirmation_code)
+    if deletion is None:
+        raise HTTPException(status_code=404, detail="Deletion request not found")
+
+    return JSONResponse({
+        "confirmation_code": deletion.confirmation_code,
+        "status": deletion.status,
+        "requested_at": deletion.requested_at.isoformat(),
+    })
+
+
 @app.post("/api/webhooks/meta/deauthorize")
 async def meta_deauthorize_webhook(request: Request) -> JSONResponse:
     """Meta data-deletion / deauthorization callback.
