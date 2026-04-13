@@ -121,7 +121,7 @@ class Settings(BaseSettings):
     # Meta OAuth (Phase B). The redirect URI must also be added to the
     # Meta App dashboard for both dev (localhost) and production URLs.
     meta_oauth_redirect_uri: str = "http://localhost:8000/api/auth/meta/callback"
-    meta_oauth_scopes: str = "ads_management,ads_read,business_management"
+    meta_oauth_scopes: str = "ads_management,ads_read,business_management,pages_show_list"
     meta_graph_api_version: str = "v18.0"
     # Fernet key for encrypting stored Meta access tokens at rest.
     # Generate with:
