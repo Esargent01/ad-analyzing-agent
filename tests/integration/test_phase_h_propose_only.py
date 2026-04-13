@@ -32,6 +32,7 @@ from __future__ import annotations
 import ast
 import uuid
 from datetime import UTC
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -283,7 +284,6 @@ class TestExecutorDispatch:
 
     async def test_scale_happy_path_calls_adapter_with_float(self) -> None:
         session = AsyncMock(spec=AsyncSession)
-        session.execute = AsyncMock()
 
         deployment_id = uuid.uuid4()
         row = _make_approval_row(
@@ -297,6 +297,12 @@ class TestExecutorDispatch:
             },
         )
         session.get = AsyncMock(return_value=row)
+
+        # The budget validation SELECT returns a campaign daily_budget
+        # high enough to allow the proposed_budget of 40.0.
+        budget_result = MagicMock()
+        budget_result.scalar_one_or_none.return_value = Decimal("100.00")
+        session.execute = AsyncMock(return_value=budget_result)
 
         adapter = MagicMock()
         adapter.update_budget = AsyncMock(return_value=True)

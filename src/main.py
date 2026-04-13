@@ -811,12 +811,36 @@ def health_check() -> None:
         click.echo("Database connection: OK")
 
         async with get_session() as session:
-            # Check table counts
-            tables = ["gene_pool", "campaigns", "variants", "deployments", "metrics"]
-            for table in tables:
-                row = await session.execute(sa_text(f"SELECT COUNT(*) FROM {table}"))
+            # Check table counts using ORM models (no raw SQL interpolation)
+            from sqlalchemy import func as sa_func
+
+            from src.db.tables import (
+                Campaign as CampaignModel,
+            )
+            from src.db.tables import (
+                Deployment as DeploymentModel,
+            )
+            from src.db.tables import (
+                GenePoolEntry,
+            )
+            from src.db.tables import (
+                Metric as MetricModel,
+            )
+            from src.db.tables import (
+                Variant as VariantModel,
+            )
+
+            _health_tables: list[tuple[str, type]] = [
+                ("gene_pool", GenePoolEntry),
+                ("campaigns", CampaignModel),
+                ("variants", VariantModel),
+                ("deployments", DeploymentModel),
+                ("metrics", MetricModel),
+            ]
+            for label, model in _health_tables:
+                row = await session.execute(select(sa_func.count()).select_from(model))
                 count = row.scalar_one()
-                click.echo(f"  {table}: {count} rows")
+                click.echo(f"  {label}: {count} rows")
 
             # Check TimescaleDB extension
             row = await session.execute(

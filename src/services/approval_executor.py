@@ -36,12 +36,12 @@ from dataclasses import dataclass
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import text
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.adapters.meta_factory import get_meta_adapter_for_campaign
 from src.db.queries import mark_proposal_executed
-from src.db.tables import ApprovalActionType, ApprovalQueueItem
+from src.db.tables import ApprovalActionType, ApprovalQueueItem, Campaign
 from src.exceptions import MetaConnectionMissing, MetaTokenExpired
 
 logger = logging.getLogger(__name__)
@@ -284,6 +284,20 @@ async def _execute_scale(
     if not platform_ad_id or proposed_budget is None:
         raise ApprovalExecutionError(
             "scale_budget payload missing 'platform_ad_id' or 'proposed_budget'"
+        )
+
+    # Defence in depth: re-validate budget against the campaign cap
+    # right before calling Meta. This catches races where the campaign
+    # budget was lowered between proposal time and approval time.
+    proposed_dec = Decimal(str(proposed_budget))
+    campaign_row = await session.execute(
+        select(Campaign.daily_budget).where(Campaign.id == item.campaign_id)
+    )
+    campaign_daily = campaign_row.scalar_one_or_none()
+    if campaign_daily is not None and proposed_dec > campaign_daily:
+        raise ApprovalExecutionError(
+            f"Proposed budget ${proposed_dec} exceeds campaign "
+            f"daily limit ${campaign_daily} — rejecting"
         )
 
     await adapter.update_budget(platform_ad_id, float(proposed_budget))

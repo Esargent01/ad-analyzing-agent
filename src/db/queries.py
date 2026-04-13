@@ -33,6 +33,7 @@ from src.db.tables import (
     Variant,
     VariantStatus,
 )
+from src.exceptions import BudgetExceededError
 
 # ---------------------------------------------------------------------------
 # Gene pool
@@ -801,6 +802,26 @@ async def queue_scale_proposal(
     ):
         return None
 
+    # ---- Budget guardrail: reject proposals that would exceed the
+    # campaign's daily budget. This is the first line of defence;
+    # ``_execute_scale`` re-validates before calling Meta.
+    campaign_row = await session.execute(
+        select(Campaign.daily_budget).where(Campaign.id == campaign_id)
+    )
+    campaign_daily = campaign_row.scalar_one_or_none()
+    if campaign_daily is not None and proposed_budget > campaign_daily:
+        raise BudgetExceededError(
+            f"Proposed budget ${proposed_budget} exceeds campaign daily limit ${campaign_daily}"
+        )
+    if campaign_daily is not None:
+        remaining = await get_remaining_budget(session, campaign_id)
+        budget_increase = proposed_budget - current_budget
+        if budget_increase > Decimal("0") and budget_increase > remaining:
+            raise BudgetExceededError(
+                f"Budget increase ${budget_increase} exceeds remaining "
+                f"campaign capacity ${remaining}"
+            )
+
     payload = {
         "deployment_id": str(deployment_id),
         "platform_ad_id": platform_ad_id,
@@ -850,6 +871,37 @@ async def get_pending_approvals(
     )
     if campaign_id is not None:
         stmt = stmt.where(ApprovalQueueItem.campaign_id == campaign_id)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+async def get_pending_approvals_for_campaigns(
+    session: AsyncSession,
+    campaign_ids: list[UUID],
+) -> list[ApprovalQueueItem]:
+    """Return pending approvals for multiple campaigns at once.
+
+    Same ordering as :func:`get_pending_approvals` (pause first, oldest
+    within each type) but scoped to *campaign_ids*. Used by the dashboard
+    ``/api/approvals`` endpoint to show a user only their own approvals.
+    """
+    if not campaign_ids:
+        return []
+    type_rank = case(
+        (ApprovalQueueItem.action_type == ApprovalActionType.pause_variant, 0),
+        (ApprovalQueueItem.action_type == ApprovalActionType.scale_budget, 1),
+        (ApprovalQueueItem.action_type == ApprovalActionType.new_variant, 2),
+        (ApprovalQueueItem.action_type == ApprovalActionType.promote_winner, 3),
+        else_=4,
+    )
+    stmt = (
+        select(ApprovalQueueItem)
+        .where(
+            ApprovalQueueItem.approved.is_(None),
+            ApprovalQueueItem.campaign_id.in_(campaign_ids),
+        )
+        .order_by(type_rank, ApprovalQueueItem.submitted_at)
+    )
     result = await session.execute(stmt)
     return list(result.scalars().all())
 

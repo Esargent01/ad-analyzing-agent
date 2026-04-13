@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from functools import partial
 
 from google.ads.googleads.client import GoogleAdsClient
@@ -22,6 +23,34 @@ logger = logging.getLogger(__name__)
 
 _MAX_RETRIES: int = 3
 _RETRY_BASE_DELAY: float = 2.0
+
+# ---------------------------------------------------------------------------
+# Input validation — GAQL doesn't support parameterized queries, so we
+# validate inputs before string interpolation to prevent injection.
+# ---------------------------------------------------------------------------
+
+_RESOURCE_NAME_RE = re.compile(r"^customers/\d+/adGroupAds/\d+~\d+$")
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _validate_resource_name(value: str) -> str:
+    """Ensure *value* matches the Google Ads adGroupAd resource name format."""
+    if not _RESOURCE_NAME_RE.match(value):
+        raise PlatformAPIError(
+            platform="google_ads",
+            message=f"Invalid resource name format: {value!r}",
+        )
+    return value
+
+
+def _validate_date(value: str) -> str:
+    """Ensure *value* is a YYYY-MM-DD date string."""
+    if not _DATE_RE.match(value):
+        raise PlatformAPIError(
+            platform="google_ads",
+            message=f"Invalid date format: {value!r}, expected YYYY-MM-DD",
+        )
+    return value
 
 
 class GoogleAdsAdapter(BaseAdapter):
@@ -240,6 +269,7 @@ class GoogleAdsAdapter(BaseAdapter):
         Google Ads doesn't set budgets on individual ads; we adjust the
         ad group's CPC bid as a proxy.
         """
+        _validate_resource_name(platform_ad_id)
         logger.info("Updating budget for Google ad %s to %.2f", platform_ad_id, new_budget)
 
         def _update() -> bool:
@@ -283,6 +313,7 @@ class GoogleAdsAdapter(BaseAdapter):
         *,
         time_range: tuple[str, str] | None = None,
     ) -> AdMetrics:
+        _validate_resource_name(platform_ad_id)
         logger.debug(
             "Fetching metrics for Google ad %s (time_range=%s)",
             platform_ad_id,
@@ -291,6 +322,8 @@ class GoogleAdsAdapter(BaseAdapter):
 
         if time_range is not None:
             since, until = time_range
+            _validate_date(since)
+            _validate_date(until)
             date_clause = f"AND segments.date BETWEEN '{since}' AND '{until}'"
         else:
             date_clause = "AND segments.date DURING TODAY"

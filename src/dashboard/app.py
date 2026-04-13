@@ -340,59 +340,88 @@ async def campaign_detail(request: Request, campaign_id: str) -> HTMLResponse:
 
 
 @app.get("/api/campaigns")
-async def api_campaigns() -> list[dict]:
-    """List all active campaigns."""
-    async with get_session() as session:
-        campaigns = await _get_campaigns_light(session)
+async def api_campaigns(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[dict]:
+    """List active campaigns the authenticated user can access."""
+    campaigns = await get_user_campaigns(session, user.id)
     return _serialize(campaigns)
 
 
 @app.get("/api/campaigns/{campaign_id}/variants")
-async def api_variants(campaign_id: str) -> list[dict]:
+async def api_variants(
+    campaign_id: UUID = Depends(require_campaign_access),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[dict]:
     """List active variants for a campaign."""
-    async with get_session() as session:
-        variants = await _get_variants_light(session, UUID(campaign_id))
+    variants = await _get_variants_light(session, campaign_id)
     return _serialize(variants)
 
 
 @app.get("/api/campaigns/{campaign_id}/elements")
-async def api_elements(campaign_id: str) -> list[dict]:
+async def api_elements(
+    campaign_id: UUID = Depends(require_campaign_access),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[dict]:
     """Element performance rankings for a campaign."""
-    async with get_session() as session:
-        elements = await get_element_rankings(session, UUID(campaign_id))
+    elements = await get_element_rankings(session, campaign_id)
     return _serialize(elements)
 
 
 @app.get("/api/campaigns/{campaign_id}/interactions")
-async def api_interactions(campaign_id: str) -> list[dict]:
+async def api_interactions(
+    campaign_id: UUID = Depends(require_campaign_access),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[dict]:
     """Top element interactions for a campaign."""
-    async with get_session() as session:
-        interactions = await get_top_interactions(session, UUID(campaign_id))
+    interactions = await get_top_interactions(session, campaign_id)
     return _serialize(interactions)
 
 
 @app.get("/api/campaigns/{campaign_id}/cycles")
-async def api_cycles(campaign_id: str) -> list[dict]:
+async def api_cycles(
+    campaign_id: UUID = Depends(require_campaign_access),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[dict]:
     """Recent optimization cycles for a campaign."""
-    async with get_session() as session:
-        cycles = await get_recent_cycles(session, UUID(campaign_id))
+    cycles = await get_recent_cycles(session, campaign_id)
     return _serialize(cycles)
 
 
 @app.get("/api/gene-pool")
-async def api_gene_pool(slot: str | None = None) -> list[dict]:
+async def api_gene_pool(
+    slot: str | None = None,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[dict]:
     """Gene pool entries, optionally filtered by slot."""
-    async with get_session() as session:
-        entries = await list_gene_pool_entries(session, slot_name=slot)
+    entries = await list_gene_pool_entries(session, slot_name=slot)
     return _serialize(entries)
 
 
 @app.get("/api/approvals")
-async def api_approvals(campaign_id: str | None = None) -> list[dict]:
-    """Pending approval queue items."""
-    cid = UUID(campaign_id) if campaign_id else None
-    async with get_session() as session:
+async def api_approvals(
+    campaign_id: str | None = None,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db_session),
+) -> list[dict]:
+    """Pending approval queue items scoped to the authenticated user."""
+    user_campaigns = await get_user_campaigns(session, user.id)
+    user_campaign_ids = {c.id for c in user_campaigns}
+
+    if campaign_id:
+        cid = UUID(campaign_id)
+        if cid not in user_campaign_ids:
+            raise HTTPException(status_code=404, detail="not found")
         items = await get_pending_approvals(session, campaign_id=cid)
+    else:
+        # Fetch approvals for all of the user's campaigns
+        from src.db.queries import get_pending_approvals_for_campaigns
+
+        items = await get_pending_approvals_for_campaigns(
+            session, campaign_ids=list(user_campaign_ids)
+        )
     return _serialize(items)
 
 
@@ -473,7 +502,9 @@ async def _load_approval_or_404(session, approval_id: UUID, campaign_id: UUID) -
 
 
 @app.post("/api/approvals/{approval_id}/approve")
+@limiter.limit("60/hour")
 async def api_approve(
+    request: Request,
     approval_id: str,
     token: str = Form(...),
 ) -> JSONResponse:
@@ -498,7 +529,9 @@ async def api_approve(
 
 
 @app.post("/api/approvals/{approval_id}/reject")
+@limiter.limit("60/hour")
 async def api_reject(
+    request: Request,
     approval_id: str,
     token: str = Form(...),
     reason: str = Form("user_rejected"),
@@ -525,7 +558,9 @@ async def api_reject(
 
 
 @app.post("/api/gene-pool/suggest")
+@limiter.limit("30/hour")
 async def api_suggest_gene_pool(
+    request: Request,
     token: str = Form(...),
     slot_name: str = Form(...),
     slot_value: str = Form(...),
@@ -1183,7 +1218,9 @@ async def api_meta_importable_campaigns(
     "/api/me/meta/campaigns/import",
     response_model=CampaignImportResult,
 )
+@limiter.limit("10/hour")
 async def api_meta_import_campaigns(
+    request: Request,
     payload: CampaignImportRequest,
     _: None = Depends(require_csrf),
     session: AsyncSession = Depends(get_db_session),
@@ -1612,7 +1649,9 @@ async def api_experiments(
     "/api/campaigns/{campaign_id}/experiments/{approval_id}/approve",
     response_model=ApproveResponse,
 )
+@limiter.limit("60/hour")
 async def api_experiment_approve(
+    request: Request,
     approval_id: UUID,
     _: None = Depends(require_csrf),
     campaign_id: UUID = Depends(require_campaign_access),
@@ -1655,7 +1694,9 @@ async def api_experiment_approve(
     "/api/campaigns/{campaign_id}/experiments/{approval_id}/reject",
     response_model=ApproveResponse,
 )
+@limiter.limit("60/hour")
 async def api_experiment_reject(
+    request: Request,
     approval_id: UUID,
     body: RejectRequest,
     _: None = Depends(require_csrf),
@@ -1686,7 +1727,9 @@ async def api_experiment_reject(
     "/api/campaigns/{campaign_id}/experiments/suggest",
     response_model=SuggestResponse,
 )
+@limiter.limit("30/hour")
 async def api_experiment_suggest(
+    request: Request,
     body: SuggestRequest,
     _: None = Depends(require_csrf),
     campaign_id: UUID = Depends(require_campaign_access),
