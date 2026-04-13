@@ -9,7 +9,7 @@ name: Weekly user generation
 
 on:
   schedule:
-    - cron: '0 14 * * 1'  # 9am CT (UTC-5) every Monday
+    - cron: '0 12 * * 1'  # 7am CT (UTC-5) every Monday
   workflow_dispatch:
 
 permissions:
