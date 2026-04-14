@@ -55,12 +55,6 @@ export function LandingRoute() {
 
         {/* Actions — right */}
         <div className="flex items-center gap-4">
-          <Link
-            to="/sign-in"
-            className="text-[13px] font-medium text-white/80 no-underline transition-colors hover:text-white"
-          >
-            Sign in
-          </Link>
           <a
             href="#join"
             className="rounded-full bg-white px-5 py-2 text-[13px] font-medium text-[#1a1a1a] no-underline transition-all hover:bg-white/90"
@@ -309,12 +303,6 @@ export function LandingRoute() {
               className="no-underline transition-colors hover:text-[#666]"
             >
               Privacy
-            </Link>
-            <Link
-              to="/sign-in"
-              className="no-underline transition-colors hover:text-[#666]"
-            >
-              Sign in
             </Link>
           </div>
         </div>

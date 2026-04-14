@@ -2494,6 +2494,38 @@ def grant_access(email: str, campaign_id: str) -> None:
     asyncio.run(_run())
 
 
+@cli.command(name="send-magic-link")
+@click.option("--email", required=True, help="Recipient email address.")
+def send_magic_link_cmd(email: str) -> None:
+    """Generate and send a magic-link sign-in email.
+
+    Creates a signed magic-link token and delivers it via SendGrid
+    (or logs it to stdout in dev mode). The recipient is auto-provisioned
+    as a user on first sign-in.
+
+    Example::
+
+        python -m src.main send-magic-link --email admin@example.com
+    """
+
+    async def _run() -> None:
+        from src.dashboard.auth import create_magic_link_token
+        from src.reports.auth_email import send_magic_link
+
+        settings = get_settings()
+        token = create_magic_link_token(email)
+        link = f"{settings.api_base_url.rstrip('/')}/api/auth/verify?token={token}"
+
+        click.echo(f"Sending magic link to {email}...")
+        ok = await send_magic_link(email, link)
+        if ok:
+            click.echo("Magic link sent successfully.")
+        else:
+            click.echo("Failed to send magic link — check logs for details.")
+
+    asyncio.run(_run())
+
+
 @cli.command(name="send-daily-reports")
 @click.option(
     "--report-date",
