@@ -26,18 +26,7 @@ export function FeatureSection({
     <section className={`${bg} py-24 lg:py-32`}>
       <div className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-16">
         <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-12 lg:gap-16">
-          {/* Animation figure */}
-          <div
-            className={`lg:col-span-7 ${
-              figurePosition === "left" ? "lg:order-1" : "lg:order-2"
-            }`}
-          >
-            <div className="relative mx-auto min-h-[360px] max-w-[480px] overflow-hidden rounded-2xl bg-[#faf9f7] p-6 lg:min-h-[420px] lg:max-w-none xl:rounded-3xl">
-              {animation}
-            </div>
-          </div>
-
-          {/* Text */}
+          {/* Text — always first on mobile, alternates on desktop */}
           <motion.div
             className={`lg:col-span-5 ${
               figurePosition === "left" ? "lg:order-2" : "lg:order-1"
@@ -57,6 +46,17 @@ export function FeatureSection({
               {description}
             </p>
           </motion.div>
+
+          {/* Animation figure — always second on mobile, alternates on desktop */}
+          <div
+            className={`lg:col-span-7 ${
+              figurePosition === "left" ? "lg:order-first" : "lg:order-2"
+            }`}
+          >
+            <div className="relative mx-auto min-h-[360px] max-w-[480px] overflow-hidden rounded-2xl bg-[#faf9f7] p-6 lg:min-h-[420px] lg:max-w-none xl:rounded-3xl">
+              {animation}
+            </div>
+          </div>
         </div>
       </div>
     </section>
