@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 
 import { api } from "@/lib/api/client";
 import { FeatureSection } from "@/components/landing/FeatureSection";
@@ -15,14 +15,16 @@ const SANS = "'Outfit', sans-serif";
 
 export function LandingRoute() {
   const [email, setEmail] = useState("");
+  const [navEmail, setNavEmail] = useState("");
   const [status, setStatus] = useState<
     "idle" | "submitting" | "success" | "error"
   >("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [navOpen, setNavOpen] = useState(false);
+  const navInputRef = useRef<HTMLInputElement>(null);
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const normalized = email.trim().toLowerCase();
+  const submitEmail = async (addr: string) => {
+    const normalized = addr.trim().toLowerCase();
     if (!normalized || !normalized.includes("@")) {
       setErrorMsg("Please enter a valid email address.");
       setStatus("error");
@@ -36,6 +38,16 @@ export function LandingRoute() {
       setErrorMsg("Something went wrong. Please try again.");
       setStatus("error");
     }
+  };
+
+  const onSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    submitEmail(email);
+  };
+
+  const onNavSubmit = (e: FormEvent) => {
+    e.preventDefault();
+    submitEmail(navEmail);
   };
 
   return (
@@ -54,13 +66,57 @@ export function LandingRoute() {
         </div>
 
         {/* Actions — right */}
-        <div className="flex items-center gap-4">
-          <a
-            href="#join"
-            className="rounded-full bg-white px-5 py-2 text-[13px] font-medium text-[#1a1a1a] no-underline transition-all hover:bg-white/90"
-          >
-            Join beta
-          </a>
+        <div className="flex items-center gap-3">
+          <AnimatePresence>
+            {navOpen && status !== "success" && (
+              <motion.form
+                onSubmit={onNavSubmit}
+                noValidate
+                className="flex items-center"
+                initial={{ width: 0, opacity: 0 }}
+                animate={{ width: "auto", opacity: 1 }}
+                exit={{ width: 0, opacity: 0 }}
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                style={{ overflow: "hidden" }}
+              >
+                <input
+                  ref={navInputRef}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="you@company.com"
+                  value={navEmail}
+                  onChange={(e) => {
+                    setNavEmail(e.target.value);
+                    if (status === "error") setStatus("idle");
+                  }}
+                  className="h-9 w-48 rounded-full border border-white/20 bg-white/10 px-4 text-[13px] text-white placeholder:text-white/40 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/30"
+                  style={{ fontFamily: SANS }}
+                />
+              </motion.form>
+            )}
+          </AnimatePresence>
+          {status === "success" ? (
+            <span className="rounded-full bg-emerald-500/20 px-4 py-2 text-[13px] font-medium text-emerald-300 backdrop-blur-sm">
+              You're on the list!
+            </span>
+          ) : (
+            <button
+              type={navOpen ? "submit" : "button"}
+              disabled={status === "submitting"}
+              onClick={() => {
+                if (!navOpen) {
+                  setNavOpen(true);
+                  setTimeout(() => navInputRef.current?.focus(), 350);
+                } else {
+                  submitEmail(navEmail);
+                }
+              }}
+              className="h-9 whitespace-nowrap rounded-full bg-white px-5 text-[13px] font-medium text-[#1a1a1a] transition-all hover:bg-white/90 active:scale-[0.98] disabled:opacity-50"
+              style={{ fontFamily: SANS }}
+            >
+              {status === "submitting" ? "..." : "Join beta"}
+            </button>
+          )}
         </div>
       </nav>
 
