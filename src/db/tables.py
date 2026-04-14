@@ -615,6 +615,25 @@ class DataDeletionRequest(Base):
         )
 
 
+class BetaSignup(Base):
+    """Email collected from the landing page beta waitlist form."""
+
+    __tablename__ = "beta_signups"
+
+    id: Mapped[UUID] = mapped_column(
+        PG_UUID(as_uuid=True),
+        primary_key=True,
+        server_default="uuid_generate_v4()",
+    )
+    email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    signed_up_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default="now()"
+    )
+
+    def __repr__(self) -> str:
+        return f"<BetaSignup email={self.email}>"
+
+
 class UsageLog(Base):
     """One row per billable event — LLM call, Meta API hit, email.
 

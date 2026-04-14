@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 
 export function PrivacyRoute() {
   return (
-    <div className="mx-auto max-w-2xl px-5 py-12">
+    <div className="mx-auto max-w-2xl px-5 py-12" style={{ fontFamily: "'Outfit', sans-serif" }}>
       <header className="mb-8">
         <h1 className="mb-1 text-2xl font-semibold">Privacy Policy</h1>
         <p className="text-xs text-[var(--text-tertiary)]">

@@ -602,6 +602,40 @@ async def meta_deauthorize_webhook(request: Request) -> JSONResponse:
 
 
 # ---------------------------------------------------------------------------
+# Beta signup (public, no auth)
+# ---------------------------------------------------------------------------
+
+
+class BetaSignupRequest(BaseModel):
+    email: str
+
+
+@app.post("/api/beta-signup", status_code=201)
+@limiter.limit("10/minute")
+async def api_beta_signup(request: Request, body: BetaSignupRequest) -> JSONResponse:
+    """Collect an email for the beta waitlist. Public, rate-limited."""
+    from src.db.tables import BetaSignup
+
+    email = body.email.strip().lower()
+    if not email or "@" not in email or len(email) > 320:
+        raise HTTPException(status_code=400, detail="Invalid email")
+
+    async with get_session() as session:
+        existing = await session.execute(
+            select(BetaSignup).where(BetaSignup.email == email)
+        )
+        if existing.scalar_one_or_none() is not None:
+            # Already signed up — return success silently (don't leak info)
+            return JSONResponse({"status": "ok"}, status_code=201)
+
+        session.add(BetaSignup(email=email))
+        await session.flush()
+
+    logger.info("Beta signup: %s", email)
+    return JSONResponse({"status": "ok"}, status_code=201)
+
+
+# ---------------------------------------------------------------------------
 
 
 async def _load_approval_or_404(session, approval_id: UUID, campaign_id: UUID) -> None:

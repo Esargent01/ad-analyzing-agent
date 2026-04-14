@@ -7,6 +7,7 @@ import { DashboardRoute } from "@/routes/dashboard";
 import { DataDeletionRoute } from "@/routes/data-deletion";
 import { ExperimentsRoute } from "@/routes/experiments";
 import { ImportMetaCampaignsRoute } from "@/routes/import-meta-campaigns";
+import { LandingRoute } from "@/routes/landing";
 import { MagicLinkSentRoute } from "@/routes/magic-link-sent";
 import { PrivacyRoute } from "@/routes/privacy";
 import { ReportsDailyListRoute } from "@/routes/reports-daily-list";
@@ -21,7 +22,7 @@ import { WeeklyReportDetailRoute } from "@/routes/weekly-report-detail";
 export const router = createBrowserRouter([
   {
     path: "/",
-    element: <Navigate to="/dashboard" replace />,
+    element: <LandingRoute />,
   },
   {
     path: "/sign-in",
