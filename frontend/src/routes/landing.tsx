@@ -52,11 +52,22 @@ export function LandingRoute() {
         </Link>
       </nav>
 
-      {/* Hero */}
-      <main className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-16">
-        <div className="grid min-h-[calc(100vh-88px)] items-center gap-12 lg:grid-cols-2 lg:gap-16">
-          {/* Left — copy + form */}
-          <div className="max-w-lg py-12 lg:py-0">
+      {/* Hero — image as full background, form over the left empty space */}
+      <main
+        className="relative min-h-[calc(100vh-88px)] bg-cover bg-right bg-no-repeat"
+        style={{ backgroundImage: "url('/hero-creative-wall.png')" }}
+      >
+        {/* Gradient overlay — solid on the left for legibility, fading to transparent on the right to reveal the image */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(to right, var(--bg) 35%, color-mix(in srgb, var(--bg) 85%, transparent) 50%, color-mix(in srgb, var(--bg) 20%, transparent) 70%, transparent 85%)",
+          }}
+        />
+
+        <div className="relative mx-auto flex min-h-[calc(100vh-88px)] max-w-7xl items-center px-6 sm:px-10 lg:px-16">
+          <div className="max-w-lg py-16">
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-3.5 py-1.5">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--green)] opacity-75" />
@@ -140,44 +151,6 @@ export function LandingRoute() {
                   </p>
                 </div>
               ))}
-            </div>
-          </div>
-
-          {/* Right — hero image */}
-          <div className="relative hidden lg:block">
-            <div className="overflow-hidden rounded-2xl shadow-2xl shadow-black/10">
-              <img
-                src="/hero-creative-wall.png"
-                alt="Ad creative variants pinned to a wall with performance metrics"
-                className="h-auto w-full object-cover"
-              />
-            </div>
-            {/* Floating metric cards */}
-            <div
-              className="absolute -bottom-4 -left-6 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3 shadow-lg"
-            >
-              <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
-                Winner detected
-              </p>
-              <p className="text-lg font-semibold tracking-tight text-[var(--green)]">
-                +34% CTR
-              </p>
-              <p className="text-[11px] text-[var(--text-tertiary)]">
-                V7 &middot; Headline + CTA combo
-              </p>
-            </div>
-            <div
-              className="absolute -right-4 top-8 rounded-xl border border-[var(--border)] bg-[var(--bg)] px-4 py-3 shadow-lg"
-            >
-              <p className="text-[11px] font-medium uppercase tracking-wider text-[var(--text-tertiary)]">
-                Today&apos;s cycle
-              </p>
-              <p className="text-lg font-semibold tracking-tight">
-                3 tested, 1 paused
-              </p>
-              <p className="text-[11px] text-[var(--text-tertiary)]">
-                Budget reallocated via Thompson sampling
-              </p>
             </div>
           </div>
         </div>
