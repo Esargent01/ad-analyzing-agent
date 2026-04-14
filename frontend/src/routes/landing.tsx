@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { motion } from "framer-motion";
 
 import { api } from "@/lib/api/client";
-
-/* ------------------------------------------------------------------ */
-/*  Sierra-inspired landing page                                       */
-/*  Full-bleed hero, serif display heading, pill CTAs, logo wall,      */
-/*  rounded-corner feature cards, generous whitespace.                  */
-/* ------------------------------------------------------------------ */
+import { FeatureSection } from "@/components/landing/FeatureSection";
+import { DecomposeAnimation } from "@/components/landing/DecomposeAnimation";
+import { GenomeAnimation } from "@/components/landing/GenomeAnimation";
+import { TestingAnimation } from "@/components/landing/TestingAnimation";
+import { CompoundAnimation } from "@/components/landing/CompoundAnimation";
+import { fadeInUp, staggerContainer, viewportConfig } from "@/components/landing/animation-variants";
 
 const SERIF = "'DM Serif Display', serif";
 const SANS = "'Outfit', sans-serif";
@@ -84,9 +85,14 @@ export function LandingRoute() {
         />
 
         <div className="relative z-10 mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-16">
-          <div className="max-w-2xl py-24">
+          <motion.div
+            className="max-w-2xl py-24"
+            initial="hidden"
+            animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.15 } } }}
+          >
             {/* Badge */}
-            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 backdrop-blur-sm">
+            <motion.div variants={fadeInUp} className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 backdrop-blur-sm">
               <span className="relative flex h-2 w-2">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                 <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
@@ -94,26 +100,26 @@ export function LandingRoute() {
               <span className="text-[12px] font-medium tracking-wide text-white/80">
                 Beta access opening soon
               </span>
-            </div>
+            </motion.div>
 
             {/* Heading — large serif, Sierra style */}
-            <h1
+            <motion.h1 variants={fadeInUp}
               className="mb-6 text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.08] tracking-tight text-white"
               style={{ fontFamily: SERIF }}
             >
               Better ad performance.
               <br />
               Powered by AI agents.
-            </h1>
+            </motion.h1>
 
-            <p className="mb-10 max-w-lg text-[16px] leading-relaxed text-white/70">
+            <motion.p variants={fadeInUp} className="mb-10 max-w-lg text-[16px] leading-relaxed text-white/70">
               Ad Creative Agent decomposes your creatives into testable
               elements, runs autonomous optimization cycles, and compounds
               learnings over time. You approve — we execute.
-            </p>
+            </motion.p>
 
             {/* CTA — pill-style buttons, Sierra aesthetic */}
-            <div id="join" className="flex flex-wrap items-center gap-4">
+            <motion.div variants={fadeInUp} id="join" className="flex flex-wrap items-center gap-4">
               {status === "success" ? (
                 <div className="rounded-full bg-emerald-500/20 px-6 py-3 backdrop-blur-sm">
                   <span className="text-[15px] font-medium text-emerald-300">
@@ -150,7 +156,7 @@ export function LandingRoute() {
                   </button>
                 </form>
               )}
-            </div>
+            </motion.div>
             {status === "error" && (
               <p className="mt-3 text-[13px] text-red-300">{errorMsg}</p>
             )}
@@ -160,33 +166,39 @@ export function LandingRoute() {
                 ready.
               </p>
             )}
-          </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* ── Social proof / logo wall ────────────────────────────── */}
+      {/* ── Social proof / metrics ──────────────────────────────── */}
       <section className="border-b border-[#e8e5e0] bg-[#faf9f7] py-20">
-        <div className="mx-auto max-w-5xl px-6 text-center sm:px-10">
-          <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.15em] text-[#999]">
+        <motion.div
+          className="mx-auto max-w-5xl px-6 text-center sm:px-10"
+          initial="hidden"
+          whileInView="visible"
+          viewport={viewportConfig}
+          variants={staggerContainer}
+        >
+          <motion.p variants={fadeInUp} className="mb-3 text-[12px] font-semibold uppercase tracking-[0.15em] text-[#999]">
             Built for performance marketers
-          </p>
-          <h2
+          </motion.p>
+          <motion.h2 variants={fadeInUp}
             className="mb-4 text-[clamp(1.5rem,3vw,2.25rem)] tracking-tight text-[#1a1a1a]"
             style={{ fontFamily: SERIF }}
           >
             The metrics that matter
-          </h2>
-          <p className="mx-auto mb-14 max-w-md text-[14px] leading-relaxed text-[#777]">
+          </motion.h2>
+          <motion.p variants={fadeInUp} className="mx-auto mb-14 max-w-md text-[14px] leading-relaxed text-[#777]">
             Early beta results across campaigns of all sizes.
-          </p>
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+          </motion.p>
+          <motion.div className="grid grid-cols-2 gap-8 sm:grid-cols-4" variants={staggerContainer}>
             {[
               { value: "4.2%", label: "Avg CTR lift" },
               { value: "3.8x", label: "ROAS improvement" },
               { value: "-62%", label: "Time to optimize" },
               { value: "12k+", label: "Variants tested" },
             ].map(({ value, label }) => (
-              <div key={label} className="flex flex-col items-center">
+              <motion.div key={label} variants={fadeInUp} className="flex flex-col items-center">
                 <span
                   className="mb-1 text-[clamp(1.75rem,3vw,2.5rem)] tracking-tight text-[#1a1a1a]"
                   style={{ fontFamily: SERIF }}
@@ -194,150 +206,62 @@ export function LandingRoute() {
                   {value}
                 </span>
                 <span className="text-[13px] text-[#999]">{label}</span>
-              </div>
+              </motion.div>
             ))}
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </section>
 
-      {/* ── How it works ────────────────────────────────────────── */}
-      <section className="bg-[#faf9f7] py-24">
-        <div className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-16">
-          <div className="mb-16 text-center">
-            <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.15em] text-[#999]">
-              How it works
-            </p>
-            <h2
-              className="mb-4 text-[clamp(1.5rem,3vw,2.5rem)] tracking-tight text-[#1a1a1a]"
-              style={{ fontFamily: SERIF }}
-            >
-              Autonomous optimization, human approval
-            </h2>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {[
-              {
-                step: "01",
-                title: "Decompose",
-                desc: "Your creatives are broken into swappable elements — headlines, CTAs, media, audiences.",
-                color: "#f5ebe0",
-              },
-              {
-                step: "02",
-                title: "Test",
-                desc: "The system generates variant combinations and deploys them across your ad platforms.",
-                color: "#e8f0e8",
-              },
-              {
-                step: "03",
-                title: "Analyze",
-                desc: "Statistical significance tests and element-level attribution identify what actually works.",
-                color: "#e0eaf5",
-              },
-              {
-                step: "04",
-                title: "Compound",
-                desc: "Winning elements are recombined. Losers are paused. Learnings accumulate over time.",
-                color: "#f5e8f0",
-              },
-            ].map(({ step, title, desc, color }) => (
-              <div
-                key={step}
-                className="rounded-2xl p-8 transition-transform hover:scale-[1.02]"
-                style={{ backgroundColor: color }}
-              >
-                <span className="mb-4 inline-block text-[12px] font-semibold tracking-wide text-[#999]">
-                  {step}
-                </span>
-                <h3
-                  className="mb-3 text-[20px] text-[#1a1a1a]"
-                  style={{ fontFamily: SERIF }}
-                >
-                  {title}
-                </h3>
-                <p className="text-[13px] leading-relaxed text-[#666]">
-                  {desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── Features ────────────────────────────────────────────── */}
-      <section className="border-t border-[#e8e5e0] bg-white py-24">
-        <div className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-16">
-          <div className="mb-16 text-center">
-            <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.15em] text-[#999]">
-              Capabilities
-            </p>
-            <h2
-              className="mb-4 text-[clamp(1.5rem,3vw,2.5rem)] tracking-tight text-[#1a1a1a]"
-              style={{ fontFamily: SERIF }}
-            >
-              Transform your creative testing
-            </h2>
-          </div>
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {[
-              {
-                title: "Element-level insights",
-                desc: "Know exactly which headline, CTA, or audience drives performance — not just which ad variant won.",
-              },
-              {
-                title: "Interaction effects",
-                desc: "Discover which element combinations create synergy or conflict. The most valuable long-term data asset.",
-              },
-              {
-                title: "Human in the loop",
-                desc: "Every pause, scale, and launch requires your approval. Review proposals from Slack, email, or the dashboard.",
-              },
-              {
-                title: "Statistical rigor",
-                desc: "Two-proportion z-tests, minimum sample sizes, and fatigue detection. No vibes — real significance.",
-              },
-              {
-                title: "Thompson sampling",
-                desc: "Budget automatically flows to the best-performing variants using Bayesian allocation.",
-              },
-              {
-                title: "Daily + weekly reports",
-                desc: "Automated performance summaries delivered to your inbox with actionable insights.",
-              },
-            ].map(({ title, desc }) => (
-              <div
-                key={title}
-                className="rounded-2xl border border-[#e8e5e0] bg-[#faf9f7] p-8 transition-colors hover:border-[#d4d0ca]"
-              >
-                <h3
-                  className="mb-3 text-[18px] text-[#1a1a1a]"
-                  style={{ fontFamily: SERIF }}
-                >
-                  {title}
-                </h3>
-                <p className="text-[13px] leading-relaxed text-[#777]">
-                  {desc}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* ── Feature sections (Sierra-style 2-column) ──────────── */}
+      <FeatureSection
+        heading="Decompose your creatives"
+        description="Your ads are broken into swappable elements — headlines, CTAs, media, and audiences. Each component becomes an independent variable in a vast optimization space."
+        figurePosition="left"
+        background="cream"
+        animation={<DecomposeAnimation />}
+      />
+      <FeatureSection
+        heading="Build winning genomes"
+        description="Elements recombine into ad genomes — unique variant configurations drawn from your gene pool. The system generates combinations humans would never think to test."
+        figurePosition="right"
+        background="white"
+        animation={<GenomeAnimation />}
+      />
+      <FeatureSection
+        heading="Test with statistical rigor"
+        description="Two-proportion z-tests, minimum sample sizes, and fatigue detection ensure every decision is backed by real significance — not vibes."
+        figurePosition="left"
+        background="cream"
+        animation={<TestingAnimation />}
+      />
+      <FeatureSection
+        heading="Compound learnings over time"
+        description="Winning elements are recombined. Losers are paused. Each cycle feeds the next, building an ever-growing knowledge base of what works for your brand."
+        figurePosition="right"
+        background="white"
+        animation={<CompoundAnimation />}
+      />
 
       {/* ── Bottom CTA ──────────────────────────────────────────── */}
       <section className="relative overflow-hidden bg-[#1a1816] py-32">
         <div className="pointer-events-none absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "40px 40px" }} />
-        <div className="relative z-10 mx-auto max-w-2xl px-6 text-center sm:px-10">
-          <h2
+        <motion.div
+          className="relative z-10 mx-auto max-w-2xl px-6 text-center sm:px-10"
+          initial="hidden"
+          whileInView="visible"
+          viewport={viewportConfig}
+          variants={staggerContainer}
+        >
+          <motion.h2 variants={fadeInUp}
             className="mb-4 text-[clamp(1.75rem,4vw,3rem)] tracking-tight text-white"
             style={{ fontFamily: SERIF }}
           >
             Ready to optimize?
-          </h2>
-          <p className="mb-10 text-[15px] leading-relaxed text-white/60">
+          </motion.h2>
+          <motion.p variants={fadeInUp} className="mb-10 text-[15px] leading-relaxed text-white/60">
             Join the beta and let AI agents handle the grind of creative testing
             while you focus on strategy.
-          </p>
+          </motion.p>
           {status === "success" ? (
             <span className="inline-block rounded-full bg-emerald-500/20 px-6 py-3 text-[15px] font-medium text-emerald-300">
               You're on the list — we'll be in touch!
@@ -370,7 +294,7 @@ export function LandingRoute() {
               </button>
             </form>
           )}
-        </div>
+        </motion.div>
       </section>
 
       {/* ── Footer ──────────────────────────────────────────────── */}
