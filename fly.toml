@@ -43,15 +43,15 @@ primary_region = "ord"           # Chicago — closest low-latency to most US us
   # same-origin /api/* path. The Vercel rewrite forwards /api/* to the Fly
   # backend, keeping cookies scoped to vercel.app (avoids cross-site cookie
   # blocking by Safari/Firefox).
-  API_BASE_URL = "https://ad-analyzing-agent.vercel.app"
+  API_BASE_URL = "https://agent.kleiber.ai"
   # Meta OAuth redirect must stay on Fly — Meta redirects to the exact URL
   # registered in the App dashboard, and the callback handler uses HMAC state
   # (not cookies) so cross-site is fine here.
   META_OAUTH_REDIRECT_URI = "https://ad-analyzing-agent.fly.dev/api/auth/meta/callback"
   # Frontend URL lives on Vercel (or wherever the React app is hosted).
   # Leave this as a placeholder until the frontend is deployed.
-  FRONTEND_BASE_URL = "https://ad-analyzing-agent.vercel.app"
-  FRONTEND_ORIGINS = "https://ad-analyzing-agent.vercel.app"
+  FRONTEND_BASE_URL = "https://agent.kleiber.ai"
+  FRONTEND_ORIGINS = "https://agent.kleiber.ai"
   META_OAUTH_SCOPES = "ads_management,ads_read,business_management,pages_show_list"
   META_GRAPH_API_VERSION = "v18.0"
   MAX_CAMPAIGNS_PER_USER = "5"
