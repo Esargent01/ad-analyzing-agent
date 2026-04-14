@@ -52,7 +52,7 @@ primary_region = "ord"           # Chicago — closest low-latency to most US us
   # Leave this as a placeholder until the frontend is deployed.
   FRONTEND_BASE_URL = "https://ad-analyzing-agent.vercel.app"
   FRONTEND_ORIGINS = "https://ad-analyzing-agent.vercel.app"
-  META_OAUTH_SCOPES = "ads_management,ads_read,business_management"
+  META_OAUTH_SCOPES = "ads_management,ads_read,business_management,pages_show_list"
   META_GRAPH_API_VERSION = "v18.0"
   MAX_CAMPAIGNS_PER_USER = "5"
 
