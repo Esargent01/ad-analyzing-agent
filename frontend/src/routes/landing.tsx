@@ -3,6 +3,15 @@ import { Link } from "react-router-dom";
 
 import { api } from "@/lib/api/client";
 
+/* ------------------------------------------------------------------ */
+/*  Sierra-inspired landing page                                       */
+/*  Full-bleed hero, serif display heading, pill CTAs, logo wall,      */
+/*  rounded-corner feature cards, generous whitespace.                  */
+/* ------------------------------------------------------------------ */
+
+const SERIF = "'DM Serif Display', serif";
+const SANS = "'Outfit', sans-serif";
+
 export function LandingRoute() {
   const [email, setEmail] = useState("");
   const [status, setStatus] = useState<
@@ -29,79 +38,94 @@ export function LandingRoute() {
   };
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ fontFamily: "'Outfit', sans-serif" }}
-    >
-      {/* Nav */}
-      <nav className="flex items-center justify-between px-6 py-5 sm:px-10 lg:px-16">
+    <div style={{ fontFamily: SANS }} className="min-h-screen bg-[#faf9f7]">
+      {/* ── Nav ─────────────────────────────────────────────────── */}
+      <nav className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-6 py-5 sm:px-10 lg:px-16">
+        {/* Logo — left */}
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden
-            className="inline-block h-7 w-7 rounded-lg bg-[var(--accent)]"
+            className="inline-block h-7 w-7 rounded-lg bg-white/90"
           />
-          <span className="text-[15px] font-semibold tracking-tight">
+          <span className="text-[15px] font-semibold tracking-tight text-white">
             Ad Creative Agent
           </span>
         </div>
-        <Link
-          to="/sign-in"
-          className="text-[13px] font-medium text-[var(--text-secondary)] no-underline transition-colors hover:text-[var(--text)]"
-        >
-          Sign in
-        </Link>
+
+        {/* Actions — right */}
+        <div className="flex items-center gap-4">
+          <Link
+            to="/sign-in"
+            className="text-[13px] font-medium text-white/80 no-underline transition-colors hover:text-white"
+          >
+            Sign in
+          </Link>
+          <a
+            href="#join"
+            className="rounded-full bg-white px-5 py-2 text-[13px] font-medium text-[#1a1a1a] no-underline transition-all hover:bg-white/90"
+          >
+            Join beta
+          </a>
+        </div>
       </nav>
 
-      {/* Hero — image as full background, form over the left empty space */}
-      <main
-        className="relative min-h-[calc(100vh-88px)] bg-cover bg-right bg-no-repeat"
+      {/* ── Hero — full viewport ────────────────────────────────── */}
+      <section
+        className="relative flex min-h-screen items-center bg-cover bg-right bg-no-repeat"
         style={{ backgroundImage: "url('/hero-creative-wall.png')" }}
       >
-        {/* Gradient overlay — solid on the left for legibility, fading to transparent on the right to reveal the image */}
+        {/* Dark overlay for legibility, heavier on left */}
         <div
           className="absolute inset-0"
           style={{
             background:
-              "linear-gradient(to right, var(--bg) 35%, color-mix(in srgb, var(--bg) 85%, transparent) 50%, color-mix(in srgb, var(--bg) 20%, transparent) 70%, transparent 85%)",
+              "linear-gradient(to right, rgba(15,12,10,0.82) 30%, rgba(15,12,10,0.55) 55%, rgba(15,12,10,0.25) 80%, rgba(15,12,10,0.15) 100%)",
           }}
         />
 
-        <div className="relative mx-auto flex min-h-[calc(100vh-88px)] max-w-7xl items-center px-6 sm:px-10 lg:px-16">
-          <div className="max-w-lg py-16">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--bg-secondary)] px-3.5 py-1.5">
+        <div className="relative z-10 mx-auto w-full max-w-7xl px-6 sm:px-10 lg:px-16">
+          <div className="max-w-2xl py-24">
+            {/* Badge */}
+            <div className="mb-8 inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 backdrop-blur-sm">
               <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--green)] opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-[var(--green)]" />
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
               </span>
-              <span className="text-[12px] font-medium tracking-wide text-[var(--text-secondary)]">
+              <span className="text-[12px] font-medium tracking-wide text-white/80">
                 Beta access opening soon
               </span>
             </div>
 
-            <h1 className="mb-4 text-[clamp(2rem,5vw,3.25rem)] font-semibold leading-[1.1] tracking-tight">
-              Your ads, optimized
+            {/* Heading — large serif, Sierra style */}
+            <h1
+              className="mb-6 text-[clamp(2.5rem,6vw,4.5rem)] leading-[1.08] tracking-tight text-white"
+              style={{ fontFamily: SERIF }}
+            >
+              Better ad performance.
               <br />
-              <span className="text-[var(--accent)]">by AI agents</span>
+              Powered by AI agents.
             </h1>
 
-            <p className="mb-8 max-w-md text-[15px] leading-relaxed text-[var(--text-secondary)]">
+            <p className="mb-10 max-w-lg text-[16px] leading-relaxed text-white/70">
               Ad Creative Agent decomposes your creatives into testable
               elements, runs autonomous optimization cycles, and compounds
               learnings over time. You approve — we execute.
             </p>
 
-            {status === "success" ? (
-              <div className="rounded-xl border border-[var(--green)]/30 bg-[var(--green)]/5 px-5 py-4">
-                <p className="text-[15px] font-medium text-[var(--green)]">
-                  You&apos;re on the list!
-                </p>
-                <p className="mt-1 text-[13px] text-[var(--text-secondary)]">
-                  We&apos;ll reach out when your spot is ready.
-                </p>
-              </div>
-            ) : (
-              <form onSubmit={onSubmit} noValidate>
-                <div className="flex gap-3 sm:max-w-md">
+            {/* CTA — pill-style buttons, Sierra aesthetic */}
+            <div id="join" className="flex flex-wrap items-center gap-4">
+              {status === "success" ? (
+                <div className="rounded-full bg-emerald-500/20 px-6 py-3 backdrop-blur-sm">
+                  <span className="text-[15px] font-medium text-emerald-300">
+                    You're on the list — we'll be in touch!
+                  </span>
+                </div>
+              ) : (
+                <form
+                  onSubmit={onSubmit}
+                  noValidate
+                  className="flex flex-col gap-3 sm:flex-row sm:items-center"
+                >
                   <input
                     type="email"
                     autoComplete="email"
@@ -111,92 +135,127 @@ export function LandingRoute() {
                       setEmail(e.target.value);
                       if (status === "error") setStatus("idle");
                     }}
-                    className="h-12 flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 text-[14px] text-[var(--text)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:ring-offset-2 focus:ring-offset-[var(--bg)]"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                    className="h-12 w-64 rounded-full border border-white/20 bg-white/10 px-5 text-[14px] text-white placeholder:text-white/40 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/30"
+                    style={{ fontFamily: SANS }}
                   />
                   <button
                     type="submit"
                     disabled={status === "submitting"}
-                    className="h-12 whitespace-nowrap rounded-lg bg-[var(--accent)] px-6 text-[14px] font-medium text-white transition-all hover:brightness-110 active:brightness-95 disabled:opacity-50"
-                    style={{ fontFamily: "'Outfit', sans-serif" }}
+                    className="h-12 whitespace-nowrap rounded-full bg-white px-8 text-[14px] font-medium text-[#1a1a1a] transition-all hover:bg-white/90 active:scale-[0.98] disabled:opacity-50"
+                    style={{ fontFamily: SANS }}
                   >
-                    {status === "submitting" ? "Joining..." : "Join the beta"}
+                    {status === "submitting"
+                      ? "Joining..."
+                      : "Join the beta"}
                   </button>
-                </div>
-                {status === "error" && (
-                  <p className="mt-2.5 text-[13px] text-[var(--red)]">
-                    {errorMsg}
-                  </p>
-                )}
-                <p className="mt-3 text-[12px] text-[var(--text-tertiary)]">
-                  No credit card required. We&apos;ll notify you when your
-                  access is ready.
-                </p>
-              </form>
-            )}
-
-            {/* Social proof */}
-            <div className="mt-10 flex flex-wrap gap-x-8 gap-y-3 border-t border-[var(--border)] pt-6">
-              {[
-                ["4.2%", "Avg CTR lift"],
-                ["3.8x", "ROAS improvement"],
-                ["-62%", "Time to optimize"],
-              ].map(([value, label]) => (
-                <div key={label}>
-                  <p className="text-lg font-semibold tracking-tight">
-                    {value}
-                  </p>
-                  <p className="text-[12px] text-[var(--text-tertiary)]">
-                    {label}
-                  </p>
-                </div>
-              ))}
+                </form>
+              )}
             </div>
+            {status === "error" && (
+              <p className="mt-3 text-[13px] text-red-300">{errorMsg}</p>
+            )}
+            {status !== "success" && (
+              <p className="mt-4 text-[12px] text-white/40">
+                No credit card required. We'll notify you when your access is
+                ready.
+              </p>
+            )}
           </div>
         </div>
-      </main>
+      </section>
 
-      {/* How it works */}
-      <section className="border-t border-[var(--border)] bg-[var(--bg-secondary)]">
-        <div className="mx-auto max-w-7xl px-6 py-20 sm:px-10 lg:px-16">
-          <h2 className="mb-2 text-center text-[12px] font-semibold uppercase tracking-widest text-[var(--accent)]">
-            How it works
-          </h2>
-          <p className="mb-12 text-center text-2xl font-semibold tracking-tight">
-            Autonomous optimization, human approval
+      {/* ── Social proof / logo wall ────────────────────────────── */}
+      <section className="border-b border-[#e8e5e0] bg-[#faf9f7] py-20">
+        <div className="mx-auto max-w-5xl px-6 text-center sm:px-10">
+          <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.15em] text-[#999]">
+            Built for performance marketers
           </p>
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+          <h2
+            className="mb-4 text-[clamp(1.5rem,3vw,2.25rem)] tracking-tight text-[#1a1a1a]"
+            style={{ fontFamily: SERIF }}
+          >
+            The metrics that matter
+          </h2>
+          <p className="mx-auto mb-14 max-w-md text-[14px] leading-relaxed text-[#777]">
+            Early beta results across campaigns of all sizes.
+          </p>
+          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+            {[
+              { value: "4.2%", label: "Avg CTR lift" },
+              { value: "3.8x", label: "ROAS improvement" },
+              { value: "-62%", label: "Time to optimize" },
+              { value: "12k+", label: "Variants tested" },
+            ].map(({ value, label }) => (
+              <div key={label} className="flex flex-col items-center">
+                <span
+                  className="mb-1 text-[clamp(1.75rem,3vw,2.5rem)] tracking-tight text-[#1a1a1a]"
+                  style={{ fontFamily: SERIF }}
+                >
+                  {value}
+                </span>
+                <span className="text-[13px] text-[#999]">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── How it works ────────────────────────────────────────── */}
+      <section className="bg-[#faf9f7] py-24">
+        <div className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-16">
+          <div className="mb-16 text-center">
+            <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.15em] text-[#999]">
+              How it works
+            </p>
+            <h2
+              className="mb-4 text-[clamp(1.5rem,3vw,2.5rem)] tracking-tight text-[#1a1a1a]"
+              style={{ fontFamily: SERIF }}
+            >
+              Autonomous optimization, human approval
+            </h2>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {[
               {
                 step: "01",
                 title: "Decompose",
                 desc: "Your creatives are broken into swappable elements — headlines, CTAs, media, audiences.",
+                color: "#f5ebe0",
               },
               {
                 step: "02",
                 title: "Test",
                 desc: "The system generates variant combinations and deploys them across your ad platforms.",
+                color: "#e8f0e8",
               },
               {
                 step: "03",
                 title: "Analyze",
                 desc: "Statistical significance tests and element-level attribution identify what actually works.",
+                color: "#e0eaf5",
               },
               {
                 step: "04",
                 title: "Compound",
                 desc: "Winning elements are recombined. Losers are paused. Learnings accumulate over time.",
+                color: "#f5e8f0",
               },
-            ].map(({ step, title, desc }) => (
+            ].map(({ step, title, desc, color }) => (
               <div
                 key={step}
-                className="rounded-xl border border-[var(--border)] bg-[var(--bg)] p-6"
+                className="rounded-2xl p-8 transition-transform hover:scale-[1.02]"
+                style={{ backgroundColor: color }}
               >
-                <span className="mb-3 inline-block text-[12px] font-semibold text-[var(--accent)]">
+                <span className="mb-4 inline-block text-[12px] font-semibold tracking-wide text-[#999]">
                   {step}
                 </span>
-                <h3 className="mb-2 text-[15px] font-semibold">{title}</h3>
-                <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
+                <h3
+                  className="mb-3 text-[20px] text-[#1a1a1a]"
+                  style={{ fontFamily: SERIF }}
+                >
+                  {title}
+                </h3>
+                <p className="text-[13px] leading-relaxed text-[#666]">
                   {desc}
                 </p>
               </div>
@@ -205,10 +264,21 @@ export function LandingRoute() {
         </div>
       </section>
 
-      {/* Features */}
-      <section className="border-t border-[var(--border)]">
-        <div className="mx-auto max-w-7xl px-6 py-20 sm:px-10 lg:px-16">
-          <div className="grid gap-12 lg:grid-cols-3">
+      {/* ── Features ────────────────────────────────────────────── */}
+      <section className="border-t border-[#e8e5e0] bg-white py-24">
+        <div className="mx-auto max-w-7xl px-6 sm:px-10 lg:px-16">
+          <div className="mb-16 text-center">
+            <p className="mb-3 text-[12px] font-semibold uppercase tracking-[0.15em] text-[#999]">
+              Capabilities
+            </p>
+            <h2
+              className="mb-4 text-[clamp(1.5rem,3vw,2.5rem)] tracking-tight text-[#1a1a1a]"
+              style={{ fontFamily: SERIF }}
+            >
+              Transform your creative testing
+            </h2>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {[
               {
                 title: "Element-level insights",
@@ -235,9 +305,17 @@ export function LandingRoute() {
                 desc: "Automated performance summaries delivered to your inbox with actionable insights.",
               },
             ].map(({ title, desc }) => (
-              <div key={title}>
-                <h3 className="mb-2 text-[15px] font-semibold">{title}</h3>
-                <p className="text-[13px] leading-relaxed text-[var(--text-secondary)]">
+              <div
+                key={title}
+                className="rounded-2xl border border-[#e8e5e0] bg-[#faf9f7] p-8 transition-colors hover:border-[#d4d0ca]"
+              >
+                <h3
+                  className="mb-3 text-[18px] text-[#1a1a1a]"
+                  style={{ fontFamily: SERIF }}
+                >
+                  {title}
+                </h3>
+                <p className="text-[13px] leading-relaxed text-[#777]">
                   {desc}
                 </p>
               </div>
@@ -246,25 +324,29 @@ export function LandingRoute() {
         </div>
       </section>
 
-      {/* Bottom CTA */}
-      <section className="border-t border-[var(--border)] bg-[var(--bg-secondary)]">
-        <div className="mx-auto max-w-2xl px-6 py-20 text-center sm:px-10">
-          <h2 className="mb-3 text-2xl font-semibold tracking-tight">
+      {/* ── Bottom CTA ──────────────────────────────────────────── */}
+      <section className="relative overflow-hidden bg-[#1a1816] py-32">
+        <div className="pointer-events-none absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "40px 40px" }} />
+        <div className="relative z-10 mx-auto max-w-2xl px-6 text-center sm:px-10">
+          <h2
+            className="mb-4 text-[clamp(1.75rem,4vw,3rem)] tracking-tight text-white"
+            style={{ fontFamily: SERIF }}
+          >
             Ready to optimize?
           </h2>
-          <p className="mb-8 text-[14px] text-[var(--text-secondary)]">
-            Join the beta and let AI agents handle the grind of creative
-            testing while you focus on strategy.
+          <p className="mb-10 text-[15px] leading-relaxed text-white/60">
+            Join the beta and let AI agents handle the grind of creative testing
+            while you focus on strategy.
           </p>
           {status === "success" ? (
-            <p className="text-[15px] font-medium text-[var(--green)]">
-              You&apos;re on the list — we&apos;ll be in touch!
-            </p>
+            <span className="inline-block rounded-full bg-emerald-500/20 px-6 py-3 text-[15px] font-medium text-emerald-300">
+              You're on the list — we'll be in touch!
+            </span>
           ) : (
             <form
               onSubmit={onSubmit}
               noValidate
-              className="mx-auto flex max-w-sm gap-3"
+              className="mx-auto flex max-w-md flex-col items-center gap-3 sm:flex-row"
             >
               <input
                 type="email"
@@ -275,14 +357,14 @@ export function LandingRoute() {
                   setEmail(e.target.value);
                   if (status === "error") setStatus("idle");
                 }}
-                className="h-12 flex-1 rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4 text-[14px] text-[var(--text)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
-                style={{ fontFamily: "'Outfit', sans-serif" }}
+                className="h-12 w-full rounded-full border border-white/20 bg-white/10 px-5 text-[14px] text-white placeholder:text-white/40 backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-white/30 sm:flex-1"
+                style={{ fontFamily: SANS }}
               />
               <button
                 type="submit"
                 disabled={status === "submitting"}
-                className="h-12 whitespace-nowrap rounded-lg bg-[var(--accent)] px-6 text-[14px] font-medium text-white transition-all hover:brightness-110 active:brightness-95 disabled:opacity-50"
-                style={{ fontFamily: "'Outfit', sans-serif" }}
+                className="h-12 w-full whitespace-nowrap rounded-full bg-white px-8 text-[14px] font-medium text-[#1a1a1a] transition-all hover:bg-white/90 active:scale-[0.98] disabled:opacity-50 sm:w-auto"
+                style={{ fontFamily: SANS }}
               >
                 {status === "submitting" ? "..." : "Join beta"}
               </button>
@@ -291,17 +373,23 @@ export function LandingRoute() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="border-t border-[var(--border)]">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-6 sm:px-10 lg:px-16">
-          <p className="text-[12px] text-[var(--text-tertiary)]">
+      {/* ── Footer ──────────────────────────────────────────────── */}
+      <footer className="border-t border-[#e8e5e0] bg-[#faf9f7]">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-8 sm:px-10 lg:px-16">
+          <p className="text-[12px] text-[#aaa]">
             &copy; 2026 Ad Creative Agent
           </p>
-          <div className="flex gap-6 text-[12px] text-[var(--text-tertiary)]">
-            <Link to="/privacy" className="hover:text-[var(--text)] no-underline">
+          <div className="flex gap-6 text-[12px] text-[#aaa]">
+            <Link
+              to="/privacy"
+              className="no-underline transition-colors hover:text-[#666]"
+            >
               Privacy
             </Link>
-            <Link to="/sign-in" className="hover:text-[var(--text)] no-underline">
+            <Link
+              to="/sign-in"
+              className="no-underline transition-colors hover:text-[#666]"
+            >
               Sign in
             </Link>
           </div>
