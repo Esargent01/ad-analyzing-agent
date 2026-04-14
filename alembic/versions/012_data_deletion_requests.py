@@ -10,8 +10,8 @@ from sqlalchemy.dialects.postgresql import UUID
 
 from alembic import op
 
-revision = "012"
-down_revision = "011"
+revision = "012_data_deletion_requests"
+down_revision = "011_budget_check_constraints"
 branch_labels = None
 depends_on = None
 

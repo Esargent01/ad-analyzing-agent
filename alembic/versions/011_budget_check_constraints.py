@@ -11,8 +11,8 @@ Revises: 010
 
 from alembic import op
 
-revision = "011"
-down_revision = "010"
+revision = "011_budget_check_constraints"
+down_revision = "010_approval_queue_actions"
 branch_labels = None
 depends_on = None
 
