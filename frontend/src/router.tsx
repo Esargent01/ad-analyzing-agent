@@ -10,6 +10,7 @@ import { ImportMetaCampaignsRoute } from "@/routes/import-meta-campaigns";
 import { LandingRoute } from "@/routes/landing";
 import { MagicLinkSentRoute } from "@/routes/magic-link-sent";
 import { PrivacyRoute } from "@/routes/privacy";
+import { ProductRoute } from "@/routes/product";
 import { ReportsDailyListRoute } from "@/routes/reports-daily-list";
 import { ReportsWeeklyListRoute } from "@/routes/reports-weekly-list";
 import { SignInRoute } from "@/routes/sign-in";
@@ -23,6 +24,10 @@ export const router = createBrowserRouter([
   {
     path: "/",
     element: <LandingRoute />,
+  },
+  {
+    path: "/product",
+    element: <ProductRoute />,
   },
   {
     path: "/sign-in",
