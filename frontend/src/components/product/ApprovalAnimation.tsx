@@ -33,13 +33,15 @@ const ROWS = [
 
 export function ApprovalAnimation() {
   const reduce = useReducedMotion();
-  const [approved, setApproved] = useState<number[]>(reduce ? [0, 1, 2, 3] : []);
+  // Approve rows 0 and 1; leave rows 2 and 3 pending to show both states.
+  const APPROVE_ORDER = [0, 1];
+  const [approved, setApproved] = useState<number[]>(reduce ? APPROVE_ORDER : []);
 
   useEffect(() => {
     if (reduce) return;
     const timers: ReturnType<typeof setTimeout>[] = [];
-    ROWS.forEach((_, i) => {
-      timers.push(setTimeout(() => setApproved((a) => [...a, i]), 1400 + i * 550));
+    APPROVE_ORDER.forEach((idx, i) => {
+      timers.push(setTimeout(() => setApproved((a) => [...a, idx]), 1400 + i * 550));
     });
     return () => timers.forEach(clearTimeout);
   }, [reduce]);
