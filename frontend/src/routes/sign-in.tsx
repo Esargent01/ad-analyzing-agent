@@ -47,11 +47,7 @@ export function SignInRoute() {
     <div className="flex min-h-screen items-center justify-center px-5">
       <Card className="w-full max-w-sm">
         <div className="mb-4 flex items-center gap-2">
-          <span
-            aria-hidden
-            className="inline-block h-6 w-6 rounded bg-[var(--accent)]"
-          />
-          <span className="text-sm font-medium">Ad Creative Agent</span>
+          <span className="text-base font-normal tracking-tight" style={{ fontFamily: "'DM Serif Display', serif" }}>Kleiber</span>
         </div>
         <h1 className="mb-1 text-xl font-medium">Sign in</h1>
         <p className="mb-5 text-xs text-[var(--text-secondary)]">

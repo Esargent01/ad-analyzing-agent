@@ -27,11 +27,7 @@ export function Header() {
           to="/dashboard"
           className="flex items-center gap-2 text-[var(--text)] no-underline hover:no-underline"
         >
-          <span
-            aria-hidden
-            className="inline-block h-6 w-6 rounded bg-[var(--accent)]"
-          />
-          <span className="text-sm font-medium">Ad Creative Agent</span>
+          <span className="text-base font-normal tracking-tight" style={{ fontFamily: "'DM Serif Display', serif" }}>Kleiber</span>
         </Link>
         <div className="flex items-center gap-3">
           {me.data ? (

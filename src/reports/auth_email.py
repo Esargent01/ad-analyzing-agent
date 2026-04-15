@@ -63,7 +63,7 @@ async def send_magic_link(email: str, magic_link: str) -> bool:
         "personalizations": [
             {
                 "to": [{"email": email}],
-                "subject": "Sign in to the Ad Creative Agent dashboard",
+                "subject": "Sign in to Kleiber",
             },
         ],
         "from": {"email": settings.report_email_from},

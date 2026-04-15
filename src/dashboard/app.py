@@ -125,7 +125,7 @@ TEMPLATE_DIR = Path(__file__).parent / "templates"
 templates = Jinja2Templates(directory=str(TEMPLATE_DIR))
 
 app = FastAPI(
-    title="Ad Creative Agent Dashboard",
+    title="Kleiber Dashboard",
     description="Read-only monitoring dashboard + authenticated JSON API",
     docs_url=None,
     redoc_url=None,

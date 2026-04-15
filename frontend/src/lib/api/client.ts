@@ -1,5 +1,5 @@
 /**
- * Fetch wrapper for the Ad Creative Agent dashboard backend.
+ * Fetch wrapper for the Kleiber dashboard backend.
  *
  * - Always sends cookies (credentials: "include") so the HttpOnly session
  *   cookie rides along on every request.

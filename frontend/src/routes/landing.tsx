@@ -55,15 +55,12 @@ export function LandingRoute() {
       {/* ── Nav ─────────────────────────────────────────────────── */}
       <nav className="absolute left-0 right-0 top-0 z-30 flex items-center justify-between px-6 py-5 sm:px-10 lg:px-16">
         {/* Logo — left */}
-        <div className="flex items-center gap-2.5">
-          <span
-            aria-hidden
-            className="inline-block h-7 w-7 rounded-lg bg-white/90"
-          />
-          <span className="text-[15px] font-semibold tracking-tight text-white">
-            Ad Creative Agent
-          </span>
-        </div>
+        <span
+          className="text-[22px] tracking-tight text-white"
+          style={{ fontFamily: SERIF }}
+        >
+          Kleiber
+        </span>
 
         {/* Actions — right */}
         <div className="flex items-center gap-3">
@@ -163,7 +160,7 @@ export function LandingRoute() {
             </motion.h1>
 
             <motion.p variants={fadeInUp} className="mb-10 max-w-lg text-[16px] leading-relaxed text-white/70">
-              Ad Creative Agent decomposes your creatives into testable
+              Kleiber decomposes your creatives into testable
               elements, runs autonomous optimization cycles, and compounds
               learnings over time. You approve — we execute.
             </motion.p>
@@ -351,7 +348,7 @@ export function LandingRoute() {
       <footer className="border-t border-[#e8e5e0] bg-[#faf9f7]">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-8 sm:px-10 lg:px-16">
           <p className="text-[12px] text-[#aaa]">
-            &copy; 2026 Ad Creative Agent
+            &copy; 2026 Kleiber
           </p>
           <div className="flex gap-6 text-[12px] text-[#aaa]">
             <Link

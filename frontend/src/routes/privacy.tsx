@@ -13,7 +13,7 @@ export function PrivacyRoute() {
       <section className="mb-8">
         <h2 className="mb-2 text-lg font-medium">1. What we do</h2>
         <p className="text-sm leading-relaxed text-[var(--text-secondary)]">
-          Ad Creative Agent (&ldquo;the Service&rdquo;) is an ad optimization
+          Kleiber (&ldquo;the Service&rdquo;) is an ad optimization
           platform that helps advertisers test creative variants across Meta
           (Facebook/Instagram) and Google Ads. The Service monitors campaign
           performance, analyzes results, and generates optimized creative

@@ -53,7 +53,7 @@ export function DataDeletionRoute() {
       <header className="mb-6">
         <h1 className="mb-1 text-xl font-semibold">Data Deletion Status</h1>
         <p className="text-xs text-[var(--text-tertiary)]">
-          Ad Creative Agent
+          Kleiber
         </p>
       </header>
 
