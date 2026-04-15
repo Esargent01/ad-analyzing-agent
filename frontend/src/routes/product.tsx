@@ -73,7 +73,14 @@ export function ProductRoute() {
           Kleiber
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <Link
+            to="/"
+            className="hidden text-[13px] text-[#666] no-underline transition-colors hover:text-[#1a1a1a] sm:inline-block"
+            style={{ fontFamily: SANS }}
+          >
+            Home
+          </Link>
           <AnimatePresence>
             {navOpen && status !== "success" && (
               <motion.form

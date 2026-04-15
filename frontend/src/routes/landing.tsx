@@ -63,7 +63,14 @@ export function LandingRoute() {
         </span>
 
         {/* Actions — right */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
+          <Link
+            to="/product"
+            className="hidden text-[13px] text-white/70 no-underline transition-colors hover:text-white sm:inline-block"
+            style={{ fontFamily: SANS }}
+          >
+            How it works
+          </Link>
           <AnimatePresence>
             {navOpen && status !== "success" && (
               <motion.form
