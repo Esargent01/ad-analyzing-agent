@@ -37,6 +37,71 @@ def _render_magic_link_email(magic_link: str, ttl_minutes: int) -> str:
     return template.render(magic_link=magic_link, ttl_minutes=ttl_minutes)
 
 
+def _render_beta_signup_email() -> str:
+    env = jinja2.Environment(
+        loader=jinja2.FileSystemLoader(str(_TEMPLATE_DIR)),
+        autoescape=True,
+    )
+    template = env.get_template("beta_signup_email.html")
+    return template.render()
+
+
+async def send_beta_signup_confirmation(email: str) -> bool:
+    """Send a Kleiber-branded beta-waitlist confirmation email.
+
+    Mirrors :func:`send_magic_link` — same SendGrid v3 path, same
+    dev-mode fallback when ``settings.sendgrid_api_key`` is empty or a
+    placeholder. Returns ``True`` on SendGrid 200/202 (or dev mode).
+    """
+    settings = get_settings()
+    html_content = _render_beta_signup_email()
+
+    if settings.sendgrid_api_key in _DEV_PLACEHOLDER_KEYS:
+        logger.info("=" * 72)
+        logger.info("DEV MODE: beta confirmation would be sent to %s", email)
+        logger.info("=" * 72)
+        return True
+
+    payload: dict[str, object] = {
+        "personalizations": [
+            {
+                "to": [{"email": email}],
+                "subject": "You're on the Kleiber beta list",
+            },
+        ],
+        "from": {"email": settings.report_email_from},
+        "content": [
+            {"type": "text/html", "value": html_content},
+        ],
+    }
+
+    headers: dict[str, str] = {
+        "Authorization": f"Bearer {settings.sendgrid_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                _SENDGRID_API_URL,
+                json=payload,
+                headers=headers,
+            )
+            if response.status_code in (200, 202):
+                logger.info("Beta confirmation email sent to %s", email)
+                return True
+
+            logger.error(
+                "SendGrid returned HTTP %d: %s",
+                response.status_code,
+                response.text[:500],
+            )
+            return False
+    except httpx.RequestError as exc:
+        logger.error("SendGrid request failed: %s", exc)
+        return False
+
+
 async def send_magic_link(email: str, magic_link: str) -> bool:
     """Send a magic-link email to ``email``.
 

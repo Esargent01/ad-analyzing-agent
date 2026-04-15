@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Daily Report — {{ report_date }}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+<body style="margin: 0; padding: 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
 
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3;">
 <tr><td align="center" style="padding: 20px 0;">
     <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px;">
     <tr><td style="padding: 32px 28px;">
@@ -15,13 +15,13 @@
         <!-- Section 1: Header -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
         <tr><td>
-            <span style="display: inline-block; background-color: #534AB7; color: #ffffff; font-size: 11px; padding: 2px 10px; border-radius: 12px; font-family: Arial, Helvetica, sans-serif;">Daily report</span>
+            <span style="display: inline-block; background-color: #1a1816; color: #ffffff; font-size: 11px; padding: 2px 10px; border-radius: 12px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Daily report</span>
         </td></tr>
         <tr><td style="padding-top: 10px;">
-            <span style="font-size: 20px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">{{ campaign_name }}</span>
+            <span style="font-size: 20px; font-weight: 500; color: #1a1a1a; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ campaign_name }}</span>
         </td></tr>
         <tr><td style="padding-top: 4px;">
-            <span style="font-size: 13px; color: #999999; font-family: Arial, Helvetica, sans-serif;">Day {{ day_number }} &middot; {{ report_date_fmt }} &middot; Cycle {{ cycle_number }}</span>
+            <span style="font-size: 13px; color: #999999; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Day {{ day_number }} &middot; {{ report_date_fmt }} &middot; Cycle {{ cycle_number }}</span>
         </td></tr>
         </table>
 
@@ -33,52 +33,52 @@
         <tr>
             <!-- Spend -->
             <td width="25%" style="padding: 0 4px 0 0;" valign="top">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
                 <tr><td style="padding: 12px 14px;">
-                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Spend</p>
-                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ total_spend|currency }}</p>
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Spend</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ total_spend|currency }}</p>
                     {% if prev_spend is not none and prev_spend %}
                     {% set spend_delta = ((total_spend - prev_spend) / prev_spend * 100)|round(1) %}
-                    <p style="font-size: 11px; color: #999999; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">&rarr; {{ spend_delta|onedecimal }}%</p>
+                    <p style="font-size: 11px; color: #999999; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">&rarr; {{ spend_delta|onedecimal }}%</p>
                     {% endif %}
                 </td></tr>
                 </table>
             </td>
             <!-- Purchases -->
             <td width="25%" style="padding: 0 4px;" valign="top">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
                 <tr><td style="padding: 12px 14px;">
-                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Purchases</p>
-                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ total_purchases|intcomma }}</p>
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Purchases</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ total_purchases|intcomma }}</p>
                     {% if prev_purchases is not none and prev_purchases %}
                     {% set purch_delta = ((total_purchases - prev_purchases) / prev_purchases * 100)|round(1) %}
-                    <p style="font-size: 11px; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif; color: {% if purch_delta > 0 %}#1D9E75{% elif purch_delta < 0 %}#D85A30{% else %}#999999{% endif %};">{% if purch_delta > 0 %}&uarr;{% elif purch_delta < 0 %}&darr;{% else %}&rarr;{% endif %} {{ purch_delta|onedecimal }}%</p>
+                    <p style="font-size: 11px; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif; color: {% if purch_delta > 0 %}#059669{% elif purch_delta < 0 %}#dc2626{% else %}#999999{% endif %};">{% if purch_delta > 0 %}&uarr;{% elif purch_delta < 0 %}&darr;{% else %}&rarr;{% endif %} {{ purch_delta|onedecimal }}%</p>
                     {% endif %}
                 </td></tr>
                 </table>
             </td>
             <!-- CPA (inverted) -->
             <td width="25%" style="padding: 0 4px;" valign="top">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
                 <tr><td style="padding: 12px 14px;">
-                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Avg. CPA</p>
-                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ avg_cost_per_purchase|currency }}</p>
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Avg. CPA</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ avg_cost_per_purchase|currency }}</p>
                     {% if prev_avg_cpa is not none and prev_avg_cpa %}
                     {% set cpa_delta = ((avg_cost_per_purchase - prev_avg_cpa) / prev_avg_cpa * 100)|round(1) %}
-                    <p style="font-size: 11px; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif; color: {% if cpa_delta < 0 %}#1D9E75{% elif cpa_delta > 0 %}#D85A30{% else %}#999999{% endif %};">{% if cpa_delta < 0 %}&uarr;{% elif cpa_delta > 0 %}&darr;{% else %}&rarr;{% endif %} {{ cpa_delta|onedecimal }}%</p>
+                    <p style="font-size: 11px; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif; color: {% if cpa_delta < 0 %}#059669{% elif cpa_delta > 0 %}#dc2626{% else %}#999999{% endif %};">{% if cpa_delta < 0 %}&uarr;{% elif cpa_delta > 0 %}&darr;{% else %}&rarr;{% endif %} {{ cpa_delta|onedecimal }}%</p>
                     {% endif %}
                 </td></tr>
                 </table>
             </td>
             <!-- ROAS -->
             <td width="25%" style="padding: 0 0 0 4px;" valign="top">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
                 <tr><td style="padding: 12px 14px;">
-                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">ROAS</p>
-                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</p>
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">ROAS</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</p>
                     {% if prev_avg_roas is not none and prev_avg_roas and avg_roas %}
                     {% set roas_delta = ((avg_roas - prev_avg_roas) / prev_avg_roas * 100)|round(1) %}
-                    <p style="font-size: 11px; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif; color: {% if roas_delta > 0 %}#1D9E75{% elif roas_delta < 0 %}#D85A30{% else %}#999999{% endif %};">{% if roas_delta > 0 %}&uarr;{% elif roas_delta < 0 %}&darr;{% else %}&rarr;{% endif %} {{ roas_delta|onedecimal }}%</p>
+                    <p style="font-size: 11px; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif; color: {% if roas_delta > 0 %}#059669{% elif roas_delta < 0 %}#dc2626{% else %}#999999{% endif %};">{% if roas_delta > 0 %}&uarr;{% elif roas_delta < 0 %}&darr;{% else %}&rarr;{% endif %} {{ roas_delta|onedecimal }}%</p>
                     {% endif %}
                 </td></tr>
                 </table>
@@ -91,21 +91,21 @@
         <!-- Spacer -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
 
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e5e5e5; border-radius: 12px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e8e5e0; border-radius: 12px;">
         <tr><td style="padding: 20px;">
 
             <!-- Spotlight header -->
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
             <tr>
-                <td style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">{{ best_variant.variant_code }} &middot; {{ best_variant.genome_summary }}</td>
-                <td align="right"><span style="display: inline-block; background-color: #EAF3DE; color: #27500A; font-size: 11px; padding: 2px 10px; border-radius: 12px; font-family: Arial, Helvetica, sans-serif;">Best CPA today</span></td>
+                <td style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ best_variant.variant_code }} &middot; {{ best_variant.genome_summary }}</td>
+                <td align="right"><span style="display: inline-block; background-color: #d1fae5; color: #047857; font-size: 11px; padding: 2px 10px; border-radius: 12px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Best CPA today</span></td>
             </tr>
             </table>
 
             {% if best_variant.hypothesis %}
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
             <tr><td style="padding-top: 6px;">
-                <span style="font-size: 12px; color: #6b6b6b; font-style: italic; font-family: Arial, Helvetica, sans-serif;">{{ best_variant.hypothesis }}</span>
+                <span style="font-size: 12px; color: #666666; font-style: italic; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ best_variant.hypothesis }}</span>
             </td></tr>
             </table>
             {% endif %}
@@ -117,58 +117,58 @@
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
             <tr>
                 <td width="33%" style="padding: 0 4px 8px 0;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
                     <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Cost per purchase</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ best_variant.cost_per_purchase|currency }}</p>
+                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Cost per purchase</p>
+                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ best_variant.cost_per_purchase|currency }}</p>
                         {% if best_variant.cost_per_purchase %}
-                        <p style="font-size: 10px; color: #999999; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">target: &lt; ${{ (best_variant.cost_per_purchase * 1.2)|round(0)|int }}</p>
+                        <p style="font-size: 10px; color: #999999; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">target: &lt; ${{ (best_variant.cost_per_purchase * 1.2)|round(0)|int }}</p>
                         {% endif %}
                     </td></tr>
                     </table>
                 </td>
                 <td width="33%" style="padding: 0 4px 8px;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
                     <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">ROAS</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{% if best_variant.roas %}{{ best_variant.roas|onedecimal }}x{% else %}N/A{% endif %}</p>
+                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">ROAS</p>
+                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{% if best_variant.roas %}{{ best_variant.roas|onedecimal }}x{% else %}N/A{% endif %}</p>
                     </td></tr>
                     </table>
                 </td>
                 <td width="33%" style="padding: 0 0 8px 4px;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
                     <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Purchases</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ best_variant.purchases|intcomma }}</p>
+                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Purchases</p>
+                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ best_variant.purchases|intcomma }}</p>
                     </td></tr>
                     </table>
                 </td>
             </tr>
             <tr>
                 <td width="33%" style="padding: 0 4px 0 0;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
                     <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Hook rate</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{% if best_variant.hook_rate_pct is not none %}{{ best_variant.hook_rate_pct|round(1) }}%{% else %}N/A{% endif %}</p>
-                        <p style="font-size: 10px; color: #999999; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">benchmark 30%</p>
+                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Hook rate</p>
+                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{% if best_variant.hook_rate_pct is not none %}{{ best_variant.hook_rate_pct|round(1) }}%{% else %}N/A{% endif %}</p>
+                        <p style="font-size: 10px; color: #999999; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">benchmark 30%</p>
                     </td></tr>
                     </table>
                 </td>
                 <td width="33%" style="padding: 0 4px;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
                     <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">Hold rate</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{% if best_variant.hold_rate_pct is not none %}{{ best_variant.hold_rate_pct|round(1) }}%{% else %}N/A{% endif %}</p>
-                        <p style="font-size: 10px; color: #999999; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">benchmark 25%</p>
+                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Hold rate</p>
+                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{% if best_variant.hold_rate_pct is not none %}{{ best_variant.hold_rate_pct|round(1) }}%{% else %}N/A{% endif %}</p>
+                        <p style="font-size: 10px; color: #999999; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">benchmark 25%</p>
                     </td></tr>
                     </table>
                 </td>
                 <td width="33%" style="padding: 0 0 0 4px;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
                     <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: Arial, Helvetica, sans-serif;">CTR</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{% if best_variant.ctr_pct is not none %}{{ best_variant.ctr_pct|round(1) }}%{% else %}N/A{% endif %}</p>
-                        <p style="font-size: 10px; color: #999999; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">benchmark 1.5%</p>
+                        <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">CTR</p>
+                        <p style="font-size: 18px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{% if best_variant.ctr_pct is not none %}{{ best_variant.ctr_pct|round(1) }}%{% else %}N/A{% endif %}</p>
+                        <p style="font-size: 10px; color: #999999; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">benchmark 1.5%</p>
                     </td></tr>
                     </table>
                 </td>
@@ -184,20 +184,20 @@
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
             {% for stage in best_variant_funnel %}
                 <tr>
-                    <td width="90" align="right" style="padding: 3px 8px 3px 0; font-size: 12px; color: #6b6b6b; font-family: Arial, Helvetica, sans-serif; vertical-align: middle;">{{ stage.label }}</td>
+                    <td width="90" align="right" style="padding: 3px 8px 3px 0; font-size: 12px; color: #666666; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif; vertical-align: middle;">{{ stage.label }}</td>
                     <td style="padding: 3px 0; vertical-align: middle;">
                         {% set bar_w = (stage.count / max_count * 400)|int if max_count > 0 else 0 %}
                         {% if bar_w < 30 %}{% set bar_w = 30 %}{% endif %}
                         <table role="presentation" cellpadding="0" cellspacing="0">
-                        <tr><td style="background-color: {{ stage.bar_color }}; border-radius: 4px; padding: 6px 10px; color: #ffffff; font-size: 12px; font-weight: 500; font-family: Arial, Helvetica, sans-serif; width: {{ bar_w }}px;">{{ stage.count|intcomma }}</td></tr>
+                        <tr><td style="background-color: {{ stage.bar_color }}; border-radius: 4px; padding: 6px 10px; color: #ffffff; font-size: 12px; font-weight: 500; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif; width: {{ bar_w }}px;">{{ stage.count|intcomma }}</td></tr>
                         </table>
                     </td>
-                    <td style="padding: 3px 0 3px 8px; font-size: 11px; color: #6b6b6b; font-family: Arial, Helvetica, sans-serif; vertical-align: middle;">{% if stage.rate_pct is not none %}{{ stage.rate_pct|round(1) }}% {{ stage.rate_label }}{% endif %}</td>
+                    <td style="padding: 3px 0 3px 8px; font-size: 11px; color: #666666; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif; vertical-align: middle;">{% if stage.rate_pct is not none %}{{ stage.rate_pct|round(1) }}% {{ stage.rate_label }}{% endif %}</td>
                 </tr>
                 {% if stage.dropoff_pct is not none and not loop.last %}
                 <tr>
                     <td width="90"></td>
-                    <td colspan="2" style="padding: 2px 0; font-size: 10px; color: #999999; font-family: Arial, Helvetica, sans-serif;">&darr; {{ stage.dropoff_pct|round(0)|int }}% didn't {{ best_variant_funnel[loop.index].label|lower }}</td>
+                    <td colspan="2" style="padding: 2px 0; font-size: 10px; color: #999999; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">&darr; {{ stage.dropoff_pct|round(0)|int }}% didn't {{ best_variant_funnel[loop.index].label|lower }}</td>
                 </tr>
                 {% endif %}
             {% endfor %}
@@ -209,14 +209,14 @@
             <!-- Spacer -->
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 14px;"></td></tr></table>
 
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f7f7f8; border-radius: 8px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
             <tr><td style="padding: 12px 14px;">
-                <p style="font-size: 12px; font-weight: 600; color: #1a1a1a; margin: 0 0 6px 0; font-family: Arial, Helvetica, sans-serif;">Diagnostics</p>
+                <p style="font-size: 12px; font-weight: 600; color: #1a1a1a; margin: 0 0 6px 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Diagnostics</p>
                 {% for d in best_variant_diagnostics %}
-                <p style="font-size: 12px; margin: 3px 0; font-family: Arial, Helvetica, sans-serif; color: {% if d.severity == 'good' %}#1D9E75{% elif d.severity == 'warning' %}#BA7517{% elif d.severity == 'bad' %}#D85A30{% else %}#6b6b6b{% endif %};">{{ d.text }}</p>
+                <p style="font-size: 12px; margin: 3px 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif; color: {% if d.severity == 'good' %}#059669{% elif d.severity == 'warning' %}#d97706{% elif d.severity == 'bad' %}#dc2626{% else %}#666666{% endif %};">{{ d.text }}</p>
                 {% endfor %}
                 {% if best_variant_projection %}
-                <p style="font-size: 12px; color: #6b6b6b; margin: 6px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ best_variant_projection }}</p>
+                <p style="font-size: 12px; color: #666666; margin: 6px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ best_variant_projection }}</p>
                 {% endif %}
             </td></tr>
             </table>
@@ -230,7 +230,7 @@
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
             <tr><td>
                 {% for slot, value in best_variant.genome.items() %}
-                <span style="display: inline-block; background-color: #f7f7f8; border-radius: 8px; padding: 3px 10px; margin: 0 4px 4px 0; font-size: 11px; font-family: Arial, Helvetica, sans-serif;"><span style="color: #999999;">{{ slot }}:</span> <span style="color: #1a1a1a;">{{ value }}</span></span>
+                <span style="display: inline-block; background-color: #f6f5f3; border-radius: 8px; padding: 3px 10px; margin: 0 4px 4px 0; font-size: 11px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;"><span style="color: #999999;">{{ slot }}:</span> <span style="color: #1a1a1a;">{{ value }}</span></span>
                 {% endfor %}
             </td></tr>
             </table>
@@ -247,37 +247,37 @@
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
         <tr><td style="padding-bottom: 10px;">
-            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Other active variants</span>
+            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Other active variants</span>
         </td></tr>
         </table>
 
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 12px; font-family: Arial, Helvetica, sans-serif;">
-        <tr style="border-bottom: 1px solid #e5e5e5;">
-            <td style="padding: 6px 8px 6px 0; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;">Variant</td>
-            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;">Hook</td>
-            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;">CTR</td>
-            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;">CPA</td>
-            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;">ROAS</td>
-            <td style="padding: 6px 0 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e5e5e5;">Status</td>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 12px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">
+        <tr style="border-bottom: 1px solid #e8e5e0;">
+            <td style="padding: 6px 8px 6px 0; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e8e5e0;">Variant</td>
+            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e8e5e0;">Hook</td>
+            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e8e5e0;">CTR</td>
+            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e8e5e0;">CPA</td>
+            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e8e5e0;">ROAS</td>
+            <td style="padding: 6px 0 6px 8px; font-size: 10px; text-transform: uppercase; color: #999999; letter-spacing: 0.4px; border-bottom: 1px solid #e8e5e0;">Status</td>
         </tr>
         {% for v in variants %}
         <tr>
-            <td style="padding: 6px 8px 6px 0; color: #1a1a1a; border-bottom: 1px solid #e5e5e5; font-family: 'Courier New', Courier, monospace; font-size: 12px;">{{ v.variant_code }}</td>
-            <td style="padding: 6px 8px; color: #1a1a1a; border-bottom: 1px solid #e5e5e5;">{% if v.hook_rate_pct is not none %}{{ v.hook_rate_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>
-            <td style="padding: 6px 8px; color: #1a1a1a; border-bottom: 1px solid #e5e5e5;">{% if v.ctr_pct is not none %}{{ v.ctr_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>
-            <td style="padding: 6px 8px; color: #1a1a1a; border-bottom: 1px solid #e5e5e5;">{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
-            <td style="padding: 6px 8px; color: #1a1a1a; border-bottom: 1px solid #e5e5e5;">{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
-            <td style="padding: 6px 0 6px 8px; border-bottom: 1px solid #e5e5e5;">
+            <td style="padding: 6px 8px 6px 0; color: #1a1a1a; border-bottom: 1px solid #e8e5e0; font-family: 'Courier New', Courier, monospace; font-size: 12px;">{{ v.variant_code }}</td>
+            <td style="padding: 6px 8px; color: #1a1a1a; border-bottom: 1px solid #e8e5e0;">{% if v.hook_rate_pct is not none %}{{ v.hook_rate_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>
+            <td style="padding: 6px 8px; color: #1a1a1a; border-bottom: 1px solid #e8e5e0;">{% if v.ctr_pct is not none %}{{ v.ctr_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>
+            <td style="padding: 6px 8px; color: #1a1a1a; border-bottom: 1px solid #e8e5e0;">{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
+            <td style="padding: 6px 8px; color: #1a1a1a; border-bottom: 1px solid #e8e5e0;">{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
+            <td style="padding: 6px 0 6px 8px; border-bottom: 1px solid #e8e5e0;">
                 {% if v.status == 'winner' %}
-                <span style="display: inline-block; background-color: #EAF3DE; color: #27500A; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ v.status }}</span>
+                <span style="display: inline-block; background-color: #d1fae5; color: #047857; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ v.status }}</span>
                 {% elif v.status == 'steady' %}
-                <span style="display: inline-block; background-color: #E6F1FB; color: #0C447C; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ v.status }}</span>
+                <span style="display: inline-block; background-color: #E6F1FB; color: #0C447C; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ v.status }}</span>
                 {% elif v.status == 'new' %}
-                <span style="display: inline-block; background-color: #EEEDFE; color: #3C3489; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ v.status }}</span>
+                <span style="display: inline-block; background-color: #e0e7ff; color: #3730a3; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ v.status }}</span>
                 {% elif v.status == 'fatigue' or v.status == 'paused' %}
-                <span style="display: inline-block; background-color: #FAEEDA; color: #633806; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ v.status }}</span>
+                <span style="display: inline-block; background-color: #fef3c7; color: #92400e; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ v.status }}</span>
                 {% else %}
-                <span style="display: inline-block; background-color: #f7f7f8; color: #6b6b6b; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ v.status }}</span>
+                <span style="display: inline-block; background-color: #f6f5f3; color: #666666; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ v.status }}</span>
                 {% endif %}
             </td>
         </tr>
@@ -292,16 +292,16 @@
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
         <tr><td style="padding-bottom: 10px;">
-            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Fatigue alerts</span>
+            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Fatigue alerts</span>
         </td></tr>
         </table>
 
         {% for alert in fatigue_alerts %}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #FDF2ED; border-radius: 8px; margin-bottom: 6px;">
-        <tr><td style="padding: 10px 14px; font-size: 13px; font-family: Arial, Helvetica, sans-serif;">
+        <tr><td style="padding: 10px 14px; font-size: 13px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">
             <span style="font-weight: 600; color: #1a1a1a;">{{ alert.variant_code }}</span>
             <span style="color: #1a1a1a;"> &mdash; {{ alert.reason }}</span>
-            <span style="color: #6b6b6b;"> {{ alert.recommendation }}</span>
+            <span style="color: #666666;"> {{ alert.recommendation }}</span>
         </td></tr>
         </table>
         {% endfor %}
@@ -314,24 +314,24 @@
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
         <tr><td style="padding-bottom: 10px;">
-            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Actions taken</span>
+            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Actions taken</span>
         </td></tr>
         </table>
 
         {% for action in actions %}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 6px;">
-        <tr><td style="padding: 6px 0; font-size: 13px; font-family: Arial, Helvetica, sans-serif; border-bottom: 1px solid #e5e5e5;">
+        <tr><td style="padding: 6px 0; font-size: 13px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif; border-bottom: 1px solid #e8e5e0;">
             {% if action.action_type == 'launch' %}
-            <span style="display: inline-block; background-color: #EAF3DE; color: #27500A; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ action.action_type }}</span>
+            <span style="display: inline-block; background-color: #d1fae5; color: #047857; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ action.action_type }}</span>
             {% elif action.action_type == 'pause' %}
-            <span style="display: inline-block; background-color: #FAEEDA; color: #633806; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ action.action_type }}</span>
+            <span style="display: inline-block; background-color: #fef3c7; color: #92400e; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ action.action_type }}</span>
             {% elif action.action_type == 'scale' %}
-            <span style="display: inline-block; background-color: #E6F1FB; color: #0C447C; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ action.action_type }}</span>
+            <span style="display: inline-block; background-color: #E6F1FB; color: #0C447C; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ action.action_type }}</span>
             {% else %}
-            <span style="display: inline-block; background-color: #f7f7f8; color: #6b6b6b; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: Arial, Helvetica, sans-serif;">{{ action.action_type }}</span>
+            <span style="display: inline-block; background-color: #f6f5f3; color: #666666; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ action.action_type }}</span>
             {% endif %}
             <span style="font-weight: 600; color: #1a1a1a; padding-left: 4px;">{{ action.variant_code }}</span>
-            <span style="color: #6b6b6b; padding-left: 4px;">{{ action.details }}</span>
+            <span style="color: #666666; padding-left: 4px;">{{ action.details }}</span>
         </td></tr>
         </table>
         {% endfor %}
@@ -344,15 +344,15 @@
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
         <tr><td style="padding-bottom: 10px;">
-            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: Arial, Helvetica, sans-serif;">Next cycle preview</span>
+            <span style="font-size: 16px; font-weight: 500; color: #1a1a1a; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Next cycle preview</span>
         </td></tr>
         </table>
 
         {% for preview in next_cycle %}
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="padding: 6px 0; border-bottom: 1px solid #e5e5e5;">
-            <p style="font-size: 13px; font-weight: 500; color: #1a1a1a; margin: 0; font-family: Arial, Helvetica, sans-serif;">{{ preview.hypothesis }}</p>
-            <p style="font-size: 12px; color: #6b6b6b; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif;">{{ preview.genome_summary }}</p>
+        <tr><td style="padding: 6px 0; border-bottom: 1px solid #e8e5e0;">
+            <p style="font-size: 13px; font-weight: 500; color: #1a1a1a; margin: 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ preview.hypothesis }}</p>
+            <p style="font-size: 12px; color: #666666; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ preview.genome_summary }}</p>
         </td></tr>
         </table>
         {% endfor %}
@@ -363,8 +363,8 @@
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="padding-top: 16px; border-top: 1px solid #e5e5e5;">
-            <p style="font-size: 12px; color: #999999; margin: 0; font-family: Arial, Helvetica, sans-serif;">Generated by Kleiber &middot; <a href="{{ base_url }}" style="color: #534AB7; text-decoration: none;">View all reports</a></p>
+        <tr><td style="padding-top: 16px; border-top: 1px solid #e8e5e0;">
+            <p style="font-size: 12px; color: #999999; margin: 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Generated by Kleiber &middot; <a href="{{ base_url }}" style="color: #1a1816; text-decoration: none;">View all reports</a></p>
         </td></tr>
         </table>
 

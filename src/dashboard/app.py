@@ -19,6 +19,7 @@ doesn't need.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -613,8 +614,13 @@ class BetaSignupRequest(BaseModel):
 @app.post("/api/beta-signup", status_code=201)
 @limiter.limit("10/minute")
 async def api_beta_signup(request: Request, body: BetaSignupRequest) -> JSONResponse:
-    """Collect an email for the beta waitlist. Public, rate-limited."""
+    """Collect an email for the beta waitlist. Public, rate-limited.
+
+    First-time signups trigger a Kleiber-branded confirmation email.
+    Duplicates return 201 silently (no info leak) and are *not* re-sent.
+    """
     from src.db.tables import BetaSignup
+    from src.reports.auth_email import send_beta_signup_confirmation
 
     email = body.email.strip().lower()
     if not email or "@" not in email or len(email) > 320:
@@ -632,6 +638,18 @@ async def api_beta_signup(request: Request, body: BetaSignupRequest) -> JSONResp
         await session.flush()
 
     logger.info("Beta signup: %s", email)
+
+    # Fire-and-forget confirmation email. Failures are logged inside the
+    # sender; we never surface them to the caller so an email outage
+    # doesn't break signups.
+    async def _send_confirmation() -> None:
+        try:
+            await send_beta_signup_confirmation(email)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Beta confirmation send failed for %s: %s", email, exc)
+
+    asyncio.create_task(_send_confirmation())
+
     return JSONResponse({"status": "ok"}, status_code=201)
 
 
