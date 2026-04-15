@@ -265,8 +265,8 @@ function ProposedVariantRow({ variant }: { variant: ProposedVariant }) {
           <span
             className="inline-block whitespace-nowrap rounded-[3px] px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.04em]"
             style={{
-              backgroundColor: isVideo ? "#EEF0FF" : "#F1F5F9",
-              color: isVideo ? "#534AB7" : "#475569",
+              backgroundColor: isVideo ? "#e0e7ff" : "#f4f3f0",
+              color: isVideo ? "#3730a3" : "#475569",
             }}
           >
             {isVideo ? "Video" : "Image"}

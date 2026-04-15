@@ -44,38 +44,53 @@ export function SignInRoute() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-5">
-      <Card className="w-full max-w-sm">
-        <div className="mb-4 flex items-center gap-2">
-          <span className="text-base font-normal tracking-tight" style={{ fontFamily: "'DM Serif Display', serif" }}>Kleiber</span>
-        </div>
-        <h1 className="mb-1 text-xl font-medium">Sign in</h1>
-        <p className="mb-5 text-xs text-[var(--text-secondary)]">
-          We&apos;ll email you a link to get in. No password required.
-        </p>
-        <form onSubmit={onSubmit} noValidate>
-          <Label htmlFor="email">Email address</Label>
-          <Input
-            id="email"
-            type="email"
-            autoComplete="email"
-            autoFocus
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            placeholder="you@company.com"
-          />
-          {error ? (
-            <p className="mt-2 text-xs text-[var(--red)]">{error}</p>
-          ) : null}
-          <Button
-            type="submit"
-            className="mt-4 w-full"
-            loading={sendLink.isPending}
+    <div className="flex min-h-screen items-center justify-center bg-[var(--bg)] px-6">
+      <div className="w-full max-w-md">
+        <div className="mb-8 text-center">
+          <span
+            className="text-[28px] tracking-tight text-[var(--text)]"
+            style={{ fontFamily: "'DM Serif Display', serif" }}
           >
-            Send magic link
-          </Button>
-        </form>
-      </Card>
+            Kleiber
+          </span>
+        </div>
+        <Card className="p-8">
+          <h1
+            className="mb-2 text-center text-[28px] leading-tight"
+            style={{ fontFamily: "'DM Serif Display', serif" }}
+          >
+            Welcome back
+          </h1>
+          <p className="mb-6 text-center text-sm text-[var(--text-secondary)]">
+            We&apos;ll email you a link to get in. No password required.
+          </p>
+          <form onSubmit={onSubmit} noValidate className="space-y-4">
+            <div>
+              <Label htmlFor="email">Email address</Label>
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+              />
+            </div>
+            {error ? (
+              <p className="text-xs text-[var(--red)]">{error}</p>
+            ) : null}
+            <Button
+              type="submit"
+              size="lg"
+              className="w-full"
+              loading={sendLink.isPending}
+            >
+              Send magic link
+            </Button>
+          </form>
+        </Card>
+      </div>
     </div>
   );
 }

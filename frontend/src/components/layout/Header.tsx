@@ -21,22 +21,27 @@ export function Header() {
   };
 
   return (
-    <header className="border-b border-[var(--border)] bg-[var(--bg)]">
-      <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-5">
+    <header className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--bg)]/90 backdrop-blur-sm">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-6 sm:px-10 lg:px-16">
         <Link
           to="/dashboard"
           className="flex items-center gap-2 text-[var(--text)] no-underline hover:no-underline"
         >
-          <span className="text-base font-normal tracking-tight" style={{ fontFamily: "'DM Serif Display', serif" }}>Kleiber</span>
+          <span
+            className="text-[22px] tracking-tight"
+            style={{ fontFamily: "'DM Serif Display', serif" }}
+          >
+            Kleiber
+          </span>
         </Link>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-4">
           {me.data ? (
             <>
-              <span className="text-xs text-[var(--text-secondary)]">
+              <span className="hidden text-[13px] text-[var(--text-secondary)] sm:inline-block">
                 {me.data.email}
               </span>
               <Button
-                variant="ghost"
+                variant="secondary"
                 size="sm"
                 onClick={onLogout}
                 loading={logout.isPending}

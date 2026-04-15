@@ -10,34 +10,34 @@
     <meta property="og:description" content="{% block og_description %}Ad creative optimization report{% endblock %}">
     <meta property="og:type" content="article">
     <meta name="twitter:card" content="summary_large_image">
+    <meta name="color-scheme" content="light">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 
     <style>
         :root {
-            --bg: #ffffff;
-            --bg-secondary: #f7f7f8;
+            /* Kleiber design tokens — mirror of frontend/src/styles/globals.css */
+            --bg: #faf9f7;
+            --bg-secondary: #f6f5f3;
+            --bg-inverse: #1a1816;
             --text: #1a1a1a;
-            --text-secondary: #6b6b6b;
+            --text-secondary: #666666;
             --text-tertiary: #999999;
-            --border: #e5e5e5;
-            --accent: #534AB7;
-            --green: #1D9E75;
-            --red: #D85A30;
-            --amber: #BA7517;
-            --font-stack: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --border: #e8e5e0;
+            --border-strong: #d4cfc5;
+            --accent: #1a1816;
+            --accent-hover: #2a2620;
+            --accent-fg: #ffffff;
+            --green: #059669;
+            --red: #dc2626;
+            --amber: #d97706;
+            --font-stack: 'Outfit', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-serif: 'DM Serif Display', Georgia, serif;
             --font-mono: "SF Mono", "Fira Code", "Cascadia Code", monospace;
-            --radius: 8px;
-            --radius-lg: 12px;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --bg: #161616;
-                --bg-secondary: #222222;
-                --text: #e5e5e5;
-                --text-secondary: #999999;
-                --text-tertiary: #666666;
-                --border: #333333;
-            }
+            --radius: 10px;
+            --radius-lg: 16px;
+            --radius-pill: 9999px;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -54,8 +54,8 @@
             padding: 2rem 1.5rem;
         }
 
-        h1 { font-size: 20px; font-weight: 500; }
-        h2 { font-size: 15px; font-weight: 500; margin-bottom: 12px; }
+        h1 { font-family: var(--font-serif); font-size: 24px; font-weight: 400; letter-spacing: -0.01em; }
+        h2 { font-family: var(--font-serif); font-size: 18px; font-weight: 400; letter-spacing: -0.01em; margin-bottom: 12px; }
         h3 { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
 
         .label {
@@ -74,8 +74,8 @@
             margin-bottom: 4px;
         }
         .report-type {
-            background: var(--accent); color: white;
-            padding: 2px 10px; border-radius: 12px;
+            background: var(--accent); color: var(--accent-fg);
+            padding: 2px 10px; border-radius: var(--radius-pill);
             font-size: 11px; font-weight: 500;
         }
         .cycle-info { font-size: 13px; color: var(--text-tertiary); margin-top: 4px; }
@@ -97,8 +97,8 @@
         }
         .mc-value { font-size: 20px; font-weight: 500; }
         .mc-trend { font-size: 11px; }
-        .mc-trend-up { color: #1D9E75; }
-        .mc-trend-down { color: #D85A30; }
+        .mc-trend-up { color: var(--green); }
+        .mc-trend-down { color: var(--red); }
         .mc-trend-flat { color: var(--text-tertiary); }
 
         /* Spotlight card */
@@ -112,12 +112,9 @@
         }
         .spotlight-header-title { font-size: 16px; font-weight: 500; }
         .spotlight-badge {
-            background: #EAF3DE; color: #27500A;
-            padding: 3px 10px; border-radius: 8px;
+            background: #d1fae5; color: #047857;
+            padding: 3px 10px; border-radius: var(--radius-pill);
             font-size: 11px; font-weight: 500;
-        }
-        @media (prefers-color-scheme: dark) {
-            .spotlight-badge { background: #173404; color: #C0DD97; }
         }
         .spotlight-hypothesis {
             font-size: 12px; color: var(--text-secondary);
@@ -170,9 +167,9 @@
         }
         .diag-title { font-size: 12px; font-weight: 500; margin-bottom: 6px; }
         .diag-line { font-size: 12px; line-height: 1.6; padding: 2px 0; }
-        .diag-good { color: #1D9E75; }
-        .diag-warning { color: #BA7517; }
-        .diag-bad { color: #D85A30; }
+        .diag-good { color: var(--green); }
+        .diag-warning { color: var(--amber); }
+        .diag-bad { color: var(--red); }
         .diag-projection { color: var(--text-secondary); margin-top: 6px; font-size: 12px; }
 
         /* Creative DNA pills */
@@ -200,30 +197,20 @@
 
         /* Status pills */
         .status-pill {
-            display: inline-block; padding: 1px 7px; border-radius: 8px;
+            display: inline-block; padding: 1px 8px; border-radius: var(--radius-pill);
             font-size: 10px; font-weight: 500;
         }
-        .status-winner { background: #EAF3DE; color: #27500A; }
-        .status-steady { background: #E6F1FB; color: #0C447C; }
-        .status-new { background: #EEEDFE; color: #3C3489; }
-        .status-fatigue { background: #FAEEDA; color: #633806; }
-        .status-paused { background: #FAEEDA; color: #633806; }
-        @media (prefers-color-scheme: dark) {
-            .status-winner { background: #173404; color: #C0DD97; }
-            .status-steady { background: #042C53; color: #B5D4F4; }
-            .status-new { background: #26215C; color: #CECBF6; }
-            .status-fatigue { background: #412402; color: #FAC775; }
-            .status-paused { background: #412402; color: #FAC775; }
-        }
+        .status-winner { background: #d1fae5; color: #047857; }
+        .status-steady { background: #f4f3f0; color: #1a1a1a; }
+        .status-new { background: #e0e7ff; color: #3730a3; }
+        .status-fatigue { background: #fef3c7; color: #92400e; }
+        .status-paused { background: #fef3c7; color: #92400e; }
 
         /* Alert rows */
         .alert-row {
             display: flex; gap: 10px; padding: 10px;
-            background: #FDF2ED; border-radius: var(--radius);
+            background: #fef3c7; border-radius: var(--radius);
             margin-bottom: 6px; font-size: 13px;
-        }
-        @media (prefers-color-scheme: dark) {
-            .alert-row { background: #2A1A0E; }
         }
 
         /* Action rows */
@@ -235,11 +222,11 @@
             padding: 2px 8px; border-radius: 4px;
             font-size: 11px; font-weight: 500;
         }
-        .action-launch { background: #EAF3DE; color: #27500A; }
-        .action-pause { background: #FAEEDA; color: #633806; }
-        .action-increase_budget { background: #E6F1FB; color: #0C447C; }
-        .action-decrease_budget { background: #FDE8E1; color: #7A1B06; }
-        .action-promote_winner { background: #EEEDFE; color: #3C3489; }
+        .action-launch { background: #d1fae5; color: #047857; }
+        .action-pause { background: #fef3c7; color: #92400e; }
+        .action-increase_budget { background: #e0e7ff; color: #3730a3; }
+        .action-decrease_budget { background: #fee2e2; color: #991b1b; }
+        .action-promote_winner { background: #f4f3f0; color: #1a1a1a; }
 
         /* Footer */
         .report-footer {
@@ -281,10 +268,11 @@
             font-family: var(--font-stack);
         }
         .copy-btn {
-            background: var(--accent); color: white; border: none;
-            padding: 8px 18px; border-radius: 6px; font-size: 13px;
+            background: var(--accent); color: var(--accent-fg); border: none;
+            padding: 8px 18px; border-radius: var(--radius-pill); font-size: 13px;
             font-weight: 500; cursor: pointer;
         }
+        .copy-btn:hover { background: var(--accent-hover); }
         .copy-btn:hover { opacity: 0.9; }
         .copy-feedback { font-size: 13px; color: var(--green); margin-left: 10px; }
 

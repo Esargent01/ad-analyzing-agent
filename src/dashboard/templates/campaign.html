@@ -4,18 +4,39 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ campaign.name }} — Dashboard</title>
+    <meta name="color-scheme" content="light">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
     <style>
-        :root { --pico-font-size: 15px; }
-        .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 500; }
-        .badge-active { background: #EAF3DE; color: #27500A; }
-        .badge-pending { background: #FAEEDA; color: #633806; }
-        .badge-winner { background: #EEEDFE; color: #3C3489; }
-        .badge-paused { background: #f0f0f0; color: #666; }
+        :root {
+            color-scheme: light;
+            --pico-font-size: 15px;
+            --pico-font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --pico-background-color: #faf9f7;
+            --pico-color: #1a1a1a;
+            --pico-muted-color: #666666;
+            --pico-muted-border-color: #e8e5e0;
+            --pico-primary: #1a1816;
+            --pico-primary-hover: #2a2620;
+            --pico-primary-focus: rgba(26, 24, 22, 0.2);
+            --pico-primary-inverse: #ffffff;
+            --pico-card-background-color: #ffffff;
+            --pico-card-border-color: #e8e5e0;
+            --pico-border-radius: 10px;
+        }
+        h1, h2 { font-family: 'DM Serif Display', Georgia, serif; font-weight: 400; letter-spacing: -0.01em; }
+        .badge { display: inline-block; padding: 2px 10px; border-radius: 9999px; font-size: 12px; font-weight: 500; }
+        .badge-active { background: #d1fae5; color: #047857; }
+        .badge-pending { background: #fef3c7; color: #92400e; }
+        .badge-winner { background: #d1fae5; color: #047857; }
+        .badge-new { background: #e0e7ff; color: #3730a3; }
+        .badge-paused { background: #f4f3f0; color: #666666; }
         .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
-        .stat-card { background: var(--pico-card-background-color); border-radius: 8px; padding: 16px; }
-        .stat-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; opacity: 0.6; }
-        .stat-value { font-size: 22px; font-weight: 600; }
+        .stat-card { background: var(--pico-card-background-color); border: 1px solid var(--pico-card-border-color); border-radius: 10px; padding: 16px; }
+        .stat-label { font-size: 12px; text-transform: uppercase; letter-spacing: 0.15em; color: #999999; font-weight: 600; }
+        .stat-value { font-size: 22px; font-weight: 500; font-family: 'DM Serif Display', Georgia, serif; }
         .mono { font-family: "SF Mono", "Fira Code", monospace; font-size: 13px; }
         nav { margin-bottom: 2rem; }
         section { margin-bottom: 2.5rem; }
@@ -138,7 +159,7 @@
                     <tr>
                         <td>{{ i.slot_a_name }}: {{ i.slot_a_value | truncate(20) }}</td>
                         <td>{{ i.slot_b_name }}: {{ i.slot_b_value | truncate(20) }}</td>
-                        <td class="mono" style="color: {% if i.interaction_lift and i.interaction_lift > 0 %}#1D9E75{% else %}#D85A30{% endif %}">
+                        <td class="mono" style="color: {% if i.interaction_lift and i.interaction_lift > 0 %}#059669{% else %}#dc2626{% endif %}">
                             {% if i.interaction_lift %}{{ "%+.0f"|format(i.interaction_lift * 100) }}%{% else %}—{% endif %}
                         </td>
                         <td class="mono">{{ i.variants_tested }}</td>

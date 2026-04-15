@@ -7,15 +7,15 @@ import { formatIntComma, formatPct, formatCurrency } from "@/lib/format";
  * dashboard matches the static HTML reports pixel-for-pixel.
  */
 const WEEKLY_STAGE_COLORS: Record<string, string> = {
-  Impressions: "#534AB7",
-  "Video views (3s)": "#7F77DD",
-  "Video views (15s)": "#378ADD",
-  "Link clicks": "#1D9E75",
-  "Landing page views": "#4DAA57",
-  "Add to carts": "#639922",
-  Purchases: "#27500A",
+  Impressions: "#1a1816",
+  "Video views (3s)": "#3f3b35",
+  "Video views (15s)": "#5f5750",
+  "Link clicks": "#059669",
+  "Landing page views": "#0d8556",
+  "Add to carts": "#0f7244",
+  Purchases: "#115e3a",
 };
-const WEEKLY_DEFAULT_COLOR = "#534AB7";
+const WEEKLY_DEFAULT_COLOR = "#1a1816";
 
 interface FunnelChartDailyProps {
   /** Daily report stages (already contain `bar_color`). */
