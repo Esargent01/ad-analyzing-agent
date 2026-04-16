@@ -7,9 +7,10 @@ direct async HTTP call, dev-mode fallback when credentials are
 placeholders so local development doesn't need a real X app.
 
 OAuth 1.0a was chosen over OAuth 2.0 PKCE because the four tokens
-(consumer key/secret + access token/secret) never expire — no refresh
-dance needed for a server-to-server cron job. ``authlib`` handles the
-signature; we just wrap its httpx client and POST JSON.
+(API key + API secret + access token + access token secret) never
+expire — no refresh dance needed for a server-to-server cron job.
+``authlib`` handles the signature; we just wrap its httpx client and
+POST JSON.
 """
 
 from __future__ import annotations
@@ -37,8 +38,8 @@ def _credentials_are_placeholder() -> bool:
     return any(
         v in _DEV_PLACEHOLDER_KEYS
         for v in (
-            settings.twitter_consumer_key,
-            settings.twitter_consumer_secret,
+            settings.twitter_api_key,
+            settings.twitter_api_secret,
             settings.twitter_access_token,
             settings.twitter_access_token_secret,
         )
@@ -68,8 +69,8 @@ async def post_tweet(text: str) -> str | None:
 
     settings = get_settings()
     client = AsyncOAuth1Client(
-        client_id=settings.twitter_consumer_key,
-        client_secret=settings.twitter_consumer_secret,
+        client_id=settings.twitter_api_key,
+        client_secret=settings.twitter_api_secret,
         token=settings.twitter_access_token,
         token_secret=settings.twitter_access_token_secret,
         timeout=30.0,

@@ -263,8 +263,8 @@ REPORT_EMAIL_FROM=adagent@company.com
 # brand account. When any of them is empty or "placeholder", the
 # auto-tweet step logs the draft and skips the real API call, so
 # local dev works without real credentials.
-TWITTER_CONSUMER_KEY=...
-TWITTER_CONSUMER_SECRET=...
+TWITTER_API_KEY=...
+TWITTER_API_SECRET=...
 TWITTER_ACCESS_TOKEN=...
 TWITTER_ACCESS_TOKEN_SECRET=...
 
@@ -282,7 +282,7 @@ CONFIDENCE_THRESHOLD=0.95
 1. Create/authorize an X app on the Kleiber brand account; generate the four
    OAuth 1.0a credentials (consumer key/secret + access token/secret)
 2. Set them as Fly secrets:
-   `fly secrets set TWITTER_CONSUMER_KEY=… TWITTER_CONSUMER_SECRET=… TWITTER_ACCESS_TOKEN=… TWITTER_ACCESS_TOKEN_SECRET=…`
+   `fly secrets set TWITTER_API_KEY=… TWITTER_API_SECRET=… TWITTER_ACCESS_TOKEN=… TWITTER_ACCESS_TOKEN_SECRET=…`
 3. Pick the campaign whose daily report should be tweeted and run:
    `python -m src.main mark-showcase-campaign --campaign-id <uuid>`
    Only one campaign can hold the flag — assigning it elsewhere clears the previous one automatically.

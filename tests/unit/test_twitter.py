@@ -24,8 +24,8 @@ def _reset_settings_cache() -> None:
 
 def _fake_settings(**overrides) -> SimpleNamespace:
     base = {
-        "twitter_consumer_key": "ck-real",
-        "twitter_consumer_secret": "cs-real",
+        "twitter_api_key": "ck-real",
+        "twitter_api_secret": "cs-real",
         "twitter_access_token": "at-real",
         "twitter_access_token_secret": "ats-real",
     }
@@ -41,8 +41,8 @@ class TestCredentialsArePlaceholder:
     @pytest.mark.parametrize(
         "missing",
         [
-            "twitter_consumer_key",
-            "twitter_consumer_secret",
+            "twitter_api_key",
+            "twitter_api_secret",
             "twitter_access_token",
             "twitter_access_token_secret",
         ],
@@ -57,7 +57,7 @@ class TestCredentialsArePlaceholder:
         with patch.object(
             twitter,
             "get_settings",
-            return_value=_fake_settings(twitter_consumer_key="placeholder"),
+            return_value=_fake_settings(twitter_api_key="placeholder"),
         ):
             assert twitter._credentials_are_placeholder() is True
 
@@ -66,7 +66,7 @@ class TestPostTweet:
     async def test_dev_mode_returns_sentinel_without_hitting_api(self) -> None:
         """Placeholder credentials must short-circuit — no network call."""
         with patch.object(
-            twitter, "get_settings", return_value=_fake_settings(twitter_consumer_key="")
+            twitter, "get_settings", return_value=_fake_settings(twitter_api_key="")
         ), patch.object(twitter, "AsyncOAuth1Client") as mock_client_cls:
             result = await twitter.post_tweet("hello world")
 
