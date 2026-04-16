@@ -2526,6 +2526,158 @@ def send_magic_link_cmd(email: str) -> None:
     asyncio.run(_run())
 
 
+async def _post_showcase_tweet(
+    *,
+    report,
+    campaign_id: UUID,
+    campaign_name: str,
+    report_day,
+    settings,
+    dry_run_tweets: bool,
+) -> None:
+    """Draft + post one marketing tweet for the showcase daily report.
+
+    Idempotent: short-circuits if ``daily_tweet_log`` already has a
+    row for (campaign_id, report_day). In dev-mode (placeholder X
+    credentials) the tweet is drafted + logged but never hits X.
+
+    Called from ``send-daily-reports`` with full exception isolation
+    — this helper must never raise past its caller.
+    """
+    import anthropic
+    from sqlalchemy import select
+
+    from src.agents.tweet_writer import SKIP_SENTINEL, draft_daily_tweet
+    from src.db.engine import get_session
+    from src.db.tables import DailyTweetLog
+    from src.reports.twitter import post_tweet
+
+    # Idempotency check — short-circuit if we already posted today.
+    async with get_session() as session:
+        existing = await session.execute(
+            select(DailyTweetLog).where(
+                DailyTweetLog.campaign_id == campaign_id,
+                DailyTweetLog.tweet_date == report_day,
+            )
+        )
+        if existing.scalar_one_or_none() is not None:
+            click.echo(
+                f"  · showcase tweet already logged for {campaign_name} "
+                f"on {report_day.isoformat()} — skipping."
+            )
+            return
+
+    # Draft via Claude tool use.
+    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
+    try:
+        draft = await draft_daily_tweet(
+            report=report,
+            client=client,
+            model=settings.anthropic_model,
+        )
+    except Exception as exc:  # noqa: BLE001
+        click.echo(f"  ✗ tweet drafter failed for {campaign_name}: {exc}")
+        return
+
+    if draft.text == SKIP_SENTINEL:
+        click.echo(
+            f"  · tweet writer skipped {campaign_name} (no meaningful signal today)"
+        )
+        return
+
+    click.echo(f"  ✎ drafted tweet ({len(draft.text)} chars): {draft.text}")
+
+    if dry_run_tweets:
+        click.echo("  · --dry-run-tweets set — skipping X POST and DB log.")
+        return
+
+    tweet_id = await post_tweet(draft.text)
+    if tweet_id is None:
+        click.echo(f"  ✗ X API rejected the tweet for {campaign_name}")
+        return
+
+    # Success (including "dev-mode" sentinel) — write the idempotency row.
+    async with get_session() as session:
+        session.add(
+            DailyTweetLog(
+                campaign_id=campaign_id,
+                tweet_date=report_day,
+                tweet_id=tweet_id if tweet_id != "dev-mode" else None,
+                text=draft.text,
+            )
+        )
+        await session.commit()
+
+    click.echo(f"  ✓ posted showcase tweet ({tweet_id}) for {campaign_name}")
+
+
+@cli.command(name="mark-showcase-campaign")
+@click.option(
+    "--campaign-id",
+    required=True,
+    type=str,
+    help="Campaign UUID to flag as the public Kleiber showcase.",
+)
+@click.option(
+    "--clear",
+    is_flag=True,
+    default=False,
+    help="Clear the flag from this campaign instead of setting it.",
+)
+def mark_showcase_campaign(campaign_id: str, clear: bool) -> None:
+    """Flag one campaign as the public Kleiber showcase.
+
+    Only the flagged campaign's daily report is turned into a tweet.
+    The partial unique index on ``campaigns.is_public_showcase``
+    guarantees at most one campaign is the showcase at any time —
+    running this against a new campaign clears the previous one
+    automatically.
+    """
+
+    async def _run() -> None:
+        from sqlalchemy import update
+
+        from src.db.engine import close_db, get_session, init_db
+        from src.db.tables import Campaign
+
+        await init_db()
+        target = UUID(campaign_id)
+
+        async with get_session() as session:
+            if clear:
+                await session.execute(
+                    update(Campaign)
+                    .where(Campaign.id == target)
+                    .values(is_public_showcase=False)
+                )
+                await session.commit()
+                click.echo(f"Cleared showcase flag on {target}.")
+            else:
+                # Unflag any currently-flagged campaign first — the partial
+                # unique index would reject two TRUE rows, so we do this
+                # explicitly for a friendlier error message.
+                await session.execute(
+                    update(Campaign)
+                    .where(Campaign.is_public_showcase.is_(True))
+                    .values(is_public_showcase=False)
+                )
+                result = await session.execute(
+                    update(Campaign)
+                    .where(Campaign.id == target)
+                    .values(is_public_showcase=True)
+                )
+                if result.rowcount == 0:
+                    click.echo(f"Error: no campaign with id {target}")
+                    await session.rollback()
+                else:
+                    await session.commit()
+                    click.echo(f"Marked {target} as public showcase campaign.")
+
+        await close_db()
+
+    asyncio.run(_run())
+
+
 @cli.command(name="send-daily-reports")
 @click.option(
     "--report-date",
@@ -2539,7 +2691,18 @@ def send_magic_link_cmd(email: str) -> None:
     default=False,
     help="List campaigns + owners without rendering or sending email.",
 )
-def send_daily_reports(report_date: str | None, dry_run: bool) -> None:
+@click.option(
+    "--dry-run-tweets",
+    is_flag=True,
+    default=False,
+    help=(
+        "Draft the showcase tweet and log it, but skip the real X API call. "
+        "Emails still send normally."
+    ),
+)
+def send_daily_reports(
+    report_date: str | None, dry_run: bool, dry_run_tweets: bool
+) -> None:
     """Phase H: send a daily report to every user-owned campaign's owner.
 
     Fans out across every active, user-owned campaign and renders a
@@ -2606,6 +2769,11 @@ def send_daily_reports(report_date: str | None, dry_run: bool) -> None:
 
         sent = 0
         failed: list[tuple[str, str]] = []
+        # Captured for the post-loop auto-tweet step so we don't rebuild the
+        # report twice. At most one campaign has ``is_public_showcase = true``
+        # (enforced by partial unique index in migration 014).
+        showcase_report = None
+        showcase_campaign = None
         for campaign, owner_email in rows:
             try:
                 # Step 1: re-poll settled metrics for ``report_day`` so the
@@ -2630,6 +2798,11 @@ def send_daily_reports(report_date: str | None, dry_run: bool) -> None:
 
                 async with get_session() as session:
                     report = await build_daily_report(session, campaign.id, report_day)
+
+                if campaign.is_public_showcase:
+                    showcase_report = report
+                    showcase_campaign = campaign
+
                 reporter = EmailReporter(
                     api_key=settings.sendgrid_api_key,
                     from_email=settings.report_email_from,
@@ -2650,6 +2823,26 @@ def send_daily_reports(report_date: str | None, dry_run: bool) -> None:
         if failed:
             for cid, err in failed:
                 click.echo(f"  {cid}: {err[:200]}")
+
+        # ------------------------------------------------------------------
+        # Post-loop: if a showcase campaign was processed, generate and post
+        # a marketing tweet for Kleiber's X account. Fully isolated — any
+        # failure here logs and moves on, never fails the daily email batch.
+        # ------------------------------------------------------------------
+        if showcase_report is not None and showcase_campaign is not None:
+            try:
+                await _post_showcase_tweet(
+                    report=showcase_report,
+                    campaign_id=showcase_campaign.id,
+                    campaign_name=showcase_campaign.name,
+                    report_day=report_day,
+                    settings=settings,
+                    dry_run_tweets=dry_run_tweets,
+                )
+            except Exception as tweet_exc:  # noqa: BLE001
+                click.echo(f"  ! showcase tweet step failed: {tweet_exc}")
+        else:
+            click.echo("No showcase campaign flagged — skipping auto-tweet.")
 
         await close_db()
 

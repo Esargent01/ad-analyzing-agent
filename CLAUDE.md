@@ -258,6 +258,16 @@ SENDGRID_API_KEY=...
 REPORT_EMAIL_TO=team@company.com
 REPORT_EMAIL_FROM=adagent@company.com
 
+# Twitter / X (OAuth 1.0a User Context — required for POST /2/tweets).
+# All four values come from the X Developer Console for the Kleiber
+# brand account. When any of them is empty or "placeholder", the
+# auto-tweet step logs the draft and skips the real API call, so
+# local dev works without real credentials.
+TWITTER_CONSUMER_KEY=...
+TWITTER_CONSUMER_SECRET=...
+TWITTER_ACCESS_TOKEN=...
+TWITTER_ACCESS_TOKEN_SECRET=...
+
 # Application
 LOG_LEVEL=INFO
 CYCLE_SCHEDULE_CRON=0 6 * * *
@@ -267,6 +277,20 @@ CONFIDENCE_THRESHOLD=0.95
 ```
 
 ## Common tasks for Claude Code
+
+### Enabling the daily auto-tweet
+1. Create/authorize an X app on the Kleiber brand account; generate the four
+   OAuth 1.0a credentials (consumer key/secret + access token/secret)
+2. Set them as Fly secrets:
+   `fly secrets set TWITTER_CONSUMER_KEY=… TWITTER_CONSUMER_SECRET=… TWITTER_ACCESS_TOKEN=… TWITTER_ACCESS_TOKEN_SECRET=…`
+3. Pick the campaign whose daily report should be tweeted and run:
+   `python -m src.main mark-showcase-campaign --campaign-id <uuid>`
+   Only one campaign can hold the flag — assigning it elsewhere clears the previous one automatically.
+4. Dry-run the pipeline locally:
+   `python -m src.main send-daily-reports --dry-run-tweets`
+   This drafts + logs the tweet body but skips the X POST.
+5. Live runs are driven by `.github/workflows/daily-report.yml` at 7am CT; the
+   tweet step is a no-op for any campaign other than the flagged showcase.
 
 ### Adding a new gene pool slot
 1. Add the slot values to `gene_pool_seed.json`

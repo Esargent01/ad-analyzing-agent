@@ -132,6 +132,16 @@ class Settings(BaseSettings):
     # Per-user limits (Phase D+). Tunable once Phase E exposes cost data.
     max_campaigns_per_user: int = 5
 
+    # Twitter / X — OAuth 1.0a User Context (required for POST /2/tweets).
+    # All four fields are generated once via the X Developer Console for the
+    # Kleiber brand account and stored in Fly secrets. When any of them is
+    # empty or a placeholder, ``src.reports.twitter.post_tweet`` logs the
+    # draft and skips the real API call so local dev still works.
+    twitter_consumer_key: str = ""
+    twitter_consumer_secret: str = ""
+    twitter_access_token: str = ""
+    twitter_access_token_secret: str = ""
+
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
