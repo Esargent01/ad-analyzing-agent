@@ -19,6 +19,10 @@ jobs:
       - uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy to Fly.io
-        run: flyctl deploy --remote-only
+        # --wait-timeout bumped to 10m: the release_command machine
+        # occasionally takes >5m to reach `stopped` even when the
+        # alembic migration itself is a no-op. The default 5m timeout
+        # fails the deploy spuriously.
+        run: flyctl deploy --remote-only --wait-timeout 600
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
