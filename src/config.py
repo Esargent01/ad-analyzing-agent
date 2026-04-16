@@ -132,17 +132,6 @@ class Settings(BaseSettings):
     # Per-user limits (Phase D+). Tunable once Phase E exposes cost data.
     max_campaigns_per_user: int = 5
 
-    # Twitter / X — OAuth 1.0a User Context (required for POST /2/tweets).
-    # Field names match what the X Developer Console calls them (API Key /
-    # API Key Secret) and what this project used pre-commit 48e6c6f, so any
-    # previously-generated credentials drop straight in. When any of the
-    # four is empty or a placeholder, ``src.reports.twitter.post_tweet``
-    # logs the draft and skips the real API call so local dev still works.
-    twitter_api_key: str = ""
-    twitter_api_secret: str = ""
-    twitter_access_token: str = ""
-    twitter_access_token_secret: str = ""
-
 
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:

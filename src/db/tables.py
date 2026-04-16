@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import enum
-from datetime import date, datetime
+from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 
@@ -13,7 +13,6 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Computed,
-    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -144,13 +143,6 @@ class Campaign(Base):
         Numeric(4, 3), nullable=False, server_default="0.950"
     )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
-    # At most one campaign can be the public Kleiber showcase (enforced by a
-    # partial unique index on the column — see migration 014). The daily
-    # auto-tweet job reads this flag to pick which campaign's report to
-    # turn into a tweet.
-    is_public_showcase: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, server_default="false"
-    )
     # Nullable until Phase F backfills legacy campaigns. Adapter
     # factory treats NULL as "fall back to global token" during the
     # transition; Phase F drops that fallback and makes the column
@@ -640,49 +632,6 @@ class BetaSignup(Base):
 
     def __repr__(self) -> str:
         return f"<BetaSignup email={self.email}>"
-
-
-class DailyTweetLog(Base):
-    """One row per (campaign, date) for the auto-tweet job.
-
-    The daily-report cron looks up today's row before posting to X so
-    that a cron retry doesn't double-post. ``tweet_id`` is NULL when
-    the row was written by a dev-mode / dry-run invocation that never
-    actually hit the X API.
-    """
-
-    __tablename__ = "daily_tweet_log"
-
-    id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        primary_key=True,
-        server_default="uuid_generate_v4()",
-    )
-    campaign_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True),
-        ForeignKey("campaigns.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-    tweet_date: Mapped[date] = mapped_column(Date, nullable=False)
-    tweet_id: Mapped[str | None] = mapped_column(Text)
-    text: Mapped[str] = mapped_column(Text, nullable=False)
-    posted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default="now()"
-    )
-
-    __table_args__ = (
-        UniqueConstraint(
-            "campaign_id",
-            "tweet_date",
-            name="uq_daily_tweet_log_campaign_date",
-        ),
-    )
-
-    def __repr__(self) -> str:
-        return (
-            f"<DailyTweetLog campaign_id={self.campaign_id} "
-            f"date={self.tweet_date} id={self.tweet_id}>"
-        )
 
 
 class UsageLog(Base):
