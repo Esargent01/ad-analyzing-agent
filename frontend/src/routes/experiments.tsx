@@ -6,6 +6,7 @@ import { ProposedScaleCard } from "@/components/ProposedScaleCard";
 import { ProposedVariantCard } from "@/components/ProposedVariantCard";
 import { SuggestGenomeForm } from "@/components/SuggestGenomeForm";
 import { Card, CardContent } from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { ApiError } from "@/lib/api/client";
 import {
   useApproveProposal,
@@ -95,11 +96,24 @@ export function ExperimentsRoute() {
       </div>
 
       {experiments.isLoading ? (
-        <Card>
-          <CardContent className="text-[var(--text-tertiary)]">
-            Loading experiments…
-          </CardContent>
-        </Card>
+        <div className="flex flex-col gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Card key={i}>
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="mt-3 h-3 w-full" />
+                  <Skeleton className="mt-2 h-3 w-5/6" />
+                  <Skeleton className="mt-2 h-3 w-2/3" />
+                </div>
+                <div className="flex gap-2">
+                  <Skeleton className="h-8 w-20 rounded-[var(--radius-pill)]" />
+                  <Skeleton className="h-8 w-20 rounded-[var(--radius-pill)]" />
+                </div>
+              </div>
+            </Card>
+          ))}
+        </div>
       ) : null}
 
       {experiments.isError ? (

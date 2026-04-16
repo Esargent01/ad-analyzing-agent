@@ -4,6 +4,7 @@ import { ConnectMetaCard } from "@/components/ConnectMetaCard";
 import { StatusPill } from "@/components/StatusPill";
 import { UsageTile } from "@/components/UsageTile";
 import { Card } from "@/components/ui/Card";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { useMe, useMetaStatus } from "@/lib/api/hooks";
 
 export function DashboardRoute() {
@@ -11,6 +12,7 @@ export function DashboardRoute() {
   const metaStatus = useMetaStatus();
   const campaigns = me.data?.campaigns ?? [];
   const metaConnected = metaStatus.data?.connected ?? false;
+  const isLoadingCampaigns = me.isLoading;
 
   return (
     <div>
@@ -18,11 +20,15 @@ export function DashboardRoute() {
         <div>
           <p className="label">Dashboard</p>
           <h1 className="mt-1 text-xl font-medium">Campaigns</h1>
-          <p className="mt-1 text-xs text-[var(--text-secondary)]">
-            {campaigns.length === 0
-              ? "You don't have access to any campaigns yet."
-              : `${campaigns.length} campaign${campaigns.length === 1 ? "" : "s"}`}
-          </p>
+          {isLoadingCampaigns ? (
+            <Skeleton className="mt-2 h-3 w-32" />
+          ) : (
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              {campaigns.length === 0
+                ? "You don't have access to any campaigns yet."
+                : `${campaigns.length} campaign${campaigns.length === 1 ? "" : "s"}`}
+            </p>
+          )}
         </div>
         {metaConnected && (
           <Link
@@ -40,7 +46,20 @@ export function DashboardRoute() {
         <UsageTile />
       </div>
 
-      {campaigns.length === 0 ? (
+      {isLoadingCampaigns ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-[var(--border)] bg-[var(--bg)] p-5"
+            >
+              <Skeleton className="h-5 w-16" />
+              <Skeleton className="mt-3 h-4 w-3/4" />
+              <Skeleton className="mt-3 h-3 w-1/2" />
+            </div>
+          ))}
+        </div>
+      ) : campaigns.length === 0 ? (
         <Card>
           {metaConnected ? (
             <>

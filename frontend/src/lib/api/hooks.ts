@@ -125,7 +125,10 @@ export function useMetaStatus(
     queryKey: qk.metaStatus,
     queryFn: ({ signal }) =>
       api.get<MetaConnectionStatus>("/api/me/meta/status", { signal }),
-    staleTime: 60_000,
+    // Connection state is stable per session; re-check only if the user
+    // disconnects explicitly (the disconnect mutation invalidates this
+    // query directly).
+    staleTime: 5 * 60_000,
     ...options,
   });
 }
@@ -272,6 +275,10 @@ export function useDailyDates(campaignId: string | undefined) {
         { signal },
       ),
     enabled: Boolean(campaignId),
+    // Index shifts at most once per cycle (one-a-day); 2 min keeps
+    // in-session navigation instant without hiding newly-run reports
+    // for long.
+    staleTime: 2 * 60_000,
   });
 }
 
@@ -284,6 +291,7 @@ export function useWeeklyIndex(campaignId: string | undefined) {
         { signal },
       ),
     enabled: Boolean(campaignId),
+    staleTime: 2 * 60_000,
   });
 }
 
@@ -307,6 +315,9 @@ export function useDailyReport(
         { signal },
       ),
     enabled,
+    // Keep the previous date's report on-screen while the new one
+    // fetches so switching dates doesn't flash a skeleton.
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -326,6 +337,7 @@ export function useWeeklyReport(
         { signal },
       ),
     enabled,
+    placeholderData: (prev) => prev,
   });
 }
 

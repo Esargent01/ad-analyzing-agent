@@ -4,6 +4,7 @@ import { BestVariantSpotlight } from "@/components/BestVariantSpotlight";
 import { MetricCard } from "@/components/MetricCard";
 import { DailyVariantTable } from "@/components/VariantTable";
 import { Card, CardContent } from "@/components/ui/Card";
+import { SkeletonReportBody } from "@/components/ui/Skeleton";
 import { useDailyReport, useMe } from "@/lib/api/hooks";
 import { ApiError } from "@/lib/api/client";
 import type { DailyReport, FatigueAlert, ReportCycleAction } from "@/lib/api/types";
@@ -58,13 +59,7 @@ export function DailyReportDetailRoute() {
         ) : null}
       </div>
 
-      {report.isLoading ? (
-        <Card>
-          <CardContent className="text-[var(--text-tertiary)]">
-            Loading report…
-          </CardContent>
-        </Card>
-      ) : null}
+      {report.isLoading && !report.data ? <SkeletonReportBody /> : null}
 
       {report.data ? (
         <DailyReportBody report={report.data} />

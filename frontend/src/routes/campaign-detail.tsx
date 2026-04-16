@@ -3,6 +3,7 @@ import { Link, Navigate, useParams } from "react-router-dom";
 import { MetricCard } from "@/components/MetricCard";
 import { StatusPill } from "@/components/StatusPill";
 import { Card, CardContent } from "@/components/ui/Card";
+import { SkeletonMetricCard } from "@/components/ui/Skeleton";
 import {
   useDailyDates,
   useExperiments,
@@ -73,32 +74,42 @@ export function CampaignDetailRoute() {
 
       {/* Status tiles */}
       <div className="mb-8 grid gap-2 sm:grid-cols-3">
-        <MetricCard
-          label="Daily reports"
-          value={daily.isLoading ? "—" : dailyCount}
-          caption={
-            latestDaily
-              ? `latest ${formatDateLabel(latestDaily)}`
-              : "no reports yet"
-          }
-        />
-        <MetricCard
-          label="Weekly reports"
-          value={weekly.isLoading ? "—" : weeklyCount}
-          caption={
-            latestWeek ? `latest ${latestWeek.label}` : "no reports yet"
-          }
-        />
-        <MetricCard
-          label="Pending approvals"
-          value={experiments.isLoading ? "—" : pendingCount}
-          tone={pendingCount > 0 ? "up" : "flat"}
-          caption={
-            pendingCount > 0
-              ? "waiting on you"
-              : "nothing to review"
-          }
-        />
+        {daily.isLoading ? (
+          <SkeletonMetricCard />
+        ) : (
+          <MetricCard
+            label="Daily reports"
+            value={dailyCount}
+            caption={
+              latestDaily
+                ? `latest ${formatDateLabel(latestDaily)}`
+                : "no reports yet"
+            }
+          />
+        )}
+        {weekly.isLoading ? (
+          <SkeletonMetricCard />
+        ) : (
+          <MetricCard
+            label="Weekly reports"
+            value={weeklyCount}
+            caption={
+              latestWeek ? `latest ${latestWeek.label}` : "no reports yet"
+            }
+          />
+        )}
+        {experiments.isLoading ? (
+          <SkeletonMetricCard />
+        ) : (
+          <MetricCard
+            label="Pending approvals"
+            value={pendingCount}
+            tone={pendingCount > 0 ? "up" : "flat"}
+            caption={
+              pendingCount > 0 ? "waiting on you" : "nothing to review"
+            }
+          />
+        )}
       </div>
 
       {/* Quick links */}

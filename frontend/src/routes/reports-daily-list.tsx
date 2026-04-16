@@ -1,6 +1,7 @@
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import { Card, CardContent } from "@/components/ui/Card";
+import { Skeleton, SkeletonListRow } from "@/components/ui/Skeleton";
 import { useDailyDates, useMe } from "@/lib/api/hooks";
 import { formatDateLabel } from "@/lib/format";
 
@@ -30,13 +31,15 @@ export function ReportsDailyListRoute() {
           ← {campaign?.name ?? "Campaign"}
         </Link>
         <h1 className="mt-3 text-xl font-medium">Daily reports</h1>
-        <p className="mt-1 text-xs text-[var(--text-secondary)]">
-          {dates.isLoading
-            ? "Loading report dates…"
-            : dates.data?.dates.length
+        {dates.isLoading ? (
+          <Skeleton className="mt-2 h-3 w-40" />
+        ) : (
+          <p className="mt-1 text-xs text-[var(--text-secondary)]">
+            {dates.data?.dates.length
               ? `${dates.data.dates.length} report${dates.data.dates.length === 1 ? "" : "s"}, newest first`
               : "No daily reports yet. Run the cycle cron and they'll appear here."}
-        </p>
+          </p>
+        )}
       </div>
 
       {dates.isError ? (
@@ -45,6 +48,14 @@ export function ReportsDailyListRoute() {
             Couldn&apos;t load daily reports. Try refreshing.
           </CardContent>
         </Card>
+      ) : null}
+
+      {dates.isLoading ? (
+        <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <SkeletonListRow key={i} />
+          ))}
+        </div>
       ) : null}
 
       {dates.data?.dates.length ? (

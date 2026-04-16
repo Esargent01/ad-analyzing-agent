@@ -6,6 +6,7 @@ import { InteractionList } from "@/components/InteractionList";
 import { MetricCard } from "@/components/MetricCard";
 import { WeeklyVariantTable } from "@/components/VariantTable";
 import { Card, CardContent } from "@/components/ui/Card";
+import { SkeletonReportBody } from "@/components/ui/Skeleton";
 import { ApiError } from "@/lib/api/client";
 import { useMe, useWeeklyReport } from "@/lib/api/hooks";
 import type { ProposedVariant, WeeklyReport } from "@/lib/api/types";
@@ -76,13 +77,7 @@ export function WeeklyReportDetailRoute() {
         ) : null}
       </div>
 
-      {report.isLoading ? (
-        <Card>
-          <CardContent className="text-[var(--text-tertiary)]">
-            Loading report…
-          </CardContent>
-        </Card>
-      ) : null}
+      {report.isLoading && !report.data ? <SkeletonReportBody /> : null}
 
       {report.data ? <WeeklyReportBody report={report.data} /> : null}
     </div>

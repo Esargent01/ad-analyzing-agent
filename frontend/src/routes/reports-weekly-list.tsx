@@ -1,6 +1,7 @@
 import { Link, Navigate, useParams } from "react-router-dom";
 
 import { Card, CardContent } from "@/components/ui/Card";
+import { Skeleton, SkeletonListRow } from "@/components/ui/Skeleton";
 import { useMe, useWeeklyIndex } from "@/lib/api/hooks";
 import { formatDateLabel } from "@/lib/format";
 
@@ -31,13 +32,15 @@ export function ReportsWeeklyListRoute() {
           ← {campaign?.name ?? "Campaign"}
         </Link>
         <h1 className="mt-3 text-xl font-medium">Weekly reports</h1>
-        <p className="mt-1 text-xs text-[var(--text-secondary)]">
-          {weeks.isLoading
-            ? "Loading weeks…"
-            : weeks.data?.weeks.length
+        {weeks.isLoading ? (
+          <Skeleton className="mt-2 h-3 w-40" />
+        ) : (
+          <p className="mt-1 text-xs text-[var(--text-secondary)]">
+            {weeks.data?.weeks.length
               ? `${weeks.data.weeks.length} week${weeks.data.weeks.length === 1 ? "" : "s"}, newest first`
               : "No weekly reports yet. They generate every Monday once the cycle has run for a full week."}
-        </p>
+          </p>
+        )}
       </div>
 
       {weeks.isError ? (
@@ -46,6 +49,14 @@ export function ReportsWeeklyListRoute() {
             Couldn&apos;t load weekly reports. Try refreshing.
           </CardContent>
         </Card>
+      ) : null}
+
+      {weeks.isLoading ? (
+        <div className="overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--bg)] px-4">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <SkeletonListRow key={i} />
+          ))}
+        </div>
       ) : null}
 
       {weeks.data?.weeks.length ? (
