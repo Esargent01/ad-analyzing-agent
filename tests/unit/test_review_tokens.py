@@ -32,8 +32,12 @@ class TestReviewTokens:
         """Flipping a bit in the signature invalidates the token."""
         campaign_id = uuid4()
         token = create_review_token(campaign_id)
-        # Mutate the last char to guarantee a different signature
-        tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+        # Mutate the second-to-last char. The outer base64 encodes 91 raw
+        # bytes, so its last char encodes 2 data bits + 4 padding bits —
+        # flipping it often changes only padding, leaving the decoded
+        # payload identical. token[-2] always encodes 6 data bits of the
+        # signature's last byte, so a flip is guaranteed to alter it.
+        tampered = token[:-2] + ("A" if token[-2] != "A" else "B") + token[-1]
         assert verify_review_token(tampered) is None
 
     def test_verify_rejects_expired_token(self) -> None:

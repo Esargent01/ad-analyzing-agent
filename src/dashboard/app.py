@@ -303,9 +303,9 @@ async def dashboard_index(request: Request) -> HTMLResponse:
         approvals = await get_pending_approvals(session)
 
     return templates.TemplateResponse(
+        request,
         "dashboard.html",
         {
-            "request": request,
             "campaigns": campaigns,
             "pending_approvals": len(approvals),
         },
@@ -325,9 +325,9 @@ async def campaign_detail(request: Request, campaign_id: str) -> HTMLResponse:
         approvals = await get_pending_approvals(session, campaign_id=cid)
 
     return templates.TemplateResponse(
+        request,
         "campaign.html",
         {
-            "request": request,
             "campaign": campaign,
             "variants": variants,
             "elements": elements,
@@ -480,9 +480,9 @@ async def review_page(request: Request, token: str) -> HTMLResponse:
         gene_pool_by_slot.setdefault(entry.slot_name, []).append(entry)
 
     return templates.TemplateResponse(
+        request,
         "review.html",
         {
-            "request": request,
             "token": token,
             "campaign": campaign,
             "proposed_variants": proposed,
