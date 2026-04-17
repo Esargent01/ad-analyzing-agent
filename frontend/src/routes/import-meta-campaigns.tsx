@@ -206,6 +206,15 @@ export function ImportMetaCampaignsRoute() {
   const showAccountPicker = availableAccounts.length > 1;
   const showPagePicker = availablePages.length > 1;
 
+  // Guardrail: importing a Meta campaign requires a ``page_id`` on the
+  // backend (``src/services/campaign_import.py``). If the connected
+  // user's OAuth token didn't grant ``pages_show_list``, the callback
+  // cached ``available_pages=[]`` and nothing will ever satisfy the
+  // submit gate. Surface a specific, actionable error instead of
+  // silently disabling the button.
+  const missingPagesAccess =
+    Boolean(status.data?.connected) && availablePages.length === 0;
+
   return (
     <div>
       <div className="mb-6">
@@ -308,6 +317,22 @@ export function ImportMetaCampaignsRoute() {
         </div>
       )}
 
+      {missingPagesAccess && (
+        <div
+          role="alert"
+          className="mb-4 rounded border border-amber-700/40 bg-amber-950/40 px-3 py-2 text-xs text-amber-200"
+        >
+          Your Meta connection doesn&apos;t have access to any Pages, so we
+          can&apos;t import a campaign (every imported campaign needs a Page
+          to run ads from).{" "}
+          <Link to="/dashboard" className="underline">
+            Disconnect and reconnect Meta from the dashboard
+          </Link>{" "}
+          — when the consent screen appears, make sure the Pages
+          permission is granted.
+        </div>
+      )}
+
       {result && (
         <Card className="mb-4">
           <CardHeader>
@@ -391,7 +416,7 @@ export function ImportMetaCampaignsRoute() {
                 over your {remaining}-campaign quota
               </span>
             )}
-            {!pageId && (
+            {!pageId && !missingPagesAccess && (
               <span className="ml-2 text-red-300">
                 pick a Page above before importing
               </span>
