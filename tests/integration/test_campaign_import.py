@@ -486,6 +486,7 @@ class TestImportCampaign:
         # rows; return an empty iterator so everything is "new".
         session.execute = AsyncMock(return_value=_IterResult([]))
 
+        grant_mock = AsyncMock()
         with (
             patch(
                 "src.services.campaign_import.get_settings",
@@ -506,6 +507,10 @@ class TestImportCampaign:
             patch(
                 "src.services.campaign_import._build_user_adapter",
                 new=AsyncMock(return_value=adapter),
+            ),
+            patch(
+                "src.services.campaign_import.grant_user_campaign_access",
+                new=grant_mock,
             ),
         ):
             summary = await import_campaign(
@@ -563,6 +568,16 @@ class TestImportCampaign:
         assert summary.registered_deployments == 2
         assert summary.platform_campaign_id == "120200000000001"
         assert summary.daily_budget == Decimal("75.00")
+
+        # Regression guard: the importer MUST grant the importing user
+        # dashboard access via the ``user_campaigns`` join table. Without
+        # this, ``require_campaign_access`` 404s every
+        # ``/api/campaigns/{id}/...`` request for the freshly imported
+        # campaign even though ``owner_user_id`` is set correctly.
+        grant_mock.assert_awaited_once()
+        _, granted_kwargs = grant_mock.await_args
+        assert granted_kwargs["user_id"] == user_id
+        assert granted_kwargs["campaign_id"] == campaign.id
 
     async def test_cap_exceeded_raises_before_meta_io(self) -> None:
         """The cap check must fire before any adapter is constructed."""

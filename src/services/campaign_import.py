@@ -69,6 +69,7 @@ from src.db.queries import (
     count_active_campaigns_for_user,
     get_imported_meta_campaign_ids_for_user,
     get_meta_connection,
+    grant_user_campaign_access,
 )
 from src.db.tables import (
     Campaign,
@@ -509,6 +510,17 @@ async def import_campaign(
     )
     session.add(campaign)
     await session.flush()
+
+    # Grant the importer dashboard access. ``campaigns.owner_user_id``
+    # alone is not sufficient — the dashboard's ``require_campaign_access``
+    # dependency scopes every ``/api/campaigns/{id}/...`` endpoint
+    # against the ``user_campaigns`` join table so the same permission
+    # model works for both the owner and any later-shared collaborators.
+    # Skipping this step hides the freshly-imported campaign from its
+    # own creator with a 404 on daily/weekly/experimental routes.
+    await grant_user_campaign_access(
+        session, user_id=user_id, campaign_id=campaign.id
+    )
 
     # 5. Seed gene pool from the ads' creative elements.
     genomes = [_extract_genome(ad) for ad in ads]
