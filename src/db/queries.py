@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Integer, case, func, select, update
+from sqlalchemy import Integer, case, func, select, text, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -1209,6 +1209,133 @@ async def revoke_user_campaign_access(
     if row is None:
         return False
     await session.delete(row)
+    await session.flush()
+    return True
+
+
+async def delete_campaign_cascade(
+    session: AsyncSession,
+    campaign_id: UUID,
+) -> bool:
+    """Delete a campaign and every row transitively owned by it.
+
+    Most FKs that point at ``campaigns.id`` (and at ``variants.id`` /
+    ``test_cycles.id`` one hop away) are ``ON DELETE NO ACTION``, so a
+    raw ``DELETE FROM campaigns`` fails with a FK violation. This
+    helper walks the tables in leaf-to-root order inside one SQL
+    transaction so the database returns to a consistent state whether
+    the full cascade succeeds or any step fails.
+
+    Returns ``True`` if the campaign was found and deleted, ``False``
+    if no row matched (idempotent for callers that don't want to
+    distinguish).
+
+    Tables cleared (in order):
+      1. ``cycle_actions`` — by variant or by test cycle
+      2. ``metrics`` — by variant (TimescaleDB hypertable chunks
+         cascade automatically)
+      3. ``approval_queue`` — by variant or by campaign
+      4. ``deployments`` — by variant
+      5. ``test_cycles`` — by campaign
+      6. ``variants`` — by campaign
+      7. ``element_interactions`` — by campaign
+      8. ``element_performance`` — by campaign
+      9. ``media_assets`` — by campaign
+     10. ``campaigns`` — the root row (``user_campaigns`` cascades and
+         ``usage_log.campaign_id`` sets NULL automatically)
+
+    Callers are still responsible for committing the session — this
+    function only flushes.
+    """
+    # Existence check up-front so we can return the right boolean
+    # without doing any destructive work.
+    exists = await session.execute(
+        select(Campaign.id).where(Campaign.id == campaign_id)
+    )
+    if exists.scalar_one_or_none() is None:
+        return False
+
+    # Collect the variant + test-cycle id lists once. Using
+    # ``DELETE ... WHERE variant_id IN (SELECT ...)`` would work too
+    # but pulling the ids up-front makes the individual statements
+    # cheaper and easier to log if anything goes wrong mid-cascade.
+    variant_ids_stmt = await session.execute(
+        text("SELECT id FROM variants WHERE campaign_id = :cid"),
+        {"cid": campaign_id},
+    )
+    variant_ids = [row[0] for row in variant_ids_stmt.fetchall()]
+
+    cycle_ids_stmt = await session.execute(
+        text("SELECT id FROM test_cycles WHERE campaign_id = :cid"),
+        {"cid": campaign_id},
+    )
+    cycle_ids = [row[0] for row in cycle_ids_stmt.fetchall()]
+
+    # Step 1: cycle_actions — remove anything keyed by either side.
+    # Some rows may reference a test_cycle for this campaign, others
+    # reference a variant for this campaign; deleting both keys
+    # covers every valid combination.
+    if cycle_ids:
+        await session.execute(
+            text("DELETE FROM cycle_actions WHERE cycle_id = ANY(:ids)"),
+            {"ids": cycle_ids},
+        )
+    if variant_ids:
+        await session.execute(
+            text("DELETE FROM cycle_actions WHERE variant_id = ANY(:ids)"),
+            {"ids": variant_ids},
+        )
+
+    if variant_ids:
+        # Step 2: metrics (hypertable chunks auto-cascade).
+        await session.execute(
+            text("DELETE FROM metrics WHERE variant_id = ANY(:ids)"),
+            {"ids": variant_ids},
+        )
+        # Step 3a: approval_queue rows keyed by variant.
+        await session.execute(
+            text("DELETE FROM approval_queue WHERE variant_id = ANY(:ids)"),
+            {"ids": variant_ids},
+        )
+        # Step 4: deployments (variant-scoped).
+        await session.execute(
+            text("DELETE FROM deployments WHERE variant_id = ANY(:ids)"),
+            {"ids": variant_ids},
+        )
+
+    # Step 3b: any approval_queue rows keyed by the campaign itself
+    # (e.g. scale_budget proposals without a specific variant).
+    await session.execute(
+        text("DELETE FROM approval_queue WHERE campaign_id = :cid"),
+        {"cid": campaign_id},
+    )
+
+    # Step 5: test_cycles (now that cycle_actions is gone).
+    await session.execute(
+        text("DELETE FROM test_cycles WHERE campaign_id = :cid"),
+        {"cid": campaign_id},
+    )
+
+    # Step 6: variants (all dependents are gone).
+    await session.execute(
+        text("DELETE FROM variants WHERE campaign_id = :cid"),
+        {"cid": campaign_id},
+    )
+
+    # Steps 7–9: campaign-scoped aggregates + media.
+    for table in ("element_interactions", "element_performance", "media_assets"):
+        await session.execute(
+            text(f"DELETE FROM {table} WHERE campaign_id = :cid"),
+            {"cid": campaign_id},
+        )
+
+    # Step 10: the root. ``user_campaigns`` cascades automatically;
+    # ``usage_log.campaign_id`` nulls out per its SET NULL rule.
+    await session.execute(
+        text("DELETE FROM campaigns WHERE id = :cid"),
+        {"cid": campaign_id},
+    )
+
     await session.flush()
     return True
 

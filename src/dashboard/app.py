@@ -77,6 +77,7 @@ from src.db.queries import (
     count_active_campaigns_for_user,
     create_data_deletion_request,
     create_user,
+    delete_campaign_cascade,
     delete_meta_connection,
     delete_meta_connection_by_meta_user_id,
     get_data_deletion_request,
@@ -391,6 +392,32 @@ async def api_cycles(
     """Recent optimization cycles for a campaign."""
     cycles = await get_recent_cycles(session, campaign_id)
     return _serialize(cycles)
+
+
+@app.delete(
+    "/api/campaigns/{campaign_id}",
+    status_code=204,
+    dependencies=[Depends(require_csrf)],
+)
+async def api_delete_campaign(
+    campaign_id: UUID = Depends(require_campaign_access),
+    session: AsyncSession = Depends(get_db_session),
+) -> Response:
+    """Delete a campaign and every row transitively owned by it.
+
+    Destructive and permanent. ``require_campaign_access`` scopes by
+    the user's ``user_campaigns`` grant, so users can only delete
+    campaigns they can already see. The cascade is handled by
+    :func:`delete_campaign_cascade`; this route just wires it into
+    an HTTP verb.
+
+    Returns ``204 No Content`` on success. Returns ``404`` if the
+    access check blocks it (same code as "not found" — we never
+    distinguish).
+    """
+    await delete_campaign_cascade(session, campaign_id)
+    await session.commit()
+    return Response(status_code=204)
 
 
 @app.get("/api/gene-pool")

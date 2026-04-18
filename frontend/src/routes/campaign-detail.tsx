@@ -1,11 +1,14 @@
-import { Link, Navigate, useParams } from "react-router-dom";
+import { useState } from "react";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 
 import { MetricCard } from "@/components/MetricCard";
 import { StatusPill } from "@/components/StatusPill";
+import { Button } from "@/components/ui/Button";
 import { Card, CardContent } from "@/components/ui/Card";
 import { SkeletonMetricCard } from "@/components/ui/Skeleton";
 import {
   useDailyDates,
+  useDeleteCampaign,
   useExperiments,
   useMe,
   useWeeklyIndex,
@@ -23,12 +26,34 @@ import { formatDateLabel } from "@/lib/format";
  */
 export function CampaignDetailRoute() {
   const { campaignId = "" } = useParams();
+  const navigate = useNavigate();
   const me = useMe();
   const campaign = me.data?.campaigns.find((c) => c.id === campaignId);
 
   const daily = useDailyDates(campaignId);
   const weekly = useWeeklyIndex(campaignId);
   const experiments = useExperiments(campaignId);
+  const deleteCampaign = useDeleteCampaign();
+
+  // Two-stage confirm: first click arms the button, second click fires
+  // the DELETE. Guarded by a typed-in campaign name match so an
+  // accidental double-tap can't nuke data — users have to type the
+  // exact campaign name into the confirmation input.
+  const [confirmArmed, setConfirmArmed] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const confirmMatches =
+    !!campaign && confirmText.trim() === campaign.name;
+
+  const handleDelete = async () => {
+    if (!confirmMatches) return;
+    try {
+      await deleteCampaign.mutateAsync(campaignId);
+      navigate("/dashboard", { replace: true });
+    } catch {
+      // Mutation state surfaces the error below; keep the user on the
+      // page so they can retry or cancel.
+    }
+  };
 
   // 404-equivalent: authed user, but campaign isn't in their list.
   if (me.data && !campaign) {
@@ -174,6 +199,72 @@ export function CampaignDetailRoute() {
             <p className="mt-3 text-xs text-[var(--accent)]">Open experiments →</p>
           </Card>
         </Link>
+      </div>
+
+      {/* Danger zone — permanent delete. Hidden behind a two-stage
+          confirm so an accidental click can't wipe a campaign. */}
+      <div className="mt-10 rounded border border-red-900/40 bg-red-950/20 p-4">
+        <h2 className="text-[13px] font-medium text-red-300">Danger zone</h2>
+        <p className="mt-1 text-xs text-[var(--text-secondary)]">
+          Delete this campaign and every variant, deployment, metric,
+          test cycle, and report tied to it. This cannot be undone. The
+          Meta ads themselves stay live on Meta&apos;s side — only the
+          Kleiber-side records are removed, so you can re-import this
+          same Meta campaign afterwards.
+        </p>
+
+        {!confirmArmed ? (
+          <button
+            type="button"
+            onClick={() => setConfirmArmed(true)}
+            className="mt-3 rounded border border-red-800/60 bg-red-900/30 px-3 py-1.5 text-xs text-red-200 hover:bg-red-900/50"
+          >
+            Delete campaign…
+          </button>
+        ) : (
+          <div className="mt-3 space-y-2">
+            <label className="block text-xs text-[var(--text-secondary)]">
+              Type{" "}
+              <span className="font-mono text-red-300">
+                {campaign?.name}
+              </span>{" "}
+              to confirm:
+              <input
+                type="text"
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                className="mt-1 block w-full rounded border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-1 text-xs font-mono"
+                autoFocus
+              />
+            </label>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={handleDelete}
+                disabled={!confirmMatches || deleteCampaign.isPending}
+                loading={deleteCampaign.isPending}
+                variant="destructive"
+              >
+                Permanently delete
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmArmed(false);
+                  setConfirmText("");
+                }}
+                className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text)]"
+              >
+                Cancel
+              </button>
+            </div>
+            {deleteCampaign.error && (
+              <p role="alert" className="text-xs text-red-300">
+                Delete failed — {deleteCampaign.error.message}. Check
+                the console logs and retry.
+              </p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

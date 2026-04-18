@@ -225,6 +225,28 @@ export function useImportCampaigns() {
   });
 }
 
+/**
+ * Deletes a campaign and every row owned by it (variants, deployments,
+ * metrics, test cycles, element rollups, media). Destructive and
+ * permanent — the caller is responsible for confirming intent.
+ *
+ * On success, invalidates the ``me`` query so the dashboard grid
+ * drops the campaign tile on next render, and the importable list
+ * so the freshly-freed ``platform_campaign_id`` becomes available
+ * to re-import.
+ */
+export function useDeleteCampaign() {
+  const qc = useQueryClient();
+  return useMutation<void, ApiError, string>({
+    mutationFn: (campaignId) =>
+      api.delete<void>(`/api/campaigns/${campaignId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.me });
+      qc.invalidateQueries({ queryKey: ["me", "meta", "campaigns"] });
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Per-user usage rollup (Phase E)
 // ---------------------------------------------------------------------------
