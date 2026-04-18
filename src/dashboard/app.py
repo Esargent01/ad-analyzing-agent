@@ -1681,12 +1681,20 @@ async def api_daily_dates(
     variant in this campaign. We expose dates newest-first so the
     frontend can render them as a sidebar list.
     """
+    # Exclude today — the metrics poller runs every few hours, so a
+    # partial row for today's UTC date is always present while the
+    # day is still in progress. Surfacing today in the date list
+    # would produce an incomplete "daily report" with artificially
+    # low spend / purchase totals. Only offer days that are fully
+    # in the past (UTC) — the cron's report generation also scopes
+    # to yesterday and earlier.
     stmt = sa_text(
         """
         SELECT DISTINCT DATE(m.recorded_at AT TIME ZONE 'UTC') AS day
         FROM metrics m
         JOIN variants v ON v.id = m.variant_id
         WHERE v.campaign_id = :campaign_id
+          AND DATE(m.recorded_at AT TIME ZONE 'UTC') < (NOW() AT TIME ZONE 'UTC')::DATE
         ORDER BY day DESC
         LIMIT 180
         """

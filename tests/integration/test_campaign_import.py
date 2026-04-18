@@ -55,6 +55,7 @@ from src.models.campaigns import (
     ImportableCampaignsResponse,
 )
 from src.services.campaign_import import (
+    _extract_asset_feed_pool_entries,
     _extract_genome,
     _seed_gene_pool_entries,
     import_campaign,
@@ -227,6 +228,45 @@ class TestExtractGenome:
 
     def test_completely_empty_ad(self) -> None:
         assert _extract_genome({}) == {}
+
+
+class TestExtractAssetFeedPoolEntries:
+    """Dynamic Creative (Advantage+) ads put every title/body/CTA
+    variant in ``asset_feed_spec``. The adapter picks one as canonical;
+    this helper flattens the rest so they can be seeded into the gene
+    pool. Regression guard: the first imported campaign with a
+    Dynamic Creative ad shipped with only ``image_url`` populated
+    because nothing read these arrays."""
+
+    def test_flattens_all_three_slot_arrays(self) -> None:
+        ad = {
+            "asset_feed_titles": ["Title A", "Title B", ""],
+            "asset_feed_bodies": ["Body A", "Body B"],
+            "asset_feed_cta_types": ["LEARN_MORE", "SHOP_NOW"],
+        }
+        extras = _extract_asset_feed_pool_entries(ad)
+        assert {"headline": "Title A"} in extras
+        assert {"headline": "Title B"} in extras
+        assert {"body": "Body A"} in extras
+        assert {"body": "Body B"} in extras
+        assert {"cta_text": "LEARN_MORE"} in extras
+        assert {"cta_text": "SHOP_NOW"} in extras
+        # Empty strings are dropped.
+        assert {"headline": ""} not in extras
+        assert len(extras) == 6
+
+    def test_non_dynamic_creative_returns_empty(self) -> None:
+        ad = {"headline": "H", "body": "B", "cta_type": "SHOP_NOW"}
+        assert _extract_asset_feed_pool_entries(ad) == []
+
+    def test_ignores_malformed_arrays(self) -> None:
+        ad = {
+            "asset_feed_titles": None,
+            "asset_feed_bodies": "not a list",
+            "asset_feed_cta_types": [None, 42, "LEARN_MORE"],
+        }
+        extras = _extract_asset_feed_pool_entries(ad)
+        assert extras == [{"cta_text": "LEARN_MORE"}]
 
 
 class TestListImportableCampaigns:

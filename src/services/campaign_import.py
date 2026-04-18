@@ -342,6 +342,44 @@ def _extract_genome(ad: dict[str, object]) -> dict[str, str]:
     return genome
 
 
+def _extract_asset_feed_pool_entries(ad: dict[str, object]) -> list[dict[str, str]]:
+    """Flatten Dynamic-Creative asset-feed variants into pseudo-genomes.
+
+    Meta's Dynamic Creative (Advantage+) format stores multiple
+    titles, bodies, and CTAs in ``asset_feed_spec`` — Meta shuffles
+    them at delivery time. ``_extract_genome`` only picks the first
+    of each for the canonical variant. This helper returns one
+    single-slot pseudo-genome per remaining variant so the caller
+    can feed them into ``_seed_gene_pool_entries`` and grow the pool
+    with every headline/body/CTA the advertiser already wrote.
+
+    Returns an empty list for non-Dynamic-Creative ads. Single-slot
+    pseudo-genomes are intentional: the gene-pool seeder reads
+    ``(slot, value)`` pairs independently so one slot per dict works
+    the same as combining them, and keeps the code branch-free.
+    """
+    extras: list[dict[str, str]] = []
+    titles = ad.get("asset_feed_titles") or []
+    bodies = ad.get("asset_feed_bodies") or []
+    cta_types = ad.get("asset_feed_cta_types") or []
+    if isinstance(titles, list):
+        for t in titles:
+            t = (t or "").strip() if isinstance(t, str) else ""
+            if t:
+                extras.append({"headline": t})
+    if isinstance(bodies, list):
+        for b in bodies:
+            b = (b or "").strip() if isinstance(b, str) else ""
+            if b:
+                extras.append({"body": b})
+    if isinstance(cta_types, list):
+        for c in cta_types:
+            c = (c or "").strip() if isinstance(c, str) else ""
+            if c:
+                extras.append({"cta_text": c})
+    return extras
+
+
 async def _seed_gene_pool_entries(
     session: AsyncSession,
     genomes: list[dict[str, str]],
@@ -522,10 +560,18 @@ async def import_campaign(
         session, user_id=user_id, campaign_id=campaign.id
     )
 
-    # 5. Seed gene pool from the ads' creative elements.
+    # 5. Seed gene pool from the ads' creative elements. For
+    # Dynamic-Creative ads (``asset_feed_spec``), the canonical
+    # ``_extract_genome`` only picks the first asset in each slot —
+    # ``_extract_asset_feed_pool_entries`` supplies the remainder so
+    # every headline/body/CTA the advertiser authored is available to
+    # the generator, not just the one we picked as canonical.
     genomes = [_extract_genome(ad) for ad in ads]
-    genomes = [g for g in genomes if g]  # drop empty genomes
-    seeded = await _seed_gene_pool_entries(session, genomes)
+    genomes = [g for g in genomes if g]
+    asset_feed_extras: list[dict[str, str]] = []
+    for ad in ads:
+        asset_feed_extras.extend(_extract_asset_feed_pool_entries(ad))
+    seeded = await _seed_gene_pool_entries(session, genomes + asset_feed_extras)
 
     # 6. One variant + one deployment per ad. Variant codes start
     # at V1 because the campaign is brand new.

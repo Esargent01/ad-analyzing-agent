@@ -563,11 +563,56 @@ class MetaAdapter(BaseAdapter):
 
         Returns a list of dicts with keys: ad_id, ad_name, adset_id,
         adset_name, status, creative_id, and the ad creative fields
-        (title, body, link_url, image_url) where available.
+        (headline, body, link_url, cta_type, image_url) where available.
+
+        Meta ships a handful of incompatible creative shapes and we
+        need to flatten them into one:
+
+        - **Static link ads** put the copy in
+          ``object_story_spec.link_data`` (name, message, link, picture,
+          call_to_action.type).
+        - **Video ads** put it in ``object_story_spec.video_data``
+          (title, message, image_url, call_to_action).
+        - **Dynamic Creative / Advantage+ ads** leave ``object_story_spec``
+          with only ``page_id`` and stuff every asset variant into
+          ``asset_feed_spec`` (titles[], bodies[], call_to_action_types[],
+          link_urls[]). We pick the first non-empty option as the
+          "canonical" representation for the single-variant genome;
+          ``src.services.campaign_import`` seeds every remaining option
+          into the gene pool so the generator can still remix them.
+        - Anything missed falls through to the creative's top-level
+          ``title``/``body``/``thumbnail_url``.
+
+        Without this fallback chain, Dynamic Creative ads (now the
+        default for new Advantage+ campaigns) import as genomes with
+        only an ``image_url`` and every other slot empty.
         """
         logger.info("Listing ads for Meta campaign %s", campaign_id)
 
         from facebook_business.adobjects.campaign import Campaign
+
+        def _first_nonempty_text(items: object) -> str:
+            """First ``item["text"]`` that is a non-empty string."""
+            if not isinstance(items, list):
+                return ""
+            for item in items:
+                if isinstance(item, dict):
+                    text = item.get("text")
+                    if isinstance(text, str) and text.strip():
+                        return text
+            return ""
+
+        def _first_str(items: object, key: str = "") -> str:
+            """First non-empty value from a list (optionally indexed by ``key``)."""
+            if not isinstance(items, list) or not items:
+                return ""
+            first = items[0]
+            if key:
+                if isinstance(first, dict):
+                    value = first.get(key)
+                    return value if isinstance(value, str) else ""
+                return ""
+            return first if isinstance(first, str) else ""
 
         def _list_ads() -> list[dict[str, object]]:
             campaign = Campaign(campaign_id)
@@ -577,14 +622,50 @@ class MetaAdapter(BaseAdapter):
                     "name",
                     "status",
                     "adset_id",
-                    "creative{id,name,title,body,object_story_spec,thumbnail_url}",
+                    "creative{id,name,title,body,object_story_spec,"
+                    "asset_feed_spec,thumbnail_url}",
                 ],
             )
             results: list[dict[str, object]] = []
             for ad in ads:
-                creative = ad.get("creative", {})
-                story_spec = creative.get("object_story_spec", {})
-                link_data = story_spec.get("link_data", {})
+                creative = ad.get("creative", {}) or {}
+                story_spec = creative.get("object_story_spec", {}) or {}
+                link_data = story_spec.get("link_data", {}) or {}
+                video_data = story_spec.get("video_data", {}) or {}
+                feed = creative.get("asset_feed_spec", {}) or {}
+
+                headline = (
+                    link_data.get("name")
+                    or video_data.get("title")
+                    or _first_nonempty_text(feed.get("titles"))
+                    or creative.get("title", "")
+                    or ""
+                )
+                body = (
+                    link_data.get("message")
+                    or video_data.get("message")
+                    or _first_nonempty_text(feed.get("bodies"))
+                    or creative.get("body", "")
+                    or ""
+                )
+                link_url = (
+                    link_data.get("link")
+                    or video_data.get("call_to_action", {}).get("value", {}).get("link", "")
+                    or _first_str(feed.get("link_urls"), "website_url")
+                    or ""
+                )
+                cta_type = (
+                    link_data.get("call_to_action", {}).get("type")
+                    or video_data.get("call_to_action", {}).get("type")
+                    or _first_str(feed.get("call_to_action_types"))
+                    or ""
+                )
+                image_url = (
+                    link_data.get("picture")
+                    or video_data.get("image_url")
+                    or creative.get("thumbnail_url", "")
+                    or ""
+                )
 
                 results.append(
                     {
@@ -594,11 +675,27 @@ class MetaAdapter(BaseAdapter):
                         "adset_id": str(ad.get("adset_id", "")),
                         "creative_id": str(creative.get("id", "")),
                         "creative_name": creative.get("name", ""),
-                        "headline": link_data.get("name", creative.get("title", "")),
-                        "body": link_data.get("message", creative.get("body", "")),
-                        "link_url": link_data.get("link", ""),
-                        "cta_type": link_data.get("call_to_action", {}).get("type", ""),
-                        "image_url": link_data.get("picture", creative.get("thumbnail_url", "")),
+                        "headline": headline,
+                        "body": body,
+                        "link_url": link_url,
+                        "cta_type": cta_type,
+                        "image_url": image_url,
+                        # Full asset-feed variants, for the import
+                        # service to seed every option into the gene
+                        # pool. Empty for non-Dynamic-Creative ads.
+                        "asset_feed_titles": [
+                            t.get("text", "")
+                            for t in (feed.get("titles") or [])
+                            if isinstance(t, dict) and t.get("text")
+                        ],
+                        "asset_feed_bodies": [
+                            b.get("text", "")
+                            for b in (feed.get("bodies") or [])
+                            if isinstance(b, dict) and b.get("text")
+                        ],
+                        "asset_feed_cta_types": [
+                            c for c in (feed.get("call_to_action_types") or []) if isinstance(c, str) and c
+                        ],
                     }
                 )
             return results
