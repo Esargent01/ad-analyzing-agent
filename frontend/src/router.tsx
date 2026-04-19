@@ -8,6 +8,7 @@ import { DataDeletionRoute } from "@/routes/data-deletion";
 import { ExperimentsRoute } from "@/routes/experiments";
 import { ImportMetaCampaignsRoute } from "@/routes/import-meta-campaigns";
 import { LandingRoute } from "@/routes/landing";
+import { LandingScientificRoute } from "@/routes/landing-scientific";
 import { MagicLinkSentRoute } from "@/routes/magic-link-sent";
 import { PrivacyRoute } from "@/routes/privacy";
 import { ProductRoute } from "@/routes/product";
@@ -24,6 +25,13 @@ export const router = createBrowserRouter([
   {
     path: "/",
     element: <LandingRoute />,
+  },
+  {
+    // A/B-test variant landing page — "scientific" voice.
+    // Paid ads can point traffic here while ``/`` serves the original.
+    // Same beta-signup endpoint; distinct PostHog URL dimension.
+    path: "/b",
+    element: <LandingScientificRoute />,
   },
   {
     path: "/product",

@@ -1,0 +1,276 @@
+/*
+ * Scoped design tokens + utility classes for the "scientific" landing
+ * variant (A/B test partner to /). Every rule is namespaced under
+ * ``.kleiber-b-landing`` so it cannot leak into the rest of the
+ * dashboard, which runs its own palette + typography.
+ *
+ * Palette: warm neutrals + terracotta accent + stats-green +
+ * stats-red. Editorial-leaning type pairing: Geist sans for UI and
+ * headlines, Instrument Serif (italic) for emphasis accents, Geist
+ * Mono for stats/code/metadata.
+ */
+
+.kleiber-b-landing {
+  /* Warm neutrals */
+  --b-paper: oklch(98.5% 0.006 80);
+  --b-paper-2: oklch(96.5% 0.01 78);
+  --b-paper-3: oklch(94% 0.012 75);
+  --b-ink: oklch(22% 0.02 60);
+  --b-ink-2: oklch(35% 0.02 65);
+  --b-muted: oklch(55% 0.015 70);
+  --b-muted-2: oklch(68% 0.012 72);
+  --b-border: oklch(90% 0.01 75);
+  --b-border-soft: oklch(94% 0.008 75);
+
+  /* Accent — warm terracotta/ochre */
+  --b-accent: oklch(62% 0.16 55);
+  --b-accent-soft: oklch(92% 0.05 60);
+  --b-accent-ink: oklch(35% 0.12 50);
+
+  /* Stats colors */
+  --b-win: oklch(58% 0.14 145);
+  --b-win-soft: oklch(94% 0.05 145);
+  --b-lose: oklch(60% 0.16 28);
+  --b-lose-soft: oklch(95% 0.04 28);
+
+  /* Type */
+  --b-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --b-serif: 'Instrument Serif', 'Times New Roman', Georgia, serif;
+  --b-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  /* Shadows — warm-tinted */
+  --b-shadow-sm: 0 1px 2px oklch(30% 0.02 60 / 0.04), 0 1px 1px oklch(30% 0.02 60 / 0.03);
+  --b-shadow-md: 0 4px 16px oklch(30% 0.02 60 / 0.06), 0 1px 2px oklch(30% 0.02 60 / 0.04);
+  --b-shadow-lg: 0 20px 60px oklch(30% 0.02 60 / 0.08), 0 4px 12px oklch(30% 0.02 60 / 0.04);
+
+  background: var(--b-paper);
+  color: var(--b-ink);
+  font-family: var(--b-sans);
+  font-size: 16px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.kleiber-b-landing *,
+.kleiber-b-landing *::before,
+.kleiber-b-landing *::after {
+  box-sizing: border-box;
+}
+
+/* Smooth-scroll between in-page anchors; offset so sections aren't
+   obscured by the 68px sticky nav when you jump to them. */
+html:has(.kleiber-b-landing) {
+  scroll-behavior: smooth;
+}
+
+.kleiber-b-landing section[id] {
+  scroll-margin-top: 80px;
+}
+
+.kleiber-b-landing a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.kleiber-b-landing button {
+  font-family: inherit;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+.kleiber-b-landing input {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Type utilities */
+.kleiber-b-landing .b-serif {
+  font-family: var(--b-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+}
+
+.kleiber-b-landing .b-mono {
+  font-family: var(--b-mono);
+}
+
+.kleiber-b-landing .b-eyebrow {
+  font-family: var(--b-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--b-muted);
+}
+
+.kleiber-b-landing .b-h-display {
+  font-size: clamp(44px, 6.2vw, 84px);
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+  font-weight: 500;
+  color: var(--b-ink);
+  margin: 0;
+}
+
+.kleiber-b-landing .b-h-display .b-serif {
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.kleiber-b-landing .b-h-section {
+  font-size: clamp(32px, 4.2vw, 56px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  font-weight: 500;
+  margin: 0;
+}
+
+.kleiber-b-landing .b-h-sub {
+  font-size: clamp(18px, 1.6vw, 22px);
+  line-height: 1.4;
+  letter-spacing: -0.01em;
+  color: var(--b-muted);
+  font-weight: 400;
+  margin: 0;
+}
+
+/* Buttons */
+.kleiber-b-landing .b-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: all 0.18s ease;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.kleiber-b-landing .b-btn-primary {
+  background: var(--b-ink);
+  color: var(--b-paper);
+}
+
+.kleiber-b-landing .b-btn-primary:hover {
+  background: var(--b-ink-2);
+  transform: translateY(-1px);
+  box-shadow: var(--b-shadow-md);
+}
+
+.kleiber-b-landing .b-btn-ghost {
+  background: transparent;
+  color: var(--b-ink);
+  border-color: var(--b-border);
+}
+
+.kleiber-b-landing .b-btn-ghost:hover {
+  background: var(--b-paper-2);
+  border-color: var(--b-muted-2);
+}
+
+.kleiber-b-landing .b-btn-sm {
+  padding: 7px 13px;
+  font-size: 13px;
+}
+
+.kleiber-b-landing .b-btn-lg {
+  padding: 14px 22px;
+  font-size: 15.5px;
+}
+
+.kleiber-b-landing .b-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.kleiber-b-landing .b-btn:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* Layout */
+.kleiber-b-landing .b-wrap {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+.kleiber-b-landing .b-wrap-narrow {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+/* Chips — the element-genome language */
+.kleiber-b-landing .b-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-family: var(--b-mono);
+  font-size: 11.5px;
+  letter-spacing: -0.005em;
+  background: var(--b-paper-2);
+  border: 1px solid var(--b-border);
+  color: var(--b-ink-2);
+}
+
+.kleiber-b-landing .b-chip-win {
+  background: var(--b-win-soft);
+  color: oklch(32% 0.14 145);
+  border-color: transparent;
+}
+
+.kleiber-b-landing .b-chip-lose {
+  background: var(--b-lose-soft);
+  color: oklch(38% 0.16 28);
+  border-color: transparent;
+}
+
+.kleiber-b-landing .b-chip-dot::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+/* Form input — matches the visual language of the ink/paper palette */
+.kleiber-b-landing .b-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--b-border);
+  border-radius: 10px;
+  font-size: 14.5px;
+  background: white;
+  color: var(--b-ink);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.kleiber-b-landing .b-input:focus {
+  border-color: var(--b-ink);
+  box-shadow: 0 0 0 3px oklch(22% 0.02 60 / 0.06);
+}
+
+/* Mobile: collapse every 2+ column grid to a single column */
+@media (max-width: 900px) {
+  .kleiber-b-landing .b-wrap,
+  .kleiber-b-landing .b-wrap-narrow {
+    padding: 0 20px;
+  }
+  .kleiber-b-landing [data-b-grid] {
+    grid-template-columns: 1fr !important;
+  }
+}
