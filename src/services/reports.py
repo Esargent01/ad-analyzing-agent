@@ -529,7 +529,8 @@ async def _variant_leaderboard(
                    COALESCE(m.video_views_15s, 0), COALESCE(m.thruplays, 0),
                    COALESCE(m.link_clicks, 0), COALESCE(m.landing_page_views, 0),
                    COALESCE(m.add_to_carts, 0), COALESCE(m.purchases, 0),
-                   COALESCE(m.purchase_value, 0)
+                   COALESCE(m.purchase_value, 0),
+                   v.media_type
             FROM variants v
             LEFT JOIN LATERAL (
                 SELECT SUM(impressions) AS impressions, SUM(clicks) AS clicks,
@@ -570,6 +571,7 @@ def _row_to_variant_summary(row) -> VariantSummary:
     atc = int(row[13])
     purch = int(row[14])
     pv = Decimal(str(row[15]))
+    media_type = str(row[16]) if len(row) > 16 and row[16] else "unknown"
 
     ctr = Decimal(str(clicks / imps)) if imps > 0 else Decimal("0")
     cpa = Decimal(str(float(spend) / convs)) if convs > 0 else None
@@ -601,6 +603,7 @@ def _row_to_variant_summary(row) -> VariantSummary:
         hold_rate=hold,
         cost_per_purchase=cpp,
         roas=roas,
+        media_type=media_type,
     )
 
 
@@ -678,12 +681,13 @@ async def _element_interactions(
 
 
 async def _variant_genome_map(session: AsyncSession, campaign_id: UUID) -> dict[str, dict]:
-    """Look up ``{variant_id: {genome, hypothesis, days_active}}`` for enrichment."""
+    """Look up ``{variant_id: {genome, hypothesis, days_active, media_type}}`` for enrichment."""
     row = await session.execute(
         sa_text(
             """
             SELECT v.id, v.genome, v.hypothesis,
-                   EXTRACT(DAY FROM NOW() - v.created_at)::INT AS days_active
+                   EXTRACT(DAY FROM NOW() - v.created_at)::INT AS days_active,
+                   v.media_type
             FROM variants v
             WHERE v.campaign_id = :id AND v.status IN ('active', 'winner', 'paused')
             """
@@ -695,6 +699,7 @@ async def _variant_genome_map(session: AsyncSession, campaign_id: UUID) -> dict[
             "genome": r[1] or {},
             "hypothesis": r[2],
             "days_active": int(r[3] or 1),
+            "media_type": r[4] or "unknown",
         }
         for r in row.fetchall()
     }
@@ -769,6 +774,7 @@ def _variant_summary_to_variant_report(
     genome = gdata.get("genome", {}) if gdata else {}
     hypothesis = gdata.get("hypothesis") if gdata else None
     days_active = gdata.get("days_active", 1) if gdata else 1
+    media_type = gdata.get("media_type", "unknown") if gdata else "unknown"
 
     summary_parts = []
     if genome.get("headline"):
@@ -785,6 +791,7 @@ def _variant_summary_to_variant_report(
         hypothesis=hypothesis,
         status=vs.status,
         days_active=days_active,
+        media_type=media_type,
         spend=vs.spend,
         purchases=purch,
         purchase_value=vs.purchase_value,

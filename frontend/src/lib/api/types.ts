@@ -345,6 +345,13 @@ export interface VariantReport {
   /** "winner" | "steady" | "new" | "fatigue" | "paused" */
   status: string;
   days_active: number;
+  /**
+   * Creative format: "video" | "image" | "mixed" | "unknown". Sourced
+   * from ``variants.media_type`` which mirrors Meta's
+   * ``AdCreative.object_type``. Used by the dashboard to hide
+   * video-only metrics (hook rate, hold rate) on image ads.
+   */
+  media_type: string;
 
   // Primary
   spend: Num;
@@ -461,6 +468,12 @@ export interface VariantSummary {
   hold_rate: Num;
   cost_per_purchase: Num;
   roas: Num;
+  /**
+   * Creative format (same taxonomy as ``VariantReport.media_type``).
+   * The weekly variant table uses this to em-dash hook/hold columns
+   * for image-only variants.
+   */
+  media_type: string;
 }
 
 export interface FunnelStage {

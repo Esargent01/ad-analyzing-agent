@@ -27,6 +27,13 @@ class VariantReport(BaseModel):
     hypothesis: str | None
     status: str  # "winner", "steady", "new", "fatigue", "paused"
     days_active: int
+    # Creative format: "video", "image", "mixed", or "unknown". Sourced
+    # from ``variants.media_type`` (mapped from Meta's
+    # ``AdCreative.object_type``). Renderers use this to hide
+    # video-only metrics (hook rate, hold rate, 3s/15s views) on image
+    # ads. "unknown" is treated identically to video/mixed — safe
+    # default for rows that predate the column.
+    media_type: str = "unknown"
 
     # Primary
     spend: Decimal
@@ -180,6 +187,11 @@ class VariantSummary(BaseModel):
     hold_rate: Decimal = Decimal("0")
     cost_per_purchase: Decimal | None = None
     roas: Decimal | None = None
+    # Creative format mirrored from ``variants.media_type``. Weekly
+    # templates read this the same way daily ones do — hide hook/hold
+    # columns for image-only variants. Default "unknown" is treated as
+    # video/mixed (full metrics) by the renderers.
+    media_type: str = "unknown"
 
 
 class CycleAction(BaseModel):

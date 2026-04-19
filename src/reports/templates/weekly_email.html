@@ -73,9 +73,34 @@
         </tr>
         </table>
 
+        {# Row 2 leads with video-watching metrics (Hook / Hold) that are
+           only meaningful when at least some variants are video. For
+           image-only campaigns (best_variant is image), those cells
+           would report a misleading 0% — swap to Frequency / ATC rate,
+           which read honestly for static creatives. #}
         <!-- Row 2 -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
         <tr>
+            {% if best_variant and best_variant.media_type == "image" %}
+            <!-- Frequency (image-campaign replacement for Hook Rate) -->
+            <td width="25%" style="padding: 0 4px 8px 0;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">Frequency</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ avg_frequency|onedecimal }}x</p>
+                </td></tr>
+                </table>
+            </td>
+            <!-- ATC Rate (image-campaign replacement for Hold Rate) -->
+            <td width="25%" style="padding: 0 4px 8px;" valign="top">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
+                <tr><td style="padding: 12px 14px;">
+                    <p style="font-size: 11px; color: #999999; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">ATC Rate</p>
+                    <p style="font-size: 20px; font-weight: 500; color: #1a1a1a; margin: 2px 0 0; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{% if total_link_clicks > 0 %}{{ "{:.1%}".format(total_add_to_carts / total_link_clicks) }}{% else %}N/A{% endif %}</p>
+                </td></tr>
+                </table>
+            </td>
+            {% else %}
             <!-- Hook Rate -->
             <td width="25%" style="padding: 0 4px 8px 0;" valign="top">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
@@ -94,6 +119,7 @@
                 </td></tr>
                 </table>
             </td>
+            {% endif %}
             <!-- CTR -->
             <td width="25%" style="padding: 0 4px 8px;" valign="top">
                 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f6f5f3; border-radius: 8px;">
@@ -312,8 +338,10 @@
                 <span style="display: inline-block; background-color: #f6f5f3; color: #666666; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Outfit', -apple-system, BlinkMacSystemFont, Arial, Helvetica, sans-serif;">{{ v.status }}</span>
                 {% endif %}
             </td>
-            <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e8e5e0; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{{ "{:.1%}".format(v.hook_rate) }}</td>
-            <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e8e5e0; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{{ "{:.1%}".format(v.hold_rate) }}</td>
+            {# Image variants have no meaningful hook/hold — em-dash
+               instead of a misleading 0.0%. #}
+            <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e8e5e0; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{% if v.media_type == "image" %}&mdash;{% else %}{{ "{:.1%}".format(v.hook_rate) }}{% endif %}</td>
+            <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e8e5e0; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{% if v.media_type == "image" %}&mdash;{% else %}{{ "{:.1%}".format(v.hold_rate) }}{% endif %}</td>
             <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e8e5e0; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{{ "{:.1%}".format(v.ctr) }}</td>
             <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e8e5e0; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
             <td style="padding: 6px 6px; color: #1a1a1a; border-bottom: 1px solid #e8e5e0; font-family: 'Courier New', Courier, monospace; font-size: 12px;" align="right">{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>

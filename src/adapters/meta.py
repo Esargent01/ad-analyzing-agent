@@ -29,6 +29,32 @@ _MAX_RETRIES: int = 3
 _RETRY_BASE_DELAY: float = 2.0  # seconds
 
 
+# Mapping from Meta's ``AdCreative.object_type`` enum to our internal
+# media-type taxonomy. Source of truth: Meta's Marketing API AdCreative
+# reference. Values we don't explicitly map fall through to ``"unknown"``
+# so reports render the full funnel as a safe default.
+_META_OBJECT_TYPE_MAP: dict[str, str] = {
+    "VIDEO": "video",
+    "PHOTO": "image",
+    "SHARE": "image",        # link-share creative (image + link preview)
+    "MULTI_SHARE": "mixed",  # carousel — cards can be image or video
+}
+
+
+def _map_media_type(object_type: str | None) -> str:
+    """Translate Meta's ``AdCreative.object_type`` into our taxonomy.
+
+    Returns one of ``"video"``, ``"image"``, ``"mixed"``, or ``"unknown"``.
+    Unknown covers unmapped values (``"STATUS"``, ``"OFFER"``,
+    ``"INVALID"``) and missing data — callers treat unknown identically
+    to video/mixed (i.e. show all funnel stages) so this always-safe
+    fallback preserves pre-existing behavior for anything surprising.
+    """
+    if not object_type:
+        return "unknown"
+    return _META_OBJECT_TYPE_MAP.get(object_type, "unknown")
+
+
 class MetaAdapter(BaseAdapter):
     """Meta Marketing API adapter.
 
@@ -622,8 +648,14 @@ class MetaAdapter(BaseAdapter):
                     "name",
                     "status",
                     "adset_id",
+                    # ``object_type`` is Meta's own image/video/carousel
+                    # discriminator — one authoritative enum per ad
+                    # (VIDEO / PHOTO / SHARE / MULTI_SHARE / …). Used
+                    # below to populate each ad dict's ``media_type`` so
+                    # the reporting layer can hide video-only metrics
+                    # (hook rate, hold rate, 3s/15s views) on image ads.
                     "creative{id,name,title,body,object_story_spec,"
-                    "asset_feed_spec,thumbnail_url}",
+                    "asset_feed_spec,thumbnail_url,object_type}",
                 ],
             )
             results: list[dict[str, object]] = []
@@ -680,6 +712,9 @@ class MetaAdapter(BaseAdapter):
                         "link_url": link_url,
                         "cta_type": cta_type,
                         "image_url": image_url,
+                        "media_type": _map_media_type(
+                            creative.get("object_type")
+                        ),
                         # Full asset-feed variants, for the import
                         # service to seed every option into the gene
                         # pool. Empty for non-Dynamic-Creative ads.

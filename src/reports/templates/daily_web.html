@@ -84,6 +84,27 @@
             <div class="tile-label">Purchases</div>
             <div class="tile-value">{{ best_variant.purchases|intcomma }}</div>
         </div>
+        {# Three diagnostic tiles under the spotlight. Image ads swap
+           Hook/Hold for ATC rate / Checkout rate — the video-specific
+           tiles are meaningless on a static creative. Video, mixed,
+           and unknown keep the current Hook/Hold/CTR trio. #}
+        {% if best_variant.media_type == "image" %}
+        <div class="tile">
+            <div class="tile-label">CTR</div>
+            <div class="tile-value">{% if best_variant.ctr_pct is not none %}{{ best_variant.ctr_pct|round(1) }}%{% else %}N/A{% endif %}</div>
+            <div class="tile-benchmark">benchmark 1.5%</div>
+        </div>
+        <div class="tile">
+            <div class="tile-label">ATC rate</div>
+            <div class="tile-value">{% if best_variant.atc_rate_pct is not none %}{{ best_variant.atc_rate_pct|round(1) }}%{% else %}N/A{% endif %}</div>
+            <div class="tile-benchmark">benchmark 5-10%</div>
+        </div>
+        <div class="tile">
+            <div class="tile-label">Checkout rate</div>
+            <div class="tile-value">{% if best_variant.checkout_rate_pct is not none %}{{ best_variant.checkout_rate_pct|round(1) }}%{% else %}N/A{% endif %}</div>
+            <div class="tile-benchmark">benchmark 30%</div>
+        </div>
+        {% else %}
         <div class="tile">
             <div class="tile-label">Hook rate</div>
             <div class="tile-value">{% if best_variant.hook_rate_pct is not none %}{{ best_variant.hook_rate_pct|round(1) }}%{% else %}N/A{% endif %}</div>
@@ -99,6 +120,7 @@
             <div class="tile-value">{% if best_variant.ctr_pct is not none %}{{ best_variant.ctr_pct|round(1) }}%{% else %}N/A{% endif %}</div>
             <div class="tile-benchmark">benchmark 1.5%</div>
         </div>
+        {% endif %}
     </div>
 
     <!-- Funnel visualization -->
@@ -166,7 +188,9 @@
             {% for v in variants %}
             <tr>
                 <td class="mono">{{ v.variant_code }}</td>
-                <td>{% if v.hook_rate_pct is not none %}{{ v.hook_rate_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>
+                {# Image variants have no meaningful hook rate — em-dash
+                   instead of a misleading 0.0%. #}
+                <td>{% if v.media_type == "image" or v.hook_rate_pct is none %}&mdash;{% else %}{{ v.hook_rate_pct|round(1) }}%{% endif %}</td>
                 <td>{% if v.ctr_pct is not none %}{{ v.ctr_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>
                 <td>{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
                 <td>{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
@@ -253,7 +277,7 @@
             {% if loop.index <= 5 %}
             <tr>
                 <td class="mono">{{ v.variant_code }}</td>
-                <td>{% if v.hook_rate_pct is not none %}{{ v.hook_rate_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>
+                <td>{% if v.media_type == "image" or v.hook_rate_pct is none %}&mdash;{% else %}{{ v.hook_rate_pct|round(1) }}%{% endif %}</td>
                 <td>{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
                 <td>{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
             </tr>

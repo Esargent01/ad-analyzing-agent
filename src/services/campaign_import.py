@@ -593,6 +593,13 @@ async def import_campaign(
             generation=0,
             parent_ids=[],
             hypothesis="Imported from existing Meta ad.",
+            # Meta-reported creative format (VIDEO/PHOTO/SHARE/
+            # MULTI_SHARE) mapped into our taxonomy by the adapter.
+            # Reports read this to hide hook/hold/3s/15s for image
+            # ads. Fall through to "unknown" — the renderers treat
+            # that identically to video/mixed (full funnel) so an
+            # unexpected creative type can't break the report.
+            media_type=str(ad.get("media_type") or "unknown"),
         )
         session.add(variant)
         await session.flush()

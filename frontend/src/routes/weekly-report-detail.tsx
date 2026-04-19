@@ -113,10 +113,34 @@ function WeeklyReportBody({ report }: { report: WeeklyReport }) {
         />
       </div>
 
-      {/* Row 2 — Engagement metrics */}
+      {/* Row 2 — Engagement metrics. Image-only campaigns swap Hook/Hold
+          for Frequency/ATC rate; the video-specific tiles would read 0%
+          on static creatives. */}
       <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MetricCard label="Hook rate" value={formatPct(report.avg_hook_rate)} />
-        <MetricCard label="Hold rate" value={formatPct(report.avg_hold_rate)} />
+        {report.best_variant?.media_type === "image" ? (
+          <>
+            <MetricCard
+              label="Frequency"
+              value={`${formatOneDecimal(report.avg_frequency)}x`}
+            />
+            <MetricCard
+              label="ATC rate"
+              value={
+                report.total_link_clicks > 0
+                  ? formatPct(
+                      Number(report.total_add_to_carts) /
+                        Number(report.total_link_clicks),
+                    )
+                  : "N/A"
+              }
+            />
+          </>
+        ) : (
+          <>
+            <MetricCard label="Hook rate" value={formatPct(report.avg_hook_rate)} />
+            <MetricCard label="Hold rate" value={formatPct(report.avg_hold_rate)} />
+          </>
+        )}
         <MetricCard label="CTR" value={formatPct(report.avg_ctr)} />
         <MetricCard label="CPM" value={formatCurrency(report.avg_cpm)} />
       </div>

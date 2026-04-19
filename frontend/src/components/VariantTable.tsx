@@ -58,10 +58,13 @@ export function DailyVariantTable({ variants }: { variants: VariantReport[] }) {
               <td className="p-2 font-mono text-[11px] text-[var(--text)]">
                 {v.variant_code}
               </td>
+              {/* Image variants have no meaningful hook rate — em-dash
+                  instead of a misleading 0.0%. Same treatment the
+                  email templates use. */}
               <td className="p-2">
-                {v.hook_rate_pct != null
-                  ? `${v.hook_rate_pct.toFixed(1)}%`
-                  : "—"}
+                {v.media_type === "image" || v.hook_rate_pct == null
+                  ? "—"
+                  : `${v.hook_rate_pct.toFixed(1)}%`}
               </td>
               <td className="p-2">
                 {v.ctr_pct != null ? `${v.ctr_pct.toFixed(1)}%` : "—"}
@@ -132,8 +135,12 @@ export function WeeklyVariantTable({
               <td className="p-2">
                 <StatusPill kind={toStatusKind(v.status)}>{v.status}</StatusPill>
               </td>
-              <td className="p-2">{formatPct(v.hook_rate)}</td>
-              <td className="p-2">{formatPct(v.hold_rate)}</td>
+              <td className="p-2">
+                {v.media_type === "image" ? "—" : formatPct(v.hook_rate)}
+              </td>
+              <td className="p-2">
+                {v.media_type === "image" ? "—" : formatPct(v.hold_rate)}
+              </td>
               <td className="p-2">{formatPct(v.ctr)}</td>
               <td className="p-2">
                 {v.cost_per_purchase != null && v.cost_per_purchase !== ""

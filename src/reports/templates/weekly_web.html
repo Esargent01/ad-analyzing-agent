@@ -38,6 +38,19 @@
 
 <!-- Row 2: Engagement metrics -->
 <section class="metric-cards">
+    {# Image-only campaigns (best_variant.media_type == "image") swap
+       Hook/Hold for Frequency/ATC Rate — same card layout, honest
+       metrics for static creatives. #}
+    {% if best_variant and best_variant.media_type == "image" %}
+    <div class="mc">
+        <div class="mc-label">Frequency</div>
+        <div class="mc-value">{{ avg_frequency|onedecimal }}x</div>
+    </div>
+    <div class="mc">
+        <div class="mc-label">ATC Rate</div>
+        <div class="mc-value">{% if total_link_clicks > 0 %}{{ "{:.1%}".format(total_add_to_carts / total_link_clicks) }}{% else %}N/A{% endif %}</div>
+    </div>
+    {% else %}
     <div class="mc">
         <div class="mc-label">Hook Rate</div>
         <div class="mc-value">{{ avg_hook_rate|pct }}</div>
@@ -46,6 +59,7 @@
         <div class="mc-label">Hold Rate</div>
         <div class="mc-value">{{ avg_hold_rate|pct }}</div>
     </div>
+    {% endif %}
     <div class="mc">
         <div class="mc-label">CTR</div>
         <div class="mc-value">{{ avg_ctr|pct }}</div>
@@ -205,8 +219,8 @@
             <tr>
                 <td class="mono">{{ v.variant_code }}</td>
                 <td><span class="status-pill status-{{ v.status }}">{{ v.status }}</span></td>
-                <td>{{ v.hook_rate|pct }}</td>
-                <td>{{ v.hold_rate|pct }}</td>
+                <td>{% if v.media_type == "image" %}&mdash;{% else %}{{ v.hook_rate|pct }}{% endif %}</td>
+                <td>{% if v.media_type == "image" %}&mdash;{% else %}{{ v.hold_rate|pct }}{% endif %}</td>
                 <td>{{ v.ctr|pct }}</td>
                 <td>{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
                 <td>{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
@@ -333,20 +347,29 @@
             <div class="sm-value">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</div>
         </div>
         <div>
+            {% if best_variant and best_variant.media_type == "image" %}
+            <div class="sm-label">CTR</div>
+            <div class="sm-value">{{ avg_ctr|pct }}</div>
+            {% else %}
             <div class="sm-label">Hook Rate</div>
             <div class="sm-value">{{ avg_hook_rate|pct }}</div>
+            {% endif %}
         </div>
     </div>
     {% if variants %}
     <table class="snapshot-table">
         <thead>
+            {% if best_variant and best_variant.media_type == "image" %}
+            <tr><th>Variant</th><th>CTR</th><th>CPA</th><th>ROAS</th><th>Spend</th></tr>
+            {% else %}
             <tr><th>Variant</th><th>Hook</th><th>CPA</th><th>ROAS</th><th>Spend</th></tr>
+            {% endif %}
         </thead>
         <tbody>
             {% for v in variants[:5] %}
             <tr>
                 <td class="mono">{{ v.variant_code }}</td>
-                <td>{{ v.hook_rate|pct }}</td>
+                <td>{% if v.media_type == "image" %}{{ v.ctr|pct }}{% else %}{{ v.hook_rate|pct }}{% endif %}</td>
                 <td>{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
                 <td>{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
                 <td>{{ v.spend|currency }}</td>
@@ -365,7 +388,7 @@
 Spend: {{ total_spend|currency }}
 Purchases: {{ total_purchases|intcomma }}
 ROAS: {% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}
-Hook Rate: {{ avg_hook_rate|pct }}
+{% if best_variant and best_variant.media_type == "image" %}CTR: {{ avg_ctr|pct }}{% else %}Hook Rate: {{ avg_hook_rate|pct }}{% endif %}
 
 Full report: {{ base_url }}/weekly/{{ week_label }}.html</div>
     <button class="copy-btn" onclick="copyTweet()">Copy to clipboard</button>

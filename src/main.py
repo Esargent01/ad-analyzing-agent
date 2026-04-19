@@ -1380,6 +1380,134 @@ def backfill_elements(campaign_id: str) -> None:
     asyncio.run(_run())
 
 
+@cli.command(name="backfill-media-type")
+@click.option("--campaign-id", required=True, type=str, help="Local campaign UUID.")
+def backfill_media_type(campaign_id: str) -> None:
+    """Refresh ``variants.media_type`` from Meta for every variant in a campaign.
+
+    Existing variants imported before ``variants.media_type`` existed
+    sit at ``'unknown'`` — the reporting layer treats that as a safe
+    default (shows the full funnel) so nothing's broken, but the
+    video-only metric rows leak onto image campaigns until we fill the
+    column in.
+
+    This command calls ``MetaAdapter.list_campaign_ads`` once against
+    the campaign's Meta id, pulls ``object_type`` from each creative,
+    and writes the mapped ``media_type`` (video/image/mixed/unknown)
+    onto each matching variant keyed by its deployment's
+    ``platform_ad_id``. Idempotent — re-running is safe and picks up
+    any Meta-side creative type changes.
+
+    Example::
+
+        python -m src.main backfill-media-type --campaign-id <uuid>
+    """
+
+    async def _run() -> None:
+        from sqlalchemy import text as sa_text
+
+        from src.adapters.meta_factory import get_meta_adapter_for_campaign
+        from src.db.engine import close_db, get_session, init_db
+
+        try:
+            campaign_uuid = UUID(campaign_id)
+        except ValueError:
+            click.echo(f"Error: {campaign_id!r} is not a valid UUID.")
+            return
+
+        await init_db()
+        try:
+            async with get_session() as session:
+                campaign_row = await session.execute(
+                    sa_text(
+                        """
+                        SELECT c.id, c.name, c.platform_campaign_id,
+                               c.meta_ad_account_id, c.meta_page_id,
+                               c.landing_page_url, c.owner_user_id
+                        FROM campaigns c
+                        WHERE c.id = :id
+                        """
+                    ),
+                    {"id": str(campaign_uuid)},
+                )
+                campaign = campaign_row.first()
+                if campaign is None:
+                    click.echo(f"Error: campaign {campaign_id} not found.")
+                    return
+                if not campaign.platform_campaign_id:
+                    click.echo(
+                        f"Error: campaign {campaign.name!r} has no "
+                        "platform_campaign_id — not a Meta-imported campaign."
+                    )
+                    return
+
+                adapter = await get_meta_adapter_for_campaign(
+                    session, campaign_uuid
+                )
+                ads = await adapter.list_campaign_ads(
+                    str(campaign.platform_campaign_id)
+                )
+                click.echo(
+                    f"Fetched {len(ads)} ads from Meta for campaign "
+                    f"{campaign.name!r}."
+                )
+
+                # Map platform_ad_id → media_type for quick lookup.
+                by_ad_id: dict[str, str] = {
+                    str(ad.get("ad_id") or ""): str(
+                        ad.get("media_type") or "unknown"
+                    )
+                    for ad in ads
+                }
+
+                # Join variants → deployments → filter by campaign.
+                rows = await session.execute(
+                    sa_text(
+                        """
+                        SELECT v.id, v.variant_code, d.platform_ad_id,
+                               v.media_type
+                        FROM variants v
+                        JOIN deployments d ON d.variant_id = v.id
+                        WHERE v.campaign_id = :id
+                        """
+                    ),
+                    {"id": str(campaign_uuid)},
+                )
+
+                updated = 0
+                skipped = 0
+                for row in rows.fetchall():
+                    variant_id = row[0]
+                    variant_code = row[1]
+                    platform_ad_id = str(row[2]) if row[2] else ""
+                    current = str(row[3] or "unknown")
+                    new_type = by_ad_id.get(platform_ad_id, "unknown")
+                    if new_type == current:
+                        skipped += 1
+                        continue
+                    await session.execute(
+                        sa_text(
+                            "UPDATE variants SET media_type = :mt "
+                            "WHERE id = :vid"
+                        ),
+                        {"mt": new_type, "vid": variant_id},
+                    )
+                    click.echo(
+                        f"  {variant_code}: {current} → {new_type}"
+                    )
+                    updated += 1
+
+                await session.commit()
+                click.echo(
+                    f"Done. Updated {updated}, skipped {skipped} "
+                    "(already correct)."
+                )
+        finally:
+            await close_db()
+
+    asyncio.run(_run())
+
+
 @cli.command()
 @click.option("--campaign-id", required=True, type=str, help="Local campaign UUID.")
 @click.option(

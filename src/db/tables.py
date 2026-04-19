@@ -19,6 +19,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    String,
     Text,
     UniqueConstraint,
 )
@@ -201,6 +202,16 @@ class Variant(Base):
         ARRAY(PG_UUID(as_uuid=True)), server_default="{}"
     )
     hypothesis: Mapped[str | None] = mapped_column(Text)
+    # Creative format, mirrored from Meta's ``AdCreative.object_type`` via
+    # ``src.adapters.meta._map_media_type``. One of "video", "image",
+    # "mixed", or "unknown". Read by the reporting layer to hide
+    # video-only metrics (hook rate, hold rate, 3s/15s views) for image
+    # ads. Default "unknown" renders the full funnel, matching the
+    # pre-column behavior for variants that haven't been re-imported
+    # or backfilled.
+    media_type: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="unknown"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )

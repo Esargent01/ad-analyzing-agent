@@ -13,18 +13,35 @@ from src.models.reports import (
 
 
 def build_funnel(v: VariantReport) -> list[ReportFunnelStage]:
-    """Build funnel stages for a variant."""
+    """Build funnel stages for a variant.
+
+    Image ads (``v.media_type == "image"``) skip the 3s/15s video-view
+    stages since they'd always be zero and misleading. Video, mixed
+    (carousel), and unknown keep the full funnel — unknown is the safe
+    default for variants that predate the ``media_type`` column.
+    """
     stages = []
     prev_count = v.impressions
 
+    is_image_only = v.media_type == "image"
+
     steps = [
         ("Impressions", v.impressions, 100.0, "", "#534AB7"),
-        ("3s views", v.video_views_3s, v.hook_rate_pct, "hook rate", "#7F77DD"),
-        ("15s views", v.video_views_15s, v.hold_rate_pct, "hold rate", "#378ADD"),
-        ("Link clicks", v.link_clicks, v.ctr_pct, "CTR", "#1D9E75"),
-        ("Add to carts", v.add_to_carts, v.atc_rate_pct, "ATC rate", "#639922"),
-        ("Purchases", v.purchases, v.checkout_rate_pct, "checkout rate", "#27500A"),
     ]
+    if not is_image_only:
+        steps.extend(
+            [
+                ("3s views", v.video_views_3s, v.hook_rate_pct, "hook rate", "#7F77DD"),
+                ("15s views", v.video_views_15s, v.hold_rate_pct, "hold rate", "#378ADD"),
+            ]
+        )
+    steps.extend(
+        [
+            ("Link clicks", v.link_clicks, v.ctr_pct, "CTR", "#1D9E75"),
+            ("Add to carts", v.add_to_carts, v.atc_rate_pct, "ATC rate", "#639922"),
+            ("Purchases", v.purchases, v.checkout_rate_pct, "checkout rate", "#27500A"),
+        ]
+    )
 
     for label, count, rate, rate_label, color in steps:
         dropoff = ((prev_count - count) / prev_count * 100) if prev_count > 0 else 0
@@ -44,47 +61,57 @@ def build_funnel(v: VariantReport) -> list[ReportFunnelStage]:
 
 
 def build_diagnostics(v: VariantReport) -> list[Diagnostic]:
-    """Generate diagnostic observations for a variant."""
+    """Generate diagnostic observations for a variant.
+
+    Hook rate and hold rate diagnostics are skipped for image ads — they
+    measure video-watching behavior that doesn't exist for static
+    creatives, and the "below 25% floor" template would read as
+    nonsensical commentary on a still image. Video / mixed / unknown
+    media types keep the full diagnostic set.
+    """
     diags: list[Diagnostic] = []
 
-    # Hook rate
-    if v.hook_rate_pct >= 30:
-        diags.append(
-            Diagnostic(
-                text=f"Hook rate {v.hook_rate_pct:.0f}% — strong opener, above 30% benchmark",
-                severity="good",
+    # Hook and hold rates only apply to video-ish creatives. Skip the
+    # entire block for image-only ads; video/mixed/unknown run it.
+    if v.media_type != "image":
+        # Hook rate
+        if v.hook_rate_pct >= 30:
+            diags.append(
+                Diagnostic(
+                    text=f"Hook rate {v.hook_rate_pct:.0f}% — strong opener, above 30% benchmark",
+                    severity="good",
+                )
             )
-        )
-    elif v.hook_rate_pct >= 25:
-        diags.append(
-            Diagnostic(
-                text=f"Hook rate {v.hook_rate_pct:.0f}% — acceptable but below 30% target",
-                severity="warning",
+        elif v.hook_rate_pct >= 25:
+            diags.append(
+                Diagnostic(
+                    text=f"Hook rate {v.hook_rate_pct:.0f}% — acceptable but below 30% target",
+                    severity="warning",
+                )
             )
-        )
-    else:
-        diags.append(
-            Diagnostic(
-                text=f"Hook rate {v.hook_rate_pct:.0f}% — below 25% floor, creative isn't stopping the scroll",
-                severity="bad",
+        else:
+            diags.append(
+                Diagnostic(
+                    text=f"Hook rate {v.hook_rate_pct:.0f}% — below 25% floor, creative isn't stopping the scroll",
+                    severity="bad",
+                )
             )
-        )
 
-    # Hold rate
-    if v.hold_rate_pct >= 25:
-        diags.append(
-            Diagnostic(
-                text=f"Hold rate {v.hold_rate_pct:.0f}% — narrative keeps viewers engaged past 15 seconds",
-                severity="good",
+        # Hold rate
+        if v.hold_rate_pct >= 25:
+            diags.append(
+                Diagnostic(
+                    text=f"Hold rate {v.hold_rate_pct:.0f}% — narrative keeps viewers engaged past 15 seconds",
+                    severity="good",
+                )
             )
-        )
-    else:
-        diags.append(
-            Diagnostic(
-                text=f"Hold rate {v.hold_rate_pct:.0f}% — viewers lose interest after the hook. Mid-video content needs work.",
-                severity="warning" if v.hold_rate_pct >= 15 else "bad",
+        else:
+            diags.append(
+                Diagnostic(
+                    text=f"Hold rate {v.hold_rate_pct:.0f}% — viewers lose interest after the hook. Mid-video content needs work.",
+                    severity="warning" if v.hold_rate_pct >= 15 else "bad",
+                )
             )
-        )
 
     # ATC rate
     if v.atc_rate_pct >= 5:
@@ -138,16 +165,23 @@ def build_diagnostics(v: VariantReport) -> list[Diagnostic]:
 
 
 def build_projection(v: VariantReport) -> str | None:
-    """Generate improvement projection based on weakest funnel stage."""
+    """Generate improvement projection based on weakest funnel stage.
+
+    Image-only ads drop the hook/hold stages from consideration —
+    they'd always be zero and falsely rank as the "weakest stage",
+    suppressing otherwise-valid projections from ATC rate or
+    checkout rate.
+    """
     if v.purchases == 0 or v.cost_per_purchase is None:
         return None
 
     stages = {
         "checkout_rate_pct": (v.checkout_rate_pct, 30.0, "checkout rate"),
         "atc_rate_pct": (v.atc_rate_pct, 10.0, "ATC rate"),
-        "hook_rate_pct": (v.hook_rate_pct, 30.0, "hook rate"),
-        "hold_rate_pct": (v.hold_rate_pct, 25.0, "hold rate"),
     }
+    if v.media_type != "image":
+        stages["hook_rate_pct"] = (v.hook_rate_pct, 30.0, "hook rate")
+        stages["hold_rate_pct"] = (v.hold_rate_pct, 25.0, "hold rate")
 
     weakest = None
     worst_gap = 0.0

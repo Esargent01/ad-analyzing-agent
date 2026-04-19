@@ -72,33 +72,74 @@ export function BestVariantSpotlight({
           label="Purchases"
           value={formatIntComma(variant.purchases)}
         />
-        <Tile
-          label="Hook rate"
-          value={
-            variant.hook_rate_pct != null
-              ? `${variant.hook_rate_pct.toFixed(1)}%`
-              : "N/A"
-          }
-          benchmark="benchmark 30%"
-        />
-        <Tile
-          label="Hold rate"
-          value={
-            variant.hold_rate_pct != null
-              ? `${variant.hold_rate_pct.toFixed(1)}%`
-              : "N/A"
-          }
-          benchmark="benchmark 25%"
-        />
-        <Tile
-          label="CTR"
-          value={
-            variant.ctr_pct != null
-              ? `${variant.ctr_pct.toFixed(1)}%`
-              : "N/A"
-          }
-          benchmark="benchmark 1.5%"
-        />
+        {/*
+          Image ads swap Hook/Hold for ATC/Checkout rate — the video-
+          specific tiles measure watch behavior that doesn't exist on a
+          static creative, so the "benchmark 30%" comparison would read
+          as nonsense. Video, mixed, and unknown media types keep the
+          original Hook/Hold/CTR trio.
+        */}
+        {variant.media_type === "image" ? (
+          <>
+            <Tile
+              label="CTR"
+              value={
+                variant.ctr_pct != null
+                  ? `${variant.ctr_pct.toFixed(1)}%`
+                  : "N/A"
+              }
+              benchmark="benchmark 1.5%"
+            />
+            <Tile
+              label="ATC rate"
+              value={
+                variant.atc_rate_pct != null
+                  ? `${variant.atc_rate_pct.toFixed(1)}%`
+                  : "N/A"
+              }
+              benchmark="benchmark 5-10%"
+            />
+            <Tile
+              label="Checkout rate"
+              value={
+                variant.checkout_rate_pct != null
+                  ? `${variant.checkout_rate_pct.toFixed(1)}%`
+                  : "N/A"
+              }
+              benchmark="benchmark 30%"
+            />
+          </>
+        ) : (
+          <>
+            <Tile
+              label="Hook rate"
+              value={
+                variant.hook_rate_pct != null
+                  ? `${variant.hook_rate_pct.toFixed(1)}%`
+                  : "N/A"
+              }
+              benchmark="benchmark 30%"
+            />
+            <Tile
+              label="Hold rate"
+              value={
+                variant.hold_rate_pct != null
+                  ? `${variant.hold_rate_pct.toFixed(1)}%`
+                  : "N/A"
+              }
+              benchmark="benchmark 25%"
+            />
+            <Tile
+              label="CTR"
+              value={
+                variant.ctr_pct != null
+                  ? `${variant.ctr_pct.toFixed(1)}%`
+                  : "N/A"
+              }
+              benchmark="benchmark 1.5%"
+            />
+          </>
+        )}
       </div>
 
       {/* Funnel */}
