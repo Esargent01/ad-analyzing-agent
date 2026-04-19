@@ -233,6 +233,14 @@ class TestTwoUserTenancyIsolation:
         session_a, added_a = _make_session()
         session_b, added_b = _make_session()
 
+        # ``_make_session`` builds a barebones AsyncMock session that
+        # only supports iteration on its .execute result. Since
+        # commit 46d2802, ``import_campaign`` also calls
+        # ``grant_user_campaign_access`` — which calls ``.scalar_one()``
+        # on its query result, blowing up the mock. Stub the grant
+        # helper directly; the real permission-grant is covered in
+        # ``test_campaign_import.py`` and doesn't belong in this
+        # cross-tenant isolation test.
         with (
             patch("src.services.campaign_import.get_settings", return_value=settings),
             patch(
@@ -250,6 +258,10 @@ class TestTwoUserTenancyIsolation:
             patch(
                 "src.services.campaign_import._build_user_adapter",
                 new=AsyncMock(return_value=adapter_a),
+            ),
+            patch(
+                "src.services.campaign_import.grant_user_campaign_access",
+                new=AsyncMock(),
             ),
         ):
             await import_campaign(
@@ -278,6 +290,10 @@ class TestTwoUserTenancyIsolation:
             patch(
                 "src.services.campaign_import._build_user_adapter",
                 new=AsyncMock(return_value=adapter_b),
+            ),
+            patch(
+                "src.services.campaign_import.grant_user_campaign_access",
+                new=AsyncMock(),
             ),
         ):
             await import_campaign(
