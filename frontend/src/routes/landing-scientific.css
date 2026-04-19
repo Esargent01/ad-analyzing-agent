@@ -5,9 +5,9 @@
  * dashboard, which runs its own palette + typography.
  *
  * Palette: warm neutrals + terracotta accent + stats-green +
- * stats-red. Editorial-leaning type pairing: Geist sans for UI and
- * headlines, Instrument Serif (italic) for emphasis accents, Geist
- * Mono for stats/code/metadata.
+ * stats-red. Editorial-leaning type pairing: Geist sans throughout
+ * (including accent spans, which lean on color + a soft underline
+ * rather than italic contrast), Geist Mono for stats/code/metadata.
  */
 
 .kleiber-b-landing {
@@ -35,7 +35,6 @@
 
   /* Type */
   --b-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --b-serif: 'Instrument Serif', 'Times New Roman', Georgia, serif;
   --b-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
 
   /* Shadows — warm-tinted */
@@ -89,13 +88,6 @@ html:has(.kleiber-b-landing) {
 }
 
 /* Type utilities */
-.kleiber-b-landing .b-serif {
-  font-family: var(--b-serif);
-  font-style: italic;
-  font-weight: 400;
-  letter-spacing: -0.01em;
-}
-
 .kleiber-b-landing .b-mono {
   font-family: var(--b-mono);
 }
@@ -108,35 +100,66 @@ html:has(.kleiber-b-landing) {
   color: var(--b-muted);
 }
 
-.kleiber-b-landing .b-h-display {
-  font-size: clamp(44px, 6.2vw, 84px);
-  line-height: 0.98;
+/*
+ * Lowercase editorial treatment for display + section headings.
+ * Applies to raw h1 / h2 tags and to the ``.b-h-display`` /
+ * ``.b-h-section`` utility classes, so headings look consistent
+ * whether they're authored as semantic tags or as styled divs.
+ * ``.b-h-display`` and ``.b-h-section`` keep their own font-size /
+ * line-height / color declarations below; this block only owns the
+ * shared lowercase + weight + tracking treatment.
+ */
+.kleiber-b-landing h1,
+.kleiber-b-landing h2,
+.kleiber-b-landing .b-h-display,
+.kleiber-b-landing .b-h-section {
+  text-transform: lowercase;
+  font-weight: 400;
   letter-spacing: -0.035em;
-  font-weight: 500;
-  color: var(--b-ink);
-  margin: 0;
 }
 
-.kleiber-b-landing .b-h-display .b-serif {
-  font-weight: 400;
-  letter-spacing: -0.02em;
+.kleiber-b-landing .b-h-display {
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 1.02;
+  color: var(--b-ink);
+  margin: 0;
 }
 
 .kleiber-b-landing .b-h-section {
   font-size: clamp(32px, 4.2vw, 56px);
   line-height: 1.02;
-  letter-spacing: -0.03em;
-  font-weight: 500;
   margin: 0;
 }
 
 .kleiber-b-landing .b-h-sub {
-  font-size: clamp(18px, 1.6vw, 22px);
-  line-height: 1.4;
+  font-size: clamp(15px, 1.25vw, 18px);
+  line-height: 1.45;
   letter-spacing: -0.01em;
   color: var(--b-muted);
   font-weight: 400;
   margin: 0;
+}
+
+/*
+ * Accent spans inside headings. ``.b-serif`` is the legacy name —
+ * kept for markup compatibility, but the treatment is now sans
+ * (inherits from the heading), colored + underlined in the accent
+ * token. The soft-accent underline gives a lightweight editorial
+ * flourish without the italic-serif contrast the name implies.
+ *
+ * Letter-spacing inherits so nested accent words track identically
+ * to the heading they sit inside.
+ */
+.kleiber-b-landing .b-serif {
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: inherit;
+  color: var(--b-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--b-accent-soft);
+  text-underline-offset: 0.18em;
 }
 
 /* Buttons */
@@ -264,13 +287,180 @@ html:has(.kleiber-b-landing) {
   box-shadow: 0 0 0 3px oklch(22% 0.02 60 / 0.06);
 }
 
-/* Mobile: collapse every 2+ column grid to a single column */
+/* ----------------------------------------------------------------
+ * Shared CTA row — hero + final CTA use the same pattern.
+ * Declared here so the small-phone breakpoint has one place to
+ * override it (stacked full-width buttons on phones).
+ * ---------------------------------------------------------------- */
+.kleiber-b-landing .b-cta-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 32px;
+  flex-wrap: wrap;
+}
+
+/* Variant leaderboard rows come in two flavors — a desktop 6-column
+   grid (``.b-variant-row``) and a mobile stacked card
+   (``.b-variant-card-mobile``). Default: desktop visible, mobile
+   hidden. The ``max-width: 900px`` block inverts these. */
+.kleiber-b-landing .b-variant-card-mobile {
+  display: none;
+}
+
+/* Final CTA heading — mirrors the display/section lowercase
+   treatment. Kept here rather than inline so the mobile pass can
+   override the clamp range cleanly. */
+.kleiber-b-landing .b-final-heading {
+  text-transform: lowercase;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  font-size: clamp(36px, 6vw, 72px);
+  line-height: 1.02;
+  text-wrap: balance;
+  margin: 0;
+}
+
+/* ================================================================
+ * MOBILE LAYOUT — max-width: 900px
+ *
+ * The desktop layout is spacious on purpose; phones need the
+ * opposite. This block:
+ *   - tightens wrap padding
+ *   - collapses every [data-b-grid] container to one column
+ *   - compresses vertical section rhythm (~50% of desktop)
+ *   - hides the dashboard mock's sidebar and lets the main panel
+ *     flood the width
+ *   - keeps the variant leaderboard legible via horizontal scroll
+ *     rather than cramming 6 columns into 300px
+ *   - stacks the week-in-review rows
+ *   - unsticks the safety-section heading
+ *
+ * Most inline styles in landing-scientific.tsx set values that are
+ * correct for desktop; !important here overrides them only at the
+ * mobile breakpoint. Scope is narrow on purpose — every rule is
+ * namespaced under .kleiber-b-landing.
+ * ================================================================ */
 @media (max-width: 900px) {
   .kleiber-b-landing .b-wrap,
   .kleiber-b-landing .b-wrap-narrow {
     padding: 0 20px;
   }
+
+  /* Every [data-b-grid] drops to a single column. */
   .kleiber-b-landing [data-b-grid] {
     grid-template-columns: 1fr !important;
+  }
+
+  /* Compress vertical section rhythm across the page. The inline
+     paddings on <section> tags need !important to back off. */
+  .kleiber-b-landing section {
+    padding-top: 64px !important;
+    padding-bottom: 48px !important;
+  }
+  .kleiber-b-landing #top {
+    padding-top: 28px !important;
+    padding-bottom: 40px !important;
+  }
+  .kleiber-b-landing #signup {
+    padding-top: 72px !important;
+    padding-bottom: 32px !important;
+  }
+
+  /* Hero product-shot wrapper — shrink the margin-top that sits
+     between the CTA buttons and the dashboard. */
+  .kleiber-b-landing .b-hero-mock {
+    margin-top: 32px !important;
+  }
+
+  /* Feature reel — collapse gap + inter-item margin. */
+  .kleiber-b-landing .b-feature-row {
+    gap: 32px !important;
+    margin-bottom: 64px !important;
+  }
+  .kleiber-b-landing .b-feature-row:last-child {
+    margin-bottom: 0 !important;
+  }
+
+  /* Stats dark section — desktop gap of 80px is way too much
+     vertically once collapsed. */
+  .kleiber-b-landing .b-stats-grid {
+    gap: 40px !important;
+  }
+
+  /* Safety: sticky positioning is pointless on a single-column
+     stack — un-stick and let it scroll naturally. */
+  .kleiber-b-landing .b-safety-sticky {
+    position: static !important;
+    top: auto !important;
+  }
+
+  /* 4-up stat row (ROAS / CPA / CTR / SPEND) — 4-col → 2×2. */
+  .kleiber-b-landing .b-stat-row {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  /* Dashboard mock — hide the 220px sidebar, let main go full
+     width, drop the fixed min-height so the box shrinks cleanly. */
+  .kleiber-b-landing .b-dash-sidebar {
+    display: none;
+  }
+  .kleiber-b-landing .b-dash-grid {
+    grid-template-columns: 1fr !important;
+    min-height: 0 !important;
+  }
+
+  /* Variant leaderboard — the 6-column desktop grid can't fit on a
+     phone without horizontal scroll (which visually reads as "cut
+     off"). Swap to the stacked-card layout rendered by
+     ``VariantCardMobile``: hide the header + desktop rows, show the
+     mobile cards. Both layouts are always in the DOM so React
+     doesn't have to mount/unmount on resize. */
+  .kleiber-b-landing .b-variant-header,
+  .kleiber-b-landing .b-variant-row {
+    display: none !important;
+  }
+  .kleiber-b-landing .b-variant-card-mobile {
+    display: block;
+  }
+
+  /* Week-in-review rows — 3-column desktop layout collapses to a
+     single-column stack with day label on top, action in the
+     middle, delta on the bottom. */
+  .kleiber-b-landing .b-week-row {
+    grid-template-columns: 1fr !important;
+    align-items: start !important;
+    gap: 4px;
+    padding: 14px 18px !important;
+  }
+  .kleiber-b-landing .b-week-row > :last-child {
+    text-align: left !important;
+  }
+}
+
+/* ================================================================
+ * SMALL PHONES — max-width: 640px
+ *
+ * Narrower than "tablet/phone-in-landscape" — this is the 320–430px
+ * portrait-phone band. Two changes:
+ *   - hide the anchor links in the sticky nav (leave only the
+ *     wordmark + "Request access" CTA). The anchors are still
+ *     reachable via scroll, and hiding them keeps the nav from
+ *     overflowing on a 375px viewport.
+ *   - stack the hero CTA buttons full-width instead of side-by-side.
+ * ================================================================ */
+@media (max-width: 640px) {
+  .kleiber-b-landing .b-nav-anchors {
+    display: none !important;
+  }
+
+  .kleiber-b-landing .b-cta-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .kleiber-b-landing .b-cta-row .b-btn {
+    width: 100%;
+    justify-content: center;
   }
 }

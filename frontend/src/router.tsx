@@ -27,10 +27,12 @@ export const router = createBrowserRouter([
     element: <LandingRoute />,
   },
   {
-    // A/B-test variant landing page — "scientific" voice.
-    // Paid ads can point traffic here while ``/`` serves the original.
-    // Same beta-signup endpoint; distinct PostHog URL dimension.
-    path: "/b",
+    // A/B-test variant landing page — "scientific" voice, served at
+    // ``/beta`` so paid-ad destinations read naturally in the ad's
+    // display URL. ``/`` still serves the original landing. Both
+    // variants post to ``/api/beta-signup``; PostHog distinguishes
+    // them by URL path.
+    path: "/beta",
     element: <LandingScientificRoute />,
   },
   {

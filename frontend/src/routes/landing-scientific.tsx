@@ -1,5 +1,5 @@
 /**
- * A/B-test landing page variant, served at ``/b``.
+ * A/B-test landing page variant, served at ``/beta``.
  *
  * Ported from a Claude Design drop ("Kleiber Site.html") — warm
  * editorial palette with Geist + Instrument Serif italic accents, a
@@ -108,29 +108,18 @@ function Nav() {
           height: 68,
         }}
       >
-        <a
-          href="#top"
-          style={{ display: "flex", alignItems: "center", gap: 9 }}
-        >
-          <KleiberMark size={22} />
-          <span
-            style={{
-              fontSize: 18,
-              letterSpacing: "-0.02em",
-              fontWeight: 500,
-              color: "var(--b-ink)",
-            }}
-          >
-            Kleiber
-          </span>
+        <a href="#top" style={{ display: "flex", alignItems: "center" }}>
+          <Wordmark />
         </a>
         <div
           style={{ display: "flex", alignItems: "center", gap: 24 }}
           className="b-nav-links"
         >
-          <NavAnchor href="#how-it-works">How it works</NavAnchor>
-          <NavAnchor href="#safety">Safety</NavAnchor>
-          <NavAnchor href="#pricing">Pricing</NavAnchor>
+          <div className="b-nav-anchors" style={{ display: "contents" }}>
+            <NavAnchor href="#how-it-works">How it works</NavAnchor>
+            <NavAnchor href="#safety">Safety</NavAnchor>
+            <NavAnchor href="#pricing">Pricing</NavAnchor>
+          </div>
           <a
             href="#signup"
             className="b-btn b-btn-primary b-btn-sm"
@@ -173,25 +162,27 @@ function NavAnchor({ href, children }: { href: string; children: string }) {
 }
 
 /* ---------------------------------------------------------------- */
-/* Logo mark                                                         */
+/* Wordmark                                                          */
+/*                                                                   */
+/* Matches the brand used on ``/`` and ``/product`` — the wordmark   */
+/* IS the logo; no separate icon glyph. DM Serif Display is already  */
+/* loaded by ``index.html`` for the existing landing.                */
 /* ---------------------------------------------------------------- */
 
-function KleiberMark({ size = 24 }: { size?: number }) {
+function Wordmark({ size = 22 }: { size?: number }) {
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 32 32"
-      fill="none"
+    <span
+      style={{
+        fontFamily: "'DM Serif Display', serif",
+        fontSize: size,
+        letterSpacing: "-0.01em",
+        color: "var(--b-ink)",
+        lineHeight: 1,
+      }}
       aria-label="Kleiber"
     >
-      <rect x="4" y="4" width="3" height="24" rx="1.5" fill="currentColor" />
-      <path
-        d="M7 16 L22 6 L22 9 L11 16 L22 23 L22 26 Z"
-        fill="currentColor"
-      />
-      <circle cx="26" cy="8" r="2" fill="currentColor" opacity="0.45" />
-    </svg>
+      Kleiber
+    </span>
   );
 }
 
@@ -263,19 +254,12 @@ function Hero() {
             textWrap: "pretty",
           }}
         >
-          Kleiber watches what you&apos;re already running, uses real
-          statistics to decide what&apos;s winning, and remixes the winning
-          elements into new variants — every night at 6 AM.
+          Every morning, a short email from Kleiber shows you what won,
+          what got paused, and what new variants it&apos;s proposing next.
+          You decide which moves run on their own and which wait for your
+          one-click approval.
         </p>
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            justifyContent: "center",
-            marginTop: 32,
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="b-cta-row">
           <a
             href="#signup"
             className="b-btn b-btn-primary b-btn-lg"
@@ -301,7 +285,7 @@ function Hero() {
 
       {/* Big product shot */}
       <div
-        className="b-wrap"
+        className="b-wrap b-hero-mock"
         style={{ marginTop: 56, position: "relative" }}
       >
         <DashboardMock />
@@ -430,9 +414,10 @@ function AppWindow({
 
 function DashboardMock() {
   return (
-    <AppWindow title="app.kleiber.ai / campaigns / summer-sale">
+    <AppWindow title="">
       <div
         data-b-grid
+        className="b-dash-grid"
         style={{
           display: "grid",
           gridTemplateColumns: "220px 1fr",
@@ -449,6 +434,7 @@ function DashboardMock() {
 function DashboardSidebar() {
   return (
     <div
+      className="b-dash-sidebar"
       style={{
         background: "var(--b-paper-2)",
         borderRight: "1px solid var(--b-border)",
@@ -464,9 +450,16 @@ function DashboardSidebar() {
           padding: "6px 8px",
         }}
       >
-        <KleiberMark size={18} />
-        <span style={{ fontWeight: 500, letterSpacing: "-0.01em" }}>
-          Acme Co.
+        <Wordmark size={15} />
+        <span
+          style={{
+            fontWeight: 500,
+            letterSpacing: "-0.01em",
+            color: "var(--b-muted)",
+            fontSize: 13,
+          }}
+        >
+          · Acme Co.
         </span>
       </div>
       <div style={{ height: 14 }} />
@@ -530,7 +523,7 @@ function DashboardSidebar() {
               NEXT CYCLE
             </span>
           </div>
-          <div style={{ fontWeight: 500 }}>Tomorrow, 6:00 AM CT</div>
+          <div style={{ fontWeight: 500 }}>Tomorrow morning</div>
         </div>
       </div>
     </div>
@@ -626,7 +619,7 @@ function DashboardMain() {
       </div>
 
       <div
-        data-b-grid
+        className="b-stat-row"
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(4, 1fr)",
@@ -641,6 +634,7 @@ function DashboardMain() {
       </div>
 
       <div
+        className="b-variant-table"
         style={{
           border: "1px solid var(--b-border)",
           borderRadius: 12,
@@ -648,6 +642,7 @@ function DashboardMain() {
         }}
       >
         <div
+          className="b-variant-header"
           style={{
             display: "grid",
             gridTemplateColumns: "40px 1.6fr 1fr 1fr 90px 70px",
@@ -663,12 +658,15 @@ function DashboardMain() {
           <span />
           <span>VARIANT · GENOME</span>
           <span>ROAS</span>
-          <span>Z-SCORE</span>
+          <span>CONFIDENCE</span>
           <span>STATUS</span>
           <span style={{ textAlign: "right" }}>BUDGET</span>
         </div>
         {VARIANTS.map((v, i) => (
           <VariantRow key={v.name} v={v} i={i} />
+        ))}
+        {VARIANTS.map((v, i) => (
+          <VariantCardMobile key={`m-${v.name}`} v={v} i={i} />
         ))}
       </div>
     </div>
@@ -732,6 +730,7 @@ function Stat({
 function VariantRow({ v, i }: { v: (typeof VARIANTS)[number]; i: number }) {
   return (
     <div
+      className="b-variant-row"
       style={{
         display: "grid",
         gridTemplateColumns: "40px 1.6fr 1fr 1fr 90px 70px",
@@ -842,6 +841,163 @@ function VariantRow({ v, i }: { v: (typeof VARIANTS)[number]; i: number }) {
   );
 }
 
+/**
+ * Mobile-native variant row, rendered as a card.
+ *
+ * The desktop ``VariantRow`` is a 6-column grid that relies on
+ * ~520px of horizontal room — on a 375px viewport it either clips
+ * or needs horizontal scroll, which makes the hero product-shot
+ * feel broken. This component renders the same data as a stacked
+ * card that fits the viewport cleanly.
+ *
+ * Display switching happens in CSS: ``.b-variant-row`` is hidden at
+ * <900px, ``.b-variant-card-mobile`` is hidden at ≥900px. Both row
+ * components are rendered on every screen so React never has to
+ * unmount one to mount the other during a resize.
+ */
+function VariantCardMobile({
+  v,
+  i,
+}: {
+  v: (typeof VARIANTS)[number];
+  i: number;
+}) {
+  const zColor =
+    v.sig === "win"
+      ? "oklch(40% 0.14 145)"
+      : v.sig === "lose"
+        ? "oklch(45% 0.16 28)"
+        : "var(--b-muted)";
+  return (
+    <div
+      className="b-variant-card-mobile"
+      style={{
+        padding: "14px 16px",
+        borderBottom:
+          i < VARIANTS.length - 1 ? "1px solid var(--b-border-soft)" : "none",
+        background:
+          v.sig === "win" && i === 0 ? "oklch(98% 0.02 145 / 0.5)" : "white",
+      }}
+    >
+      {/* Top row: rank + name + status pill */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 8,
+          marginBottom: 8,
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <span
+            style={{
+              fontFamily: "var(--b-mono)",
+              fontSize: 11,
+              color: "var(--b-muted)",
+            }}
+          >
+            #{i + 1}
+          </span>
+          <span
+            style={{
+              fontFamily: "var(--b-mono)",
+              fontSize: 12,
+              fontWeight: 500,
+            }}
+          >
+            {v.name}
+          </span>
+        </div>
+        {v.sig === "win" && (
+          <span className="b-chip b-chip-win" style={{ fontSize: 10 }}>
+            WINNING
+          </span>
+        )}
+        {v.sig === "lose" && (
+          <span className="b-chip b-chip-lose" style={{ fontSize: 10 }}>
+            PAUSED
+          </span>
+        )}
+        {v.sig === "flat" && (
+          <span className="b-chip b-mono" style={{ fontSize: 10 }}>
+            FLAT
+          </span>
+        )}
+      </div>
+
+      {/* Genome chips — full-width row */}
+      <div
+        style={{
+          display: "flex",
+          gap: 3,
+          flexWrap: "wrap",
+          marginBottom: 10,
+        }}
+      >
+        {v.genome.map((g) => (
+          <span
+            key={g}
+            style={{
+              fontSize: 10.5,
+              padding: "1.5px 6px",
+              background: "var(--b-paper-2)",
+              borderRadius: 4,
+              fontFamily: "var(--b-mono)",
+              color: "var(--b-ink-2)",
+              border: "1px solid var(--b-border-soft)",
+            }}
+          >
+            {g}
+          </span>
+        ))}
+      </div>
+
+      {/* Stats row: ROAS · confidence · budget */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          fontFamily: "var(--b-mono)",
+          fontSize: 11,
+          color: "var(--b-muted)",
+        }}
+      >
+        <span>
+          ROAS{" "}
+          <span
+            style={{
+              color: "var(--b-ink)",
+              fontSize: 12,
+              fontWeight: 500,
+            }}
+          >
+            {v.roas}
+          </span>
+        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          <ZBar z={v.z} sig={v.sig} />
+          <span style={{ color: zColor, fontSize: 11 }}>{v.z}</span>
+        </div>
+        <span>
+          <span
+            style={{
+              color: "var(--b-ink)",
+              fontSize: 12,
+              fontWeight: 500,
+            }}
+          >
+            {v.pct}%
+          </span>{" "}
+          budget
+        </span>
+      </div>
+    </div>
+  );
+}
+
 function ZBar({ z, sig }: { z: string; sig: "win" | "lose" | "flat" }) {
   const val = parseFloat(z);
   const mag = Math.min(Math.abs(val) / 4, 1);
@@ -894,8 +1050,7 @@ function ZBar({ z, sig }: { z: string; sig: "win" | "lose" | "flat" }) {
 function TrustStrip() {
   const items = [
     { t: "Meta Marketing API", s: "OAuth · read + write" },
-    { t: "scipy", s: "z-tests, not LLMs" },
-    { t: "Claude", s: "variant generation" },
+    { t: "scipy", s: "statistical tests" },
     { t: "PostgreSQL · TSDB", s: "time-series metrics" },
     { t: "Fernet", s: "encrypted tokens" },
   ];
@@ -953,30 +1108,28 @@ function TrustStrip() {
 function ProblemSection() {
   const items = [
     {
-      t: "You run 3 ads. Which one is actually winning?",
-      d: "Not which one has more sales — which one is winning by a margin the data can defend. Gut calls waste budget.",
+      t: "It's a lot to keep up with.",
+      d: "A handful of ads means checking metrics, comparing variants, and deciding what to pause or push — every day. The work adds up fast, and the dashboard never really closes.",
     },
     {
-      t: "You find a winner. Now what?",
-      d: "You need new variants that build on it — but most new creative is random, unattributable, and disconnected from what worked.",
+      t: "Good calls need real data.",
+      d: "A new ad that hasn't popped yet might be a dud — or might just need more runway. Without a real statistical test in the mix, it's easy to pause too early and kill a variant that would have worked.",
     },
     {
-      t: "You blink. The winner is fatigued.",
-      d: "Performance decays. By the time you notice, you've burned two weeks of spend on a variant that stopped working last Tuesday.",
+      t: "Winners are hard to time.",
+      d: "A single strong day tempts you to scale up. But one day isn't a trend, and scaling on noise costs more than it gains. Waiting for the data to be sure takes patience you don't always have.",
     },
   ];
   return (
     <section id="problem" style={{ padding: "120px 0 80px" }}>
       <div className="b-wrap">
-        <div className="b-eyebrow">THE PROBLEM</div>
+        <div className="b-eyebrow">THE HARD PART</div>
         <h2
           className="b-h-section"
           style={{ maxWidth: 880, marginTop: 12, textWrap: "balance" }}
         >
-          Great ads aren&apos;t found by staring at dashboards.{" "}
-          <span className="b-serif" style={{ color: "var(--b-muted)" }}>
-            They&apos;re found by testing every night for months.
-          </span>
+          Consistent testing finds great ads.{" "}
+          <span className="b-serif">Kleiber makes it easy.</span>
         </h2>
         <div
           data-b-grid
@@ -1022,6 +1175,23 @@ function ProblemSection() {
             </div>
           ))}
         </div>
+        <p
+          style={{
+            maxWidth: 680,
+            margin: "56px auto 0",
+            fontSize: 17,
+            lineHeight: 1.55,
+            color: "var(--b-ink-2)",
+            textAlign: "center",
+            textWrap: "pretty",
+          }}
+        >
+          Kleiber does the watching, the tallying, and the waiting for
+          you. It runs a real statistical test on every variant each
+          night and only acts when the data is there to back it up. You
+          wake up to a short email with what happened and what&apos;s
+          proposed next.
+        </p>
       </div>
     </section>
   );
@@ -1037,14 +1207,15 @@ function FeatureReel() {
       eyebrow: "THE DAILY CYCLE",
       title: (
         <>
-          Six steps, <span className="b-serif">every night at 6 AM</span>
+          Six steps, <span className="b-serif">ready with your coffee</span>
         </>
       ),
       body: (
         <>
-          Poll → Analyze → Act → Generate → Deploy → Report. No buttons to
-          push, no dashboards to babysit. By the time you&apos;re drinking
-          coffee, decisions are made and variants are live.
+          Poll → Analyze → Act → Generate → Deploy → Report. Finished
+          before you&apos;re at your desk. Your morning email has what
+          Kleiber did on its own, what it&apos;s proposing next, and
+          anything waiting on your sign-off.
         </>
       ),
       mock: <CycleDiagramMock />,
@@ -1095,6 +1266,7 @@ function FeatureReel() {
           <div
             key={i}
             data-b-grid
+            className="b-feature-row"
             style={{
               display: "grid",
               gridTemplateColumns: "1fr 1.3fr",
@@ -1135,15 +1307,15 @@ function FeatureReel() {
 
 function CycleDiagramMock() {
   const steps = [
-    { k: "poll", t: "Poll", d: "Meta API → yesterday" },
-    { k: "analyze", t: "Analyze", d: "2-proportion z-test" },
-    { k: "act", t: "Act", d: "Pause + scale (Thompson)" },
-    { k: "generate", t: "Generate", d: "Claude → 1–3 variants" },
-    { k: "deploy", t: "Deploy", d: "Push to Ads Manager" },
-    { k: "report", t: "Report", d: "Daily email digest" },
+    { k: "poll", t: "Poll", d: "Pull yesterday's numbers from Meta" },
+    { k: "analyze", t: "Analyze", d: "Run the statistical tests" },
+    { k: "act", t: "Act", d: "Pause losers, scale winners" },
+    { k: "generate", t: "Generate", d: "Draft 1–3 new variants to try" },
+    { k: "deploy", t: "Deploy", d: "Push them live in Ads Manager" },
+    { k: "report", t: "Report", d: "Email you a summary" },
   ];
   return (
-    <AppWindow title="daily cycle · 06:00 CT">
+    <AppWindow title="daily cycle">
       <div style={{ padding: 28 }}>
         <div
           style={{
@@ -1153,7 +1325,7 @@ function CycleDiagramMock() {
             letterSpacing: "0.1em",
           }}
         >
-          CRON · EVERY DAY · 06:00 CT
+          RUNS DAILY · AUTOMATIC
         </div>
         <div
           style={{
@@ -1335,14 +1507,13 @@ function EmailReportMock() {
           style={{ fontSize: 14, lineHeight: 1.6, color: "var(--b-ink-2)" }}
         >
           <p style={{ margin: 0 }}>
-            Good morning. Overnight, summer-sale added <b>$28 in spend</b> and
-            pulled a 3.42× ROAS — up from 2.81× last week.
+            Good morning. Since yesterday, summer-sale added <b>$28 in
+            spend</b> and pulled a 3.42× ROAS — up from 2.81× last week.
           </p>
           <p>
-            V-0041 (&quot;AI-Powered Ad Care&quot; × IMG_673) is now
-            significantly winning (
-            <span className="b-mono">z=+3.42</span>, p&lt;0.001) and scaled to
-            38% of daily budget.
+            V-0041 (&quot;AI-Powered Ad Care&quot; with the hero image) is
+            now clearly winning. Kleiber recommends scaling its budget
+            from 20% → 38%.
           </p>
           <div
             style={{
@@ -1353,11 +1524,17 @@ function EmailReportMock() {
             }}
           >
             <div className="b-eyebrow" style={{ marginBottom: 8 }}>
-              Proposed new variants · awaiting approval
+              Waiting on your approval
             </div>
             <div
               style={{ display: "flex", flexDirection: "column", gap: 6 }}
             >
+              <span
+                className="b-chip b-mono"
+                style={{ fontSize: 11, alignSelf: "flex-start" }}
+              >
+                Scale V-0041 · 20% → 38% of budget
+              </span>
               <span
                 className="b-chip b-mono"
                 style={{ fontSize: 11, alignSelf: "flex-start" }}
@@ -1396,6 +1573,7 @@ function StatsLanguageSection() {
       <div className="b-wrap">
         <div
           data-b-grid
+          className="b-stats-grid"
           style={{
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
@@ -1405,18 +1583,18 @@ function StatsLanguageSection() {
         >
           <div>
             <div className="b-eyebrow" style={{ color: "oklch(65% 0.01 70)" }}>
-              NO LLM DOES MATH HERE
+              HOW IT DECIDES
             </div>
             <h2
               className="b-h-section"
               style={{ marginTop: 12, textWrap: "balance" }}
             >
-              Statistics decide.{" "}
+              Every move has the math behind it.{" "}
               <span
                 className="b-serif"
                 style={{ color: "oklch(75% 0.1 55)" }}
               >
-                Claude just writes the email.
+                Not a guess.
               </span>
             </h2>
             <p
@@ -1428,11 +1606,12 @@ function StatsLanguageSection() {
                 maxWidth: 460,
               }}
             >
-              Every action Kleiber takes is gated by a two-proportion z-test
-              against your campaign baseline, with a minimum sample size of
-              1,000 impressions. The LLM only does two things: propose new
-              variants from your approved gene pool, and write the narrative
-              summary. It never touches the math.
+              Before Kleiber recommends scaling a winner or pausing a
+              loser, it runs a proper statistical test on your campaign
+              data and waits until there&apos;s enough signal — at least
+              1,000 impressions — to be confident the result isn&apos;t
+              random noise. Every call about your budget is decided by
+              the numbers.
             </p>
             <div
               style={{
@@ -1442,7 +1621,12 @@ function StatsLanguageSection() {
                 marginTop: 24,
               }}
             >
-              {["z-test", "Thompson sampling", "fatigue detection", "min-N gate"].map(
+              {[
+                "Real statistical tests",
+                "Smart budget allocation",
+                "Fatigue detection",
+                "Minimum sample size",
+              ].map(
                 (t) => (
                   <span
                     key={t}
@@ -1485,7 +1669,7 @@ function StatsLanguageSection() {
               p0, n0 = baseline.ctr, baseline.impressions
               <br />
               <span style={{ color: "oklch(55% 0.01 70)" }}>
-                # scipy — not an LLM
+                # real statistical test
               </span>
               <br />
               z, p_val ={" "}
@@ -1528,13 +1712,50 @@ function StatsLanguageSection() {
 
 function HowItWorksPreview() {
   const rows = [
-    { day: "Mon", action: "3 variants active. One pulling a +1.8 z-score on CTR.", delta: "$128 spent" },
-    { day: "Tue", action: "Kleiber proposes V-0012 (body swap). Auto-approved under your rules.", delta: "+1 variant" },
-    { day: "Wed", action: "V-0011 crosses significance. Scaled from 20% → 35% of budget.", delta: "ROAS 2.8× → 3.4×", good: true },
-    { day: "Thu", action: "V-0007 fatigue detected (declining CTR across 4 days). Paused.", delta: "−$14/day savings", good: true },
-    { day: "Fri", action: "Element attribution updated: 'IMG_673' carries +14% lift across all uses.", delta: "new insight" },
-    { day: "Sat", action: "2 new variants generated, both inherit IMG_673.", delta: "+2 variants" },
-    { day: "Sun", action: "Weekly report: leaderboard, element rankings, pairwise interactions.", delta: "1 email" },
+    {
+      day: "Mon",
+      action:
+        "3 variants running. One is pulling ahead on click-through — not by enough to act on yet.",
+      delta: "$128 spent",
+    },
+    {
+      day: "Tue",
+      action:
+        "Kleiber proposes a new variant — different body copy, same headline. Auto-approved under your rules.",
+      delta: "+1 variant",
+    },
+    {
+      day: "Wed",
+      action:
+        "Yesterday's winner holds up statistically. Scaled from 20% → 35% of budget.",
+      delta: "ROAS 2.8× → 3.4×",
+      good: true,
+    },
+    {
+      day: "Thu",
+      action:
+        "Kleiber notices one variant's performance has been declining for 4 days. Paused before it burns more budget.",
+      delta: "−$14/day savings",
+      good: true,
+    },
+    {
+      day: "Fri",
+      action:
+        "Kleiber notices one image is driving +14% across every variant using it.",
+      delta: "new insight",
+    },
+    {
+      day: "Sat",
+      action:
+        "Two new variants generated, both built around that winning image.",
+      delta: "+2 variants",
+    },
+    {
+      day: "Sun",
+      action:
+        "Weekly report: which variants won, which headlines pulled, which pairings work.",
+      delta: "1 email",
+    },
   ];
   return (
     <section style={{ padding: "100px 0" }}>
@@ -1564,6 +1785,7 @@ function HowItWorksPreview() {
           {rows.map((r, i) => (
             <div
               key={r.day}
+              className="b-week-row"
               style={{
                 display: "grid",
                 gridTemplateColumns: "90px 1fr 200px",
@@ -1630,7 +1852,7 @@ function SafetySection() {
             alignItems: "start",
           }}
         >
-          <div style={{ position: "sticky", top: 100 }}>
+          <div className="b-safety-sticky" style={{ position: "sticky", top: 100 }}>
             <div className="b-eyebrow">SAFETY & CONTROL</div>
             <h2 className="b-h-section" style={{ marginTop: 12 }}>
               Autonomous, <span className="b-serif">not out of hand.</span>
@@ -1728,13 +1950,14 @@ function PricingSection() {
           className="b-h-sub"
           style={{
             marginTop: 14,
-            maxWidth: 560,
+            maxWidth: 620,
             marginLeft: "auto",
             marginRight: "auto",
           }}
         >
-          Free during the private beta. Tiered pricing will be announced at
-          public launch — no enterprise-sales call, no &quot;contact us.&quot;
+          Join the private beta and lock in free access — for good. Paid
+          tiers will come at public launch, but beta members keep theirs
+          as long as they want it.
         </p>
       </div>
       <div
@@ -1784,6 +2007,17 @@ function PricingSection() {
             >
               Free
             </span>
+          </div>
+          <div
+            style={{
+              fontSize: 13,
+              color: "oklch(75% 0.01 70)",
+              marginTop: 6,
+              fontFamily: "var(--b-mono)",
+              letterSpacing: "0.02em",
+            }}
+          >
+            for beta members, forever
           </div>
           <div
             style={{
@@ -1901,14 +2135,14 @@ function SignupSection() {
           className="b-h-sub"
           style={{
             marginTop: 14,
-            maxWidth: 540,
+            maxWidth: 560,
             marginLeft: "auto",
             marginRight: "auto",
           }}
         >
-          Private beta — we&apos;re onboarding a handful of advertisers at a
-          time so we can shadow every cycle. Drop your email and we&apos;ll
-          reach out within a few days.
+          We&apos;re onboarding a handful of advertisers at a time so we
+          can shadow every cycle. Drop your email and we&apos;ll reach
+          out within a few days — and you keep free access for good.
         </p>
 
         {status === "success" ? (
@@ -2038,29 +2272,12 @@ function FinalCTA() {
   return (
     <section style={{ padding: "80px 0 80px", textAlign: "center" }}>
       <div className="b-wrap-narrow">
-        <h2
-          style={{
-            fontSize: "clamp(48px, 7vw, 96px)",
-            fontWeight: 500,
-            letterSpacing: "-0.035em",
-            lineHeight: 0.98,
-            textWrap: "balance",
-            margin: 0,
-          }}
-        >
+        <h2 className="b-final-heading">
           Let the <span className="b-serif">math</span> do the digging.
           <br />
           You focus on <span className="b-serif">making</span> the ads.
         </h2>
-        <div
-          style={{
-            display: "flex",
-            gap: 10,
-            justifyContent: "center",
-            marginTop: 36,
-            flexWrap: "wrap",
-          }}
-        >
+        <div className="b-cta-row" style={{ marginTop: 36 }}>
           <a
             href="#signup"
             className="b-btn b-btn-primary b-btn-lg"
@@ -2106,18 +2323,7 @@ function Footer() {
         }}
       >
         <div>
-          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
-            <KleiberMark size={22} />
-            <span
-              style={{
-                fontSize: 18,
-                letterSpacing: "-0.02em",
-                fontWeight: 500,
-              }}
-            >
-              Kleiber
-            </span>
-          </div>
+          <Wordmark size={24} />
           <p
             style={{
               marginTop: 16,
@@ -2129,7 +2335,7 @@ function Footer() {
           >
             Autonomous ad-testing for Meta.
             <br />
-            Runs the scientific method on your creative, every night.
+            Runs the scientific method on your creative, every day.
           </p>
         </div>
         <div>
