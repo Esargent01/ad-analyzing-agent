@@ -89,8 +89,14 @@ class TestSessionTokens:
         assert verify_session_token("") is None
 
     def test_tampered_signature_returns_none(self):
+        """Flipping a bit in the signature invalidates the token."""
         token = create_session_token(uuid4())
-        tampered = token[:-1] + ("A" if token[-1] != "A" else "B")
+        # Mutate the second-to-last char. The outer base64 encodes 91 raw
+        # bytes, so its last char encodes 2 data bits + 4 padding bits —
+        # flipping it often changes only padding, leaving the decoded
+        # payload identical. token[-2] always encodes 6 data bits of the
+        # signature's last byte, so a flip is guaranteed to alter it.
+        tampered = token[:-2] + ("A" if token[-2] != "A" else "B") + token[-1]
         assert verify_session_token(tampered) is None
 
     def test_expired_token_returns_none(self):
