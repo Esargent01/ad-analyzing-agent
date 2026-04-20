@@ -15,6 +15,18 @@ import {
   useMetaStatus,
   useMyUsage,
 } from "@/lib/api/hooks";
+import type { MetaConnectionStatus } from "@/lib/api/types";
+
+function formatRelativeDate(isoDate: string | null | undefined): string {
+  if (!isoDate) return "—";
+  const d = new Date(isoDate);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 const META_ERROR_LABELS: Record<string, string> = {
   declined: "You declined the Meta permissions prompt.",
@@ -82,7 +94,11 @@ export function DashboardRoute() {
         ) : null
       }
     >
-      <MetaConnection connected={metaConnected} status={metaStatus.data} />
+      <MetaConnection
+        connected={metaConnected}
+        status={metaStatus.data}
+        isLoading={metaStatus.isLoading}
+      />
 
       <div
         data-ds-grid
@@ -159,9 +175,11 @@ export function DashboardRoute() {
 function MetaConnection({
   connected,
   status,
+  isLoading,
 }: {
   connected: boolean;
-  status: { available_ad_accounts?: unknown[]; available_pages?: unknown[] } | null | undefined;
+  status: MetaConnectionStatus | null | undefined;
+  isLoading: boolean;
 }) {
   const qc = useQueryClient();
   const connect = useConnectMeta();
@@ -227,6 +245,26 @@ function MetaConnection({
   const disconnectError = disconnect.isError
     ? "Couldn't disconnect — please try again."
     : null;
+
+  // Pre-resolution: avoid flashing the "NOT CONNECTED" banner on first
+  // paint for users who are in fact connected. Render a neutral
+  // placeholder until /api/me/meta/status resolves.
+  if (isLoading && !status) {
+    return (
+      <div
+        style={{
+          padding: 18,
+          border: "1px solid var(--border)",
+          borderRadius: 12,
+          background: "var(--paper-2)",
+          fontSize: 13,
+          color: "var(--muted)",
+        }}
+      >
+        Checking Meta connection…
+      </div>
+    );
+  }
 
   if (!connected) {
     return (
@@ -302,81 +340,140 @@ function MetaConnection({
   const pageCount = status?.available_pages?.length ?? 0;
   return (
     <div
-      data-ds-grid
       style={{
         padding: 18,
         border: "1px solid var(--border)",
         borderRadius: 12,
         background: "white",
-        display: "grid",
-        gridTemplateColumns: "1fr auto",
-        alignItems: "center",
-        gap: 20,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-        <div
-          style={{
-            width: 36,
-            height: 36,
-            borderRadius: 10,
-            background: "var(--win-soft)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            flexShrink: 0,
-          }}
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M4 9l3 3 7-7"
-              stroke="oklch(40% 0.14 145)"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              fill="none"
-            />
-          </svg>
-        </div>
-        <div>
-          <div style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}>
-            Meta connected
-          </div>
-          <div
-            style={{
-              fontFamily: "var(--font-mono)",
-              fontSize: 11.5,
-              color: "var(--muted)",
-            }}
-          >
-            {adAccountCount} ad account{adAccountCount === 1 ? "" : "s"} ·{" "}
-            {pageCount} page{pageCount === 1 ? "" : "s"}
-          </div>
-        </div>
-      </div>
       <div
+        data-ds-grid
         style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "flex-end",
-          gap: 6,
+          display: "grid",
+          gridTemplateColumns: "1fr auto",
+          alignItems: "center",
+          gap: 20,
         }}
       >
-        <button
-          type="button"
-          className="btn btn-ghost btn-sm"
-          onClick={handleDisconnect}
-          disabled={disconnect.isPending}
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              background: "var(--win-soft)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <path
+                d="M4 9l3 3 7-7"
+                stroke="oklch(40% 0.14 145)"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                fill="none"
+              />
+            </svg>
+          </div>
+          <div>
+            <div
+              style={{ fontSize: 14, fontWeight: 500, color: "var(--ink)" }}
+            >
+              Meta connected
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11.5,
+                color: "var(--muted)",
+              }}
+            >
+              {adAccountCount} ad account{adAccountCount === 1 ? "" : "s"} ·{" "}
+              {pageCount} page{pageCount === 1 ? "" : "s"}
+            </div>
+          </div>
+        </div>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 6,
+          }}
         >
-          {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
-        </button>
-        {(banner || disconnectError) && (
-          <BannerLine
-            kind={banner?.kind ?? "error"}
-            text={banner?.text ?? disconnectError ?? ""}
-          />
-        )}
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={handleDisconnect}
+            disabled={disconnect.isPending}
+          >
+            {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
+          </button>
+          {(banner || disconnectError) && (
+            <BannerLine
+              kind={banner?.kind ?? "error"}
+              text={banner?.text ?? disconnectError ?? ""}
+            />
+          )}
+        </div>
       </div>
+
+      {status && (
+        <dl
+          data-ds-grid
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 16,
+            margin: "14px 0 0",
+            paddingTop: 14,
+            borderTop: "1px solid var(--border-soft)",
+          }}
+        >
+          <MetaFact label="Meta user ID" value={status.meta_user_id ?? "—"} mono />
+          <MetaFact
+            label="Connected"
+            value={formatRelativeDate(status.connected_at)}
+          />
+          <MetaFact
+            label="Token expires"
+            value={formatRelativeDate(status.token_expires_at)}
+          />
+        </dl>
+      )}
+    </div>
+  );
+}
+
+function MetaFact({
+  label,
+  value,
+  mono = false,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+}) {
+  return (
+    <div>
+      <dt className="eyebrow" style={{ fontSize: 9.5 }}>
+        {label}
+      </dt>
+      <dd
+        style={{
+          margin: "4px 0 0",
+          fontSize: 12.5,
+          color: "var(--ink)",
+          fontFamily: mono ? "var(--font-mono)" : undefined,
+        }}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

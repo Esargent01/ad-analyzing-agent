@@ -213,7 +213,9 @@ function DashNav() {
                   overflow: "hidden",
                 }}
               >
-                <MenuItem href="/">Back to site</MenuItem>
+                <MenuItem href="/" onClose={() => setOpen(false)}>
+                  Back to site
+                </MenuItem>
                 <div style={{ height: 1, background: "var(--border)" }} />
                 <MenuButton onClick={onSignOut} disabled={logout.isPending}>
                   {logout.isPending ? "Signing out…" : "Sign out"}
@@ -253,10 +255,19 @@ function NavLink({
   );
 }
 
-function MenuItem({ href, children }: { href: string; children: React.ReactNode }) {
+function MenuItem({
+  href,
+  children,
+  onClose,
+}: {
+  href: string;
+  children: React.ReactNode;
+  onClose?: () => void;
+}) {
   return (
     <Link
       to={href}
+      onClick={onClose}
       style={{
         display: "block",
         padding: "10px 14px",
