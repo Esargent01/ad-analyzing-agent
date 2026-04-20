@@ -100,21 +100,21 @@
         {% set bar_width = (stage.value / max_value * 100)|round(1) if max_value > 0 else 0 %}
         {% set bar_width = [bar_width, 5]|max %}
         {% if stage.stage_name == 'Impressions' %}
-            {% set bar_color = '#1a1816' %}
+            {% set bar_color = '#1f1d18' %}
         {% elif stage.stage_name == 'Video views (3s)' %}
-            {% set bar_color = '#7F77DD' %}
+            {% set bar_color = '#c46f3f' %}
         {% elif stage.stage_name == 'Video views (15s)' %}
-            {% set bar_color = '#378ADD' %}
+            {% set bar_color = '#c46f3f' %}
         {% elif stage.stage_name == 'Link clicks' %}
-            {% set bar_color = '#059669' %}
+            {% set bar_color = '#3c6a24' %}
         {% elif stage.stage_name == 'Landing page views' %}
-            {% set bar_color = '#4DAA57' %}
+            {% set bar_color = '#7ea64d' %}
         {% elif stage.stage_name == 'Add to carts' %}
-            {% set bar_color = '#639922' %}
+            {% set bar_color = '#7ea64d' %}
         {% elif stage.stage_name == 'Purchases' %}
-            {% set bar_color = '#047857' %}
+            {% set bar_color = '#3c6a24' %}
         {% else %}
-            {% set bar_color = '#1a1816' %}
+            {% set bar_color = '#1f1d18' %}
         {% endif %}
         <div class="funnel-step">
             <span class="funnel-label">{{ stage.stage_name }}</span>
@@ -163,11 +163,11 @@
                     <span style="color: var(--text);">{{ pv.genome_summary }}</span>
                 </div>
                 {% if pv.classification == "expiring_soon" %}
-                <span style="display: inline-block; background-color: #FFF4D6; color: #B07C1A; font-size: 10px; padding: 2px 8px; border-radius: 10px; white-space: nowrap;">
+                <span style="display: inline-block; background-color: #f3e3d2; color: #6b3818; font-size: 10px; padding: 2px 8px; border-radius: 10px; white-space: nowrap;">
                     Expires in {{ pv.days_until_expiry }} day{{ "s" if pv.days_until_expiry != 1 else "" }}
                 </span>
                 {% else %}
-                <span style="display: inline-block; background-color: #EDF4EC; color: #2B6B30; font-size: 10px; padding: 2px 8px; border-radius: 10px; white-space: nowrap;">New</span>
+                <span style="display: inline-block; background-color: #e4f0d7; color: #3c6a24; font-size: 10px; padding: 2px 8px; border-radius: 10px; white-space: nowrap;">New</span>
                 {% endif %}
             </div>
             {% if pv.genome.media_asset %}
@@ -175,7 +175,7 @@
             {% set ext = (media.rsplit('.', 1)[-1]|lower) if '.' in media else '' %}
             {% set is_video = ext in ['mov', 'mp4', 'webm', 'avi', 'm4v', 'mkv'] %}
             <div style="font-size: 12px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; margin-top: 2px;">
-                <span style="display: inline-block; background-color: {% if is_video %}#EEF0FF{% else %}#F1F5F9{% endif %}; color: {% if is_video %}#1a1816{% else %}#475569{% endif %}; font-size: 9px; font-weight: 600; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 3px; white-space: nowrap;">{{ "VIDEO" if is_video else "IMAGE" }}</span>
+                <span style="display: inline-block; background-color: {% if is_video %}#f3efe5{% else %}#f3efe5{% endif %}; color: {% if is_video %}#1f1d18{% else %}#3d3932{% endif %}; font-size: 9px; font-weight: 600; letter-spacing: 0.04em; padding: 2px 6px; border-radius: 3px; white-space: nowrap;">{{ "VIDEO" if is_video else "IMAGE" }}</span>
                 <span class="mono" style="font-family: var(--font-mono); color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ media|truncate(70) }}</span>
             </div>
             {% endif %}
