@@ -37,6 +37,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { api } from "@/lib/api/client";
+import { trackSignupEvent } from "@/lib/analytics";
 
 import "./landing-scientific.css";
 
@@ -2100,18 +2101,30 @@ function SignupSection() {
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
     const normalized = email.trim().toLowerCase();
+    // Fire attempt BEFORE client-side validation so the funnel can
+    // distinguish "tried to submit but typed a bad email" from "never
+    // tried at all". Variant tag on every event so PostHog can split
+    // /beta vs / in a single funnel view.
+    trackSignupEvent("beta_signup_submit_attempt", "scientific");
     if (!normalized || !normalized.includes("@")) {
       setErrorMsg("Please enter a valid email address.");
       setStatus("error");
+      trackSignupEvent("beta_signup_error", "scientific", {
+        reason: "client_validation_invalid_email",
+      });
       return;
     }
     setStatus("submitting");
     try {
       await api.post("/api/beta-signup", { email: normalized });
       setStatus("success");
+      trackSignupEvent("beta_signup_success", "scientific");
     } catch {
       setErrorMsg("Something went wrong. Please try again.");
       setStatus("error");
+      trackSignupEvent("beta_signup_error", "scientific", {
+        reason: "api_error",
+      });
     }
   };
 

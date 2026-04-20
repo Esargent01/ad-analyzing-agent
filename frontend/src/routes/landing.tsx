@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { api } from "@/lib/api/client";
+import { trackSignupEvent } from "@/lib/analytics";
 import { FeatureSection } from "@/components/landing/FeatureSection";
 import { DecomposeAnimation } from "@/components/landing/DecomposeAnimation";
 import { GenomeAnimation } from "@/components/landing/GenomeAnimation";
@@ -25,18 +26,29 @@ export function LandingRoute() {
 
   const submitEmail = async (addr: string) => {
     const normalized = addr.trim().toLowerCase();
+    // Fire attempt BEFORE the email-shape validation so we can
+    // distinguish "user tried to submit but typed an invalid email"
+    // from "user never tried at all" in the funnel.
+    trackSignupEvent("beta_signup_submit_attempt", "original");
     if (!normalized || !normalized.includes("@")) {
       setErrorMsg("Please enter a valid email address.");
       setStatus("error");
+      trackSignupEvent("beta_signup_error", "original", {
+        reason: "client_validation_invalid_email",
+      });
       return;
     }
     setStatus("submitting");
     try {
       await api.post("/api/beta-signup", { email: normalized });
       setStatus("success");
+      trackSignupEvent("beta_signup_success", "original");
     } catch {
       setErrorMsg("Something went wrong. Please try again.");
       setStatus("error");
+      trackSignupEvent("beta_signup_error", "original", {
+        reason: "api_error",
+      });
     }
   };
 
