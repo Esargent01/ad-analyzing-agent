@@ -1,0 +1,259 @@
+/*
+ * Kleiber design system — warm editorial palette.
+ *
+ * One shared source of truth for design tokens + utility classes
+ * across the dashboard and marketing pages. Promoted from what
+ * started as ``/beta``-scoped styles to global after the design
+ * system consolidation.
+ *
+ * Scope rules:
+ *
+ * - **Tokens** (CSS variables) live at ``:root`` — every page gets
+ *   access. Harmless for the original ``/`` landing because that
+ *   page uses inline styles for its fonts + colors and doesn't read
+ *   any of the custom properties here.
+ *
+ * - **Heading treatment** ("lowercase editorial" — text-transform,
+ *   400 weight, -0.035em tracking, accent underline for
+ *   ``.serif`` spans) targets the utility classes ``.h-display``
+ *   and ``.h-section`` rather than bare ``h1`` / ``h2``. This keeps
+ *   the original marketing landing at ``/`` untouched (it uses
+ *   bare ``<h1>`` with inline DM Serif Display styling) while the
+ *   dashboard + ``/beta`` both opt in by adding the utility class.
+ *
+ * - **Utility classes** (``.btn``, ``.chip``, ``.eyebrow``, etc.)
+ *   are global. Name-collision-safe because they're descriptive
+ *   and the older landings don't use these class names.
+ *
+ * Type pairing: Geist (sans) + Instrument Serif (italic, retained
+ * for legacy) + Geist Mono. Already loaded in ``index.html``.
+ */
+
+:root {
+  /* Warm neutrals */
+  --paper: oklch(98.5% 0.006 80);
+  --paper-2: oklch(96.5% 0.01 78);
+  --paper-3: oklch(94% 0.012 75);
+  --ink: oklch(22% 0.02 60);
+  --ink-2: oklch(35% 0.02 65);
+  --muted: oklch(55% 0.015 70);
+  --muted-2: oklch(68% 0.012 72);
+  --border: oklch(90% 0.01 75);
+  --border-soft: oklch(94% 0.008 75);
+
+  /* Accent — warm terracotta/ochre */
+  --accent: oklch(62% 0.16 55);
+  --accent-soft: oklch(92% 0.05 60);
+  --accent-ink: oklch(35% 0.12 50);
+
+  /* Stats colors */
+  --win: oklch(58% 0.14 145);
+  --win-soft: oklch(94% 0.05 145);
+  --lose: oklch(60% 0.16 28);
+  --lose-soft: oklch(95% 0.04 28);
+
+  /* Type */
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: "Instrument Serif", "Times New Roman", Georgia, serif;
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* Radii */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+
+  /* Shadows — warm-tinted */
+  --shadow-sm: 0 1px 2px oklch(30% 0.02 60 / 0.04),
+    0 1px 1px oklch(30% 0.02 60 / 0.03);
+  --shadow-md: 0 4px 16px oklch(30% 0.02 60 / 0.06),
+    0 1px 2px oklch(30% 0.02 60 / 0.04);
+  --shadow-lg: 0 20px 60px oklch(30% 0.02 60 / 0.08),
+    0 4px 12px oklch(30% 0.02 60 / 0.04);
+}
+
+/* ----------------------------------------------------------------
+ * Type utilities — opt-in, name-collision-safe.
+ * ---------------------------------------------------------------- */
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* Lowercase editorial heading treatment. Opt-in via utility class —
+   bare h1/h2 elsewhere on the site are untouched. */
+.h-display {
+  text-transform: lowercase;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  font-size: clamp(32px, 4vw, 48px);
+  line-height: 1.02;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  margin: 0;
+}
+
+.h-section {
+  text-transform: lowercase;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  font-size: clamp(24px, 2.4vw, 32px);
+  line-height: 1.05;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  margin: 0;
+}
+
+/* Accent span inside an ``.h-display`` / ``.h-section`` heading.
+   Renders as sans (not italic-serif), 500 weight, accent color,
+   soft-accent underline — the editorial emphasis look. */
+.h-display .serif,
+.h-section .serif {
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-decoration-color: var(--accent-soft);
+  text-underline-offset: 0.18em;
+}
+
+/* ----------------------------------------------------------------
+ * Buttons — ``.btn`` + variant + size classes. Pill-shaped, quick
+ * hover lift, designed to work on both warm-paper backgrounds and
+ * white card surfaces.
+ * ---------------------------------------------------------------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  transition: all 0.18s ease;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  font-family: inherit;
+  cursor: pointer;
+  color: inherit;
+  background: transparent;
+}
+
+.btn-primary {
+  background: var(--ink);
+  color: var(--paper);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--ink-2);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-accent {
+  background: var(--accent);
+  color: white;
+}
+.btn-accent:hover:not(:disabled) {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--border);
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--paper-2);
+  border-color: var(--muted-2);
+}
+
+.btn-danger {
+  background: oklch(50% 0.18 28);
+  color: white;
+}
+.btn-danger:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.btn-sm {
+  padding: 6px 12px;
+  font-size: 12.5px;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ----------------------------------------------------------------
+ * Forms
+ * ---------------------------------------------------------------- */
+
+.ds-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13.5px;
+  background: white;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  font-family: inherit;
+}
+.ds-input:focus {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px oklch(22% 0.02 60 / 0.06);
+}
+
+/* ----------------------------------------------------------------
+ * Cards + dividers
+ * ---------------------------------------------------------------- */
+
+.ds-card {
+  background: white;
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 18px;
+}
+
+.ds-divider {
+  height: 1px;
+  background: var(--border);
+  width: 100%;
+}
+
+/* ----------------------------------------------------------------
+ * Page-level wrap — primary max-width used across the app.
+ * Prefixed ``ds-`` so it doesn't clash with the landings' ``.wrap``.
+ * ---------------------------------------------------------------- */
+
+.ds-wrap {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding: 0 28px;
+}
+
+@media (max-width: 900px) {
+  .ds-wrap {
+    padding: 0 20px;
+  }
+  [data-ds-grid] {
+    grid-template-columns: 1fr !important;
+  }
+}

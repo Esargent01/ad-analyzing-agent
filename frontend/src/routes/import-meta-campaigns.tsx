@@ -39,6 +39,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import { MetaCampaignRow } from "@/components/MetaCampaignRow";
+import { DashPage } from "@/components/dashboard/DashPage";
 import { Button } from "@/components/ui/Button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ApiError } from "@/lib/api/client";
@@ -216,24 +217,19 @@ export function ImportMetaCampaignsRoute() {
     Boolean(status.data?.connected) && availablePages.length === 0;
 
   return (
-    <div>
-      <div className="mb-6">
-        <Link
-          to="/dashboard"
-          className="text-xs text-[var(--accent)] no-underline hover:underline"
-        >
-          ← Dashboard
-        </Link>
-        <p className="label mt-2">Import campaigns</p>
-        <h1 className="mt-1 text-xl font-medium">
-          Pick Meta campaigns to manage
-        </h1>
-        <p className="mt-1 text-xs text-[var(--text-secondary)]">
-          Selected campaigns will be imported with their current ads as
-          baseline variants. You can import up to {quotaMax} campaigns
-          total — {quotaUsed} used, {remaining} remaining.
-        </p>
-      </div>
+    <DashPage
+      crumb={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: "Import campaigns" },
+      ]}
+      title="import campaigns"
+      sub={
+        <>
+          pick meta campaigns to manage · you can import up to {quotaMax} total
+          — {quotaUsed} used, {remaining} remaining.
+        </>
+      }
+    >
 
       {(showAccountPicker || showPagePicker) && (
         <Card className="mb-4">
@@ -431,6 +427,6 @@ export function ImportMetaCampaignsRoute() {
           </Button>
         </div>
       )}
-    </div>
+    </DashPage>
   );
 }

@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router-dom";
 
-import { Header } from "@/components/layout/Header";
+import { DashShell } from "@/components/dashboard/DashShell";
 import { useMe } from "@/lib/api/hooks";
 
 /**
@@ -13,6 +13,11 @@ import { useMe } from "@/lib/api/hooks";
  *
  * We also subscribe to the global `auth:unauthenticated` event emitted
  * by the API client so background queries that 401 kick the user back.
+ *
+ * Chrome is now ``DashShell`` (warm-paper palette, sticky nav with
+ * Kleiber wordmark + user menu) — every authed route renders inside
+ * it. Individual pages use ``DashPage`` to get the standard
+ * breadcrumb / title / actions frame.
  */
 export function AuthedLayout() {
   const me = useMe();
@@ -29,8 +34,25 @@ export function AuthedLayout() {
 
   if (me.isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-xs text-[var(--text-tertiary)]">Loading…</p>
+      <div
+        style={{
+          display: "flex",
+          minHeight: "100vh",
+          alignItems: "center",
+          justifyContent: "center",
+          background: "var(--paper)",
+          fontFamily: "var(--font-sans)",
+        }}
+      >
+        <p
+          style={{
+            fontSize: 12,
+            color: "var(--muted)",
+            fontFamily: "var(--font-mono)",
+          }}
+        >
+          Loading…
+        </p>
       </div>
     );
   }
@@ -41,11 +63,8 @@ export function AuthedLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg)]">
-      <Header />
-      <main className="mx-auto max-w-7xl px-6 py-10 sm:px-10 lg:px-16">
-        <Outlet />
-      </main>
-    </div>
+    <DashShell>
+      <Outlet />
+    </DashShell>
   );
 }

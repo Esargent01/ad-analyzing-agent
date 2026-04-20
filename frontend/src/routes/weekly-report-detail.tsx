@@ -1,11 +1,12 @@
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 
 import { FunnelChart } from "@/components/FunnelChart";
 import { ElementRanking } from "@/components/ElementRanking";
 import { InteractionList } from "@/components/InteractionList";
 import { MetricCard } from "@/components/MetricCard";
 import { WeeklyVariantTable } from "@/components/VariantTable";
-import { Card, CardContent } from "@/components/ui/Card";
+import { DashPage } from "@/components/dashboard/DashPage";
+import { EmptyState } from "@/components/dashboard/primitives";
 import { SkeletonReportBody } from "@/components/ui/Skeleton";
 import { ApiError } from "@/lib/api/client";
 import { useMe, useWeeklyReport } from "@/lib/api/hooks";
@@ -22,6 +23,10 @@ import {
  * Weekly report detail page. Mirrors `weekly_web.html` section-by-section:
  * header, 3 rows of metric cards, full funnel, next week's experiments,
  * variant leaderboard, element rankings, interactions, and budget summary.
+ *
+ * Outer frame is the shared ``DashPage``; the data-dense body retains
+ * the existing ``WeeklyVariantTable`` / ``ElementRanking`` /
+ * ``InteractionList`` / ``FunnelChart`` components.
  */
 export function WeeklyReportDetailRoute() {
   const { campaignId = "", weekStart = "" } = useParams();
@@ -34,53 +39,62 @@ export function WeeklyReportDetailRoute() {
     return <Navigate to="/dashboard" replace />;
   }
 
+  const crumb = [
+    { label: "Dashboard", href: "/dashboard" },
+    {
+      label: campaign?.name ?? "Campaign",
+      href: `/campaigns/${campaignId}`,
+    },
+    {
+      label: "Weekly",
+      href: `/campaigns/${campaignId}/reports/weekly`,
+    },
+    { label: weekStart },
+  ];
+
   if (
     report.isError &&
     report.error instanceof ApiError &&
     report.error.status === 404
   ) {
     return (
-      <NotFound
-        campaignId={campaignId}
-        campaignName={campaign?.name}
-        weekStart={weekStart}
-      />
+      <DashPage
+        crumb={crumb}
+        title={<>weekly · <span className="serif">{weekStart}</span></>}
+      >
+        <EmptyState
+          title={`No weekly report for ${formatDateLabel(weekStart)}`}
+          desc="The week may not have any completed cycles, or the date is outside your campaign window. Pick another week from the index."
+          icon="?"
+        />
+      </DashPage>
     );
   }
 
+  const rangeLabel = report.data
+    ? `${formatDateLabel(report.data.week_start)} – ${formatDateLabel(report.data.week_end)}`
+    : formatDateLabel(weekStart);
+
+  const sub = report.data ? (
+    <>
+      {report.data.campaign_name ?? campaign?.name} ·{" "}
+      <span style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>
+        {report.data.cycles_run} cycles · {report.data.variants_launched} launched
+        · {report.data.variants_retired} retired
+      </span>
+    </>
+  ) : null;
+
   return (
-    <div>
-      <Breadcrumb campaignId={campaignId} campaignName={campaign?.name} />
-
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-[11px]">
-          <span className="rounded-xl bg-[var(--accent)] px-2.5 py-0.5 font-medium text-white">
-            Weekly report
-          </span>
-          <time className="text-[var(--text-tertiary)]">
-            {report.data
-              ? `${formatDateLabel(report.data.week_start)} – ${formatDateLabel(
-                  report.data.week_end,
-                )}`
-              : formatDateLabel(weekStart)}
-          </time>
-        </div>
-        <h1 className="mt-2 text-xl font-medium">
-          {report.data?.campaign_name ?? campaign?.name ?? "Weekly report"}
-        </h1>
-        {report.data ? (
-          <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-            {report.data.cycles_run} cycles ·{" "}
-            {report.data.variants_launched} launched ·{" "}
-            {report.data.variants_retired} retired
-          </p>
-        ) : null}
-      </div>
-
+    <DashPage
+      crumb={crumb}
+      title={<>weekly · <span className="serif">{rangeLabel}</span></>}
+      sub={sub}
+    >
       {report.isLoading && !report.data ? <SkeletonReportBody /> : null}
 
       {report.data ? <WeeklyReportBody report={report.data} /> : null}
-    </div>
+    </DashPage>
   );
 }
 
@@ -394,59 +408,3 @@ function truncate(value: string, max: number): string {
   return `${value.slice(0, max - 1)}…`;
 }
 
-function Breadcrumb({
-  campaignId,
-  campaignName,
-}: {
-  campaignId: string;
-  campaignName?: string;
-}) {
-  return (
-    <div className="mb-4 text-xs">
-      <Link
-        to={`/campaigns/${campaignId}/reports/weekly`}
-        className="text-[var(--accent)] no-underline hover:underline"
-      >
-        ← Weekly reports
-      </Link>
-      {campaignName ? (
-        <>
-          <span className="mx-1 text-[var(--text-tertiary)]">·</span>
-          <Link
-            to={`/campaigns/${campaignId}`}
-            className="text-[var(--text-tertiary)] no-underline hover:underline"
-          >
-            {campaignName}
-          </Link>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-function NotFound({
-  campaignId,
-  campaignName,
-  weekStart,
-}: {
-  campaignId: string;
-  campaignName?: string;
-  weekStart: string;
-}) {
-  return (
-    <div>
-      <Breadcrumb campaignId={campaignId} campaignName={campaignName} />
-      <Card>
-        <CardContent>
-          <p className="text-sm text-[var(--text)]">
-            No weekly report for the week of {formatDateLabel(weekStart)}.
-          </p>
-          <p className="mt-2 text-xs text-[var(--text-tertiary)]">
-            The week may not have any completed cycles, or the date is outside
-            your campaign window.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}

@@ -1,9 +1,10 @@
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 
 import { BestVariantSpotlight } from "@/components/BestVariantSpotlight";
 import { MetricCard } from "@/components/MetricCard";
 import { DailyVariantTable } from "@/components/VariantTable";
-import { Card, CardContent } from "@/components/ui/Card";
+import { DashPage } from "@/components/dashboard/DashPage";
+import { EmptyState } from "@/components/dashboard/primitives";
 import { SkeletonReportBody } from "@/components/ui/Skeleton";
 import { useDailyReport, useMe } from "@/lib/api/hooks";
 import { ApiError } from "@/lib/api/client";
@@ -14,6 +15,11 @@ import { formatCurrency, formatDateLabel, formatIntComma, formatOneDecimal } fro
  * Daily report detail page. Mirrors `daily_web.html` section-by-section:
  * header, 4-card top-line metrics, best-variant spotlight, "other active
  * variants" table, fatigue alerts, actions, next-cycle preview.
+ *
+ * Wraps the rich existing data components inside the new ``DashPage``
+ * frame so the outer chrome (nav, breadcrumbs, editorial title)
+ * matches the rest of the dashboard. Body-level styling of the
+ * spotlight + variant table lives in those components.
  */
 export function DailyReportDetailRoute() {
   const { campaignId = "", reportDate = "" } = useParams();
@@ -26,45 +32,55 @@ export function DailyReportDetailRoute() {
     return <Navigate to="/dashboard" replace />;
   }
 
+  const crumb = [
+    { label: "Dashboard", href: "/dashboard" },
+    {
+      label: campaign?.name ?? "Campaign",
+      href: `/campaigns/${campaignId}`,
+    },
+    {
+      label: "Daily",
+      href: `/campaigns/${campaignId}/reports/daily`,
+    },
+    { label: reportDate },
+  ];
+
   if (report.isError && report.error instanceof ApiError && report.error.status === 404) {
     return (
-      <NotFound
-        campaignId={campaignId}
-        campaignName={campaign?.name}
-        reportDate={reportDate}
-      />
+      <DashPage
+        crumb={crumb}
+        title={<>daily · <span className="serif">{reportDate}</span></>}
+      >
+        <EmptyState
+          title={`No daily report for ${formatDateLabel(reportDate)}`}
+          desc="The cycle may not have run that day, or the date is outside your campaign window. Pick another date from the index."
+          icon="?"
+        />
+      </DashPage>
     );
   }
 
+  const sub = report.data ? (
+    <>
+      {report.data.campaign_name ?? campaign?.name} ·{" "}
+      <span
+        style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}
+      >
+        day {report.data.day_number} · cycle {report.data.cycle_number}
+      </span>
+    </>
+  ) : null;
+
   return (
-    <div>
-      <Breadcrumb campaignId={campaignId} campaignName={campaign?.name} />
-
-      <div className="mb-6">
-        <div className="flex items-center gap-2 text-[11px]">
-          <span className="rounded-xl bg-[var(--accent)] px-2.5 py-0.5 font-medium text-white">
-            Daily report
-          </span>
-          <time className="text-[var(--text-tertiary)]">
-            {formatDateLabel(reportDate)}
-          </time>
-        </div>
-        <h1 className="mt-2 text-xl font-medium">
-          {report.data?.campaign_name ?? campaign?.name ?? "Daily report"}
-        </h1>
-        {report.data ? (
-          <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-            Day {report.data.day_number} · Cycle {report.data.cycle_number}
-          </p>
-        ) : null}
-      </div>
-
+    <DashPage
+      crumb={crumb}
+      title={<>daily · <span className="serif">{reportDate}</span></>}
+      sub={sub}
+    >
       {report.isLoading && !report.data ? <SkeletonReportBody /> : null}
 
-      {report.data ? (
-        <DailyReportBody report={report.data} />
-      ) : null}
-    </div>
+      {report.data ? <DailyReportBody report={report.data} /> : null}
+    </DashPage>
   );
 }
 
@@ -249,59 +265,3 @@ function changeTone(
   return better ? "up" : "down";
 }
 
-function Breadcrumb({
-  campaignId,
-  campaignName,
-}: {
-  campaignId: string;
-  campaignName?: string;
-}) {
-  return (
-    <div className="mb-4 text-xs">
-      <Link
-        to={`/campaigns/${campaignId}/reports/daily`}
-        className="text-[var(--accent)] no-underline hover:underline"
-      >
-        ← Daily reports
-      </Link>
-      {campaignName ? (
-        <>
-          <span className="mx-1 text-[var(--text-tertiary)]">·</span>
-          <Link
-            to={`/campaigns/${campaignId}`}
-            className="text-[var(--text-tertiary)] no-underline hover:underline"
-          >
-            {campaignName}
-          </Link>
-        </>
-      ) : null}
-    </div>
-  );
-}
-
-function NotFound({
-  campaignId,
-  campaignName,
-  reportDate,
-}: {
-  campaignId: string;
-  campaignName?: string;
-  reportDate: string;
-}) {
-  return (
-    <div>
-      <Breadcrumb campaignId={campaignId} campaignName={campaignName} />
-      <Card>
-        <CardContent>
-          <p className="text-sm text-[var(--text)]">
-            No daily report for {formatDateLabel(reportDate)}.
-          </p>
-          <p className="mt-2 text-xs text-[var(--text-tertiary)]">
-            The cycle may not have run that day, or the date is outside your
-            campaign window.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
-  );
-}

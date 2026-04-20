@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { Navigate, useNavigate, useParams } from "react-router-dom";
 
-import { MetricCard } from "@/components/MetricCard";
-import { StatusPill } from "@/components/StatusPill";
-import { Button } from "@/components/ui/Button";
-import { Card, CardContent } from "@/components/ui/Card";
-import { SkeletonMetricCard } from "@/components/ui/Skeleton";
+import { DashPage } from "@/components/dashboard/DashPage";
+import {
+  DangerZone,
+  QuickLink,
+  StatTile,
+  StatusPill,
+} from "@/components/dashboard/primitives";
 import {
   useDailyDates,
   useDeleteCampaign,
@@ -16,13 +17,21 @@ import {
 import { formatDateLabel } from "@/lib/format";
 
 /**
- * Campaign overview page — the landing surface once a user clicks a
- * campaign tile on /dashboard. Pulls four queries in parallel via
- * TanStack Query: /api/me (for campaign name), daily index, weekly
- * index, and experiments (for the pending-approvals count).
+ * Campaign overview — the landing page after you click a campaign
+ * card on the dashboard home.
  *
- * Phase 4 scope: status tiles + quick-link cards. Phase 5 wires the
- * "latest report" links into actual detail pages.
+ * Port of ``kleiber-agent-deign/project/src/dashboard/screens-a.jsx::CampaignOverview``.
+ * Layout:
+ *
+ * 1. DashPage frame with breadcrumb (Dashboard → {campaign name}),
+ *    lowercase editorial title, subtitle with status pill + ID, and
+ *    actions (primary "Approvals" button with pending-count badge).
+ * 2. Three StatTile-s: daily reports count / weekly reports count /
+ *    pending approvals count (red tint when > 0).
+ * 3. "GO TO" eyebrow + three QuickLink cards (daily, weekly,
+ *    experiments).
+ * 4. DangerZone at the bottom — type-to-confirm delete flow, wired
+ *    to the existing ``useDeleteCampaign`` mutation + cascade.
  */
 export function CampaignDetailRoute() {
   const { campaignId = "" } = useParams();
@@ -35,23 +44,21 @@ export function CampaignDetailRoute() {
   const experiments = useExperiments(campaignId);
   const deleteCampaign = useDeleteCampaign();
 
-  // Two-stage confirm: first click arms the button, second click fires
-  // the DELETE. Guarded by a typed-in campaign name match so an
-  // accidental double-tap can't nuke data — users have to type the
-  // exact campaign name into the confirmation input.
-  const [confirmArmed, setConfirmArmed] = useState(false);
-  const [confirmText, setConfirmText] = useState("");
-  const confirmMatches =
-    !!campaign && confirmText.trim() === campaign.name;
+  const dailyCount = daily.data?.dates.length ?? 0;
+  const weeklyCount = weekly.data?.weeks.length ?? 0;
+  const pendingCount =
+    experiments.data?.pending_approvals?.length ??
+    experiments.data?.proposed_variants.length ??
+    0;
+  const latestDaily = daily.data?.dates[0];
+  const latestWeek = weekly.data?.weeks[0];
 
   const handleDelete = async () => {
-    if (!confirmMatches) return;
     try {
       await deleteCampaign.mutateAsync(campaignId);
       navigate("/dashboard", { replace: true });
     } catch {
-      // Mutation state surfaces the error below; keep the user on the
-      // page so they can retry or cancel.
+      // Mutation error state surfaces in the DangerZone component.
     }
   };
 
@@ -60,212 +67,138 @@ export function CampaignDetailRoute() {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const dailyCount = daily.data?.dates.length ?? 0;
-  const weeklyCount = weekly.data?.weeks.length ?? 0;
-  // Phase H: prefer the unified ``pending_approvals`` list so
-  // pause_variant and scale_budget proposals are counted alongside
-  // new variants. Fall back to the legacy ``proposed_variants`` field
-  // for back-compat during rollout (pre-Phase-H backend).
-  const pendingCount =
-    experiments.data?.pending_approvals?.length ??
-    experiments.data?.proposed_variants.length ??
-    0;
-  const latestDaily = daily.data?.dates[0];
-  const latestWeek = weekly.data?.weeks[0];
-
   return (
-    <div>
-      <div className="mb-6">
-        <Link
-          to="/dashboard"
-          className="text-xs text-[var(--accent)] no-underline hover:underline"
-        >
-          ← All campaigns
-        </Link>
-        <div className="mt-3 flex items-center gap-3">
-          <h1 className="text-xl font-medium">
-            {campaign?.name ?? "Campaign"}
-          </h1>
-          {campaign ? (
-            <StatusPill kind={campaign.is_active ? "active" : "paused"}>
-              {campaign.is_active ? "Active" : "Paused"}
-            </StatusPill>
-          ) : null}
-        </div>
-        <p className="mt-1 text-[11px] text-[var(--text-tertiary)]">
-          ID: <span className="font-mono">{campaignId}</span>
-        </p>
-      </div>
-
-      {/* Status tiles */}
-      <div className="mb-8 grid gap-2 sm:grid-cols-3">
-        {daily.isLoading ? (
-          <SkeletonMetricCard />
-        ) : (
-          <MetricCard
-            label="Daily reports"
-            value={dailyCount}
-            caption={
-              latestDaily
-                ? `latest ${formatDateLabel(latestDaily)}`
-                : "no reports yet"
-            }
-          />
-        )}
-        {weekly.isLoading ? (
-          <SkeletonMetricCard />
-        ) : (
-          <MetricCard
-            label="Weekly reports"
-            value={weeklyCount}
-            caption={
-              latestWeek ? `latest ${latestWeek.label}` : "no reports yet"
-            }
-          />
-        )}
-        {experiments.isLoading ? (
-          <SkeletonMetricCard />
-        ) : (
-          <MetricCard
-            label="Pending approvals"
-            value={pendingCount}
-            tone={pendingCount > 0 ? "up" : "flat"}
-            caption={
-              pendingCount > 0 ? "waiting on you" : "nothing to review"
-            }
-          />
-        )}
-      </div>
-
-      {/* Quick links */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Link
-          to={`/campaigns/${campaignId}/reports/daily`}
-          className="no-underline hover:no-underline"
-        >
-          <Card className="h-full transition-colors hover:border-[var(--accent)]">
-            <h2 className="text-[15px] font-medium text-[var(--text)]">
-              Daily reports
-            </h2>
-            <CardContent className="mt-2 text-[var(--text-secondary)]">
-              Browse every daily snapshot with funnel, spotlight variant, and
-              day-over-day diagnostics.
-            </CardContent>
-            <p className="mt-3 text-xs text-[var(--accent)]">
-              View {dailyCount} report{dailyCount === 1 ? "" : "s"} →
-            </p>
-          </Card>
-        </Link>
-
-        <Link
-          to={`/campaigns/${campaignId}/reports/weekly`}
-          className="no-underline hover:no-underline"
-        >
-          <Card className="h-full transition-colors hover:border-[var(--accent)]">
-            <h2 className="text-[15px] font-medium text-[var(--text)]">
-              Weekly reports
-            </h2>
-            <CardContent className="mt-2 text-[var(--text-secondary)]">
-              Full weekly breakdown with variant leaderboard, element
-              rankings, and interaction effects.
-            </CardContent>
-            <p className="mt-3 text-xs text-[var(--accent)]">
-              View {weeklyCount} week{weeklyCount === 1 ? "" : "s"} →
-            </p>
-          </Card>
-        </Link>
-
-        <Link
-          to={`/campaigns/${campaignId}/experiments`}
-          className="sm:col-span-2 no-underline hover:no-underline"
-        >
-          <Card className="h-full transition-colors hover:border-[var(--accent)]">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <h2 className="text-[15px] font-medium text-[var(--text)]">
-                  Next week&apos;s experiments
-                </h2>
-                <CardContent className="mt-2 text-[var(--text-secondary)]">
-                  Review proposed variants, approve or reject them, and
-                  suggest new gene pool entries.
-                </CardContent>
-              </div>
-              {pendingCount > 0 ? (
-                <StatusPill kind="new">
-                  {pendingCount} pending
-                </StatusPill>
-              ) : null}
-            </div>
-            <p className="mt-3 text-xs text-[var(--accent)]">Open experiments →</p>
-          </Card>
-        </Link>
-      </div>
-
-      {/* Danger zone — permanent delete. Hidden behind a two-stage
-          confirm so an accidental click can't wipe a campaign. */}
-      <div className="mt-10 rounded border border-red-900/40 bg-red-950/20 p-4">
-        <h2 className="text-[13px] font-medium text-red-300">Danger zone</h2>
-        <p className="mt-1 text-xs text-[var(--text-secondary)]">
-          Delete this campaign and every variant, deployment, metric,
-          test cycle, and report tied to it. This cannot be undone. The
-          Meta ads themselves stay live on Meta&apos;s side — only the
-          Kleiber-side records are removed, so you can re-import this
-          same Meta campaign afterwards.
-        </p>
-
-        {!confirmArmed ? (
-          <button
-            type="button"
-            onClick={() => setConfirmArmed(true)}
-            className="mt-3 rounded border border-red-800/60 bg-red-900/30 px-3 py-1.5 text-xs text-red-200 hover:bg-red-900/50"
+    <DashPage
+      crumb={[
+        { label: "Dashboard", href: "/dashboard" },
+        { label: campaign?.name ?? "Campaign" },
+      ]}
+      title={campaign?.name ?? "campaign"}
+      sub={
+        campaign ? (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 10,
+              flexWrap: "wrap",
+            }}
           >
-            Delete campaign…
-          </button>
-        ) : (
-          <div className="mt-3 space-y-2">
-            <label className="block text-xs text-[var(--text-secondary)]">
-              Type{" "}
-              <span className="font-mono text-red-300">
-                {campaign?.name}
-              </span>{" "}
-              to confirm:
-              <input
-                type="text"
-                value={confirmText}
-                onChange={(e) => setConfirmText(e.target.value)}
-                className="mt-1 block w-full rounded border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-1 text-xs font-mono"
-                autoFocus
-              />
-            </label>
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={handleDelete}
-                disabled={!confirmMatches || deleteCampaign.isPending}
-                loading={deleteCampaign.isPending}
-                variant="destructive"
-              >
-                Permanently delete
-              </Button>
-              <button
-                type="button"
-                onClick={() => {
-                  setConfirmArmed(false);
-                  setConfirmText("");
-                }}
-                className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text)]"
-              >
-                Cancel
-              </button>
-            </div>
-            {deleteCampaign.error && (
-              <p role="alert" className="text-xs text-red-300">
-                Delete failed — {deleteCampaign.error.message}. Check
-                the console logs and retry.
-              </p>
-            )}
-          </div>
-        )}
+            <StatusPill kind={campaign.is_active ? "active" : "paused"}>
+              {campaign.is_active ? "active" : "paused"}
+            </StatusPill>
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: "var(--muted)",
+              }}
+            >
+              {campaign.id}
+            </span>
+          </span>
+        ) : null
+      }
+      actions={
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={() => navigate(`/campaigns/${campaignId}/experiments`)}
+          style={{
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          Approvals
+          {pendingCount > 0 && (
+            <span
+              style={{
+                background: "var(--accent)",
+                color: "white",
+                fontSize: 10,
+                padding: "1px 6px",
+                borderRadius: 99,
+                fontWeight: 500,
+              }}
+            >
+              {pendingCount}
+            </span>
+          )}
+        </button>
+      }
+    >
+      <div
+        data-ds-grid
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 16,
+          marginBottom: 28,
+        }}
+      >
+        <StatTile
+          label="DAILY REPORTS"
+          value={dailyCount}
+          sub={
+            latestDaily
+              ? `latest ${formatDateLabel(latestDaily)}`
+              : "no reports yet"
+          }
+        />
+        <StatTile
+          label="WEEKLY REPORTS"
+          value={weeklyCount}
+          sub={latestWeek ? `latest ${latestWeek.label}` : "no reports yet"}
+        />
+        <StatTile
+          label="PENDING APPROVALS"
+          value={pendingCount}
+          sub={pendingCount > 0 ? "waiting on you" : "nothing to review"}
+          bad={pendingCount > 0}
+        />
       </div>
-    </div>
+
+      <div className="eyebrow" style={{ marginBottom: 14 }}>
+        GO TO
+      </div>
+      <div
+        data-ds-grid
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 14,
+        }}
+      >
+        <QuickLink
+          label="Daily reports"
+          desc="Day-by-day funnel metrics and variant performance."
+          onClick={() => navigate(`/campaigns/${campaignId}/reports/daily`)}
+        />
+        <QuickLink
+          label="Weekly reports"
+          desc="Leaderboard, element rankings, and pairwise lift."
+          onClick={() => navigate(`/campaigns/${campaignId}/reports/weekly`)}
+        />
+        <QuickLink
+          label="Next week's experiments"
+          desc="Proposed variants and actions awaiting approval."
+          badge={pendingCount}
+          onClick={() => navigate(`/campaigns/${campaignId}/experiments`)}
+        />
+      </div>
+
+      {campaign && (
+        <DangerZone
+          campaignName={campaign.name}
+          onDelete={handleDelete}
+          isPending={deleteCampaign.isPending}
+          errorMessage={
+            deleteCampaign.error ? deleteCampaign.error.message : null
+          }
+        />
+      )}
+    </DashPage>
   );
 }

@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Navigate, useParams } from "react-router-dom";
 
 import { ProposedPauseCard } from "@/components/ProposedPauseCard";
 import { ProposedScaleCard } from "@/components/ProposedScaleCard";
 import { ProposedVariantCard } from "@/components/ProposedVariantCard";
 import { SuggestGenomeForm } from "@/components/SuggestGenomeForm";
+import { DashPage } from "@/components/dashboard/DashPage";
 import { Card, CardContent } from "@/components/ui/Card";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { ApiError } from "@/lib/api/client";
@@ -80,21 +81,18 @@ export function ExperimentsRoute() {
         : null;
 
   return (
-    <div>
-      <div className="mb-6">
-        <Link
-          to={`/campaigns/${campaignId}`}
-          className="text-xs text-[var(--accent)] no-underline hover:underline"
-        >
-          ← {campaign?.name ?? "Campaign"}
-        </Link>
-        <h1 className="mt-3 text-xl font-medium">Next week&rsquo;s experiments</h1>
-        <p className="mt-1 text-xs text-[var(--text-tertiary)]">
-          Review proposed variants, approve or reject them, and suggest new
-          gene pool entries. Decisions sync back to the weekly generator.
-        </p>
-      </div>
-
+    <DashPage
+      crumb={[
+        { label: "Dashboard", href: "/dashboard" },
+        {
+          label: campaign?.name ?? "Campaign",
+          href: `/campaigns/${campaignId}`,
+        },
+        { label: "Next week's experiments" },
+      ]}
+      title="next week's experiments"
+      sub="review proposed variants, approve or reject them, and suggest new gene pool entries. decisions sync back to the weekly generator."
+    >
       {experiments.isLoading ? (
         <div className="flex flex-col gap-3">
           {Array.from({ length: 3 }).map((_, i) => (
@@ -144,7 +142,7 @@ export function ExperimentsRoute() {
           onReject={handleReject}
         />
       ) : null}
-    </div>
+    </DashPage>
   );
 }
 
