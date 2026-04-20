@@ -1077,6 +1077,11 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                     week_label=week_label,
                     base_url=settings.report_base_url,
                     review_url=report.review_url,
+                    dashboard_url=(
+                        f"{settings.frontend_base_url.rstrip('/')}"
+                        f"/campaigns/{campaign_id}/reports/weekly/"
+                        f"{report.week_start.isoformat()}"
+                    ),
                 )
                 if success:
                     click.echo(f"\nEmail report sent to {settings.report_email_to}")
@@ -1277,6 +1282,11 @@ def daily_report(campaign_id: str, send_email: bool, report_date: str | None) ->
                 success = await reporter.send_daily_report(
                     v2_report,
                     base_url=settings.report_base_url,
+                    dashboard_url=(
+                        f"{settings.frontend_base_url.rstrip('/')}"
+                        f"/campaigns/{campaign_id}/reports/daily/"
+                        f"{v2_report.report_date.isoformat()}"
+                    ),
                 )
                 if success:
                     click.echo(f"\nEmail report sent to {settings.report_email_to}")
@@ -2838,7 +2848,15 @@ def send_daily_reports(report_date: str | None, dry_run: bool) -> None:
                     from_email=settings.report_email_from,
                     to_email=owner_email,
                 )
-                ok = await reporter.send_daily_report(report, base_url=settings.report_base_url)
+                ok = await reporter.send_daily_report(
+                    report,
+                    base_url=settings.report_base_url,
+                    dashboard_url=(
+                        f"{settings.frontend_base_url.rstrip('/')}"
+                        f"/campaigns/{campaign.id}/reports/daily/"
+                        f"{report_day.isoformat()}"
+                    ),
+                )
                 if ok:
                     sent += 1
                     click.echo(f"  ✓ {campaign.name} → {owner_email}")
@@ -2996,6 +3014,11 @@ def send_weekly_reports(week_start: str | None, dry_run: bool) -> None:
                     week_label=week_label,
                     base_url=settings.report_base_url,
                     review_url=report.review_url,
+                    dashboard_url=(
+                        f"{settings.frontend_base_url.rstrip('/')}"
+                        f"/campaigns/{campaign.id}/reports/weekly/"
+                        f"{ws.isoformat()}"
+                    ),
                 )
                 if ok:
                     sent += 1

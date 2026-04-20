@@ -221,6 +221,13 @@
 </td></tr>
 {% endif %}
 
+{# Primary dashboard CTA — deep link to the authenticated weekly detail #}
+{% if dashboard_url %}
+<tr><td style="padding:28px 32px 24px;" align="center">
+  <a href="{{ dashboard_url }}" style="display:inline-block;background:#1f1d18;color:#fafaf7;font-size:14px;font-weight:500;text-decoration:none;padding:12px 22px;border-radius:99px;">Open full report →</a>
+</td></tr>
+{% endif %}
+
 <!-- Footer -->
 <tr><td style="padding:24px 32px 26px;border-top:1px solid #e2dccf;background:#f3efe5;margin-top:28px;">
   <table width="100%"><tr>

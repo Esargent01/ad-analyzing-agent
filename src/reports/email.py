@@ -140,9 +140,20 @@ class EmailReporter:
         self,
         report: DailyReport,
         base_url: str = "",
+        dashboard_url: str | None = None,
     ) -> bool:
-        """Send a daily report email using the v2 template. Returns True on success."""
-        html_content = self._render_daily_html(report, base_url=base_url)
+        """Send a daily report email using the v2 template. Returns True on success.
+
+        ``base_url`` is the public web-archive origin (GitHub Pages) used
+        for any deep links to the static archived HTML. ``dashboard_url``
+        is the authenticated dashboard deep link (e.g.
+        ``https://agent.kleiber.ai/campaigns/<id>/reports/daily/<date>``)
+        used by the primary "Open full report" CTA — the call site is
+        expected to build this per campaign + report date.
+        """
+        html_content = self._render_daily_html(
+            report, base_url=base_url, dashboard_url=dashboard_url
+        )
 
         subject = f"Daily Ad Report: {report.campaign_name} ({report.report_date.isoformat()})"
 
@@ -204,14 +215,21 @@ class EmailReporter:
         week_label: str,
         base_url: str = "",
         review_url: str | None = None,
+        dashboard_url: str | None = None,
     ) -> bool:
-        """Send a weekly report email using the redesigned template. Returns True on success."""
+        """Send a weekly report email using the redesigned template. Returns True on success.
+
+        ``dashboard_url`` is the authed weekly-report deep link
+        (``{frontend_base_url}/campaigns/<id>/reports/weekly/<week_start>``);
+        when provided it supersedes ``base_url`` for the primary CTA.
+        """
         html_content = self._render_weekly_email_html(
             report,
             campaign_name=campaign_name,
             week_label=week_label,
             base_url=base_url,
             review_url=review_url,
+            dashboard_url=dashboard_url,
         )
 
         subject = f"Weekly Ad Report: {campaign_name} (Week {week_label})"
@@ -271,7 +289,12 @@ class EmailReporter:
     # Template rendering
     # ------------------------------------------------------------------
 
-    def _render_daily_html(self, report: DailyReport, base_url: str = "") -> str:
+    def _render_daily_html(
+        self,
+        report: DailyReport,
+        base_url: str = "",
+        dashboard_url: str | None = None,
+    ) -> str:
         """Render the daily email HTML from the Jinja2 template."""
         template = self._jinja_env.get_template("daily_email.html")
 
@@ -282,6 +305,7 @@ class EmailReporter:
             report_date_fmt=report.report_date.strftime("%B %d, %Y"),
             generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
             base_url=base_url,
+            dashboard_url=dashboard_url,
             day_number=report.day_number,
             cycle_number=report.cycle_number,
             # Top-line cards
@@ -318,6 +342,7 @@ class EmailReporter:
         week_label: str,
         base_url: str = "",
         review_url: str | None = None,
+        dashboard_url: str | None = None,
     ) -> str:
         """Render the weekly email HTML from the redesigned template."""
         template = self._jinja_env.get_template("weekly_email.html")
@@ -366,6 +391,7 @@ class EmailReporter:
             expired_count=report.expired_count,
             generation_paused=report.generation_paused,
             review_url=review_url or report.review_url,
+            dashboard_url=dashboard_url,
         )
 
     def _render_html(self, report: WeeklyReport, report_type: str = "Weekly") -> str:
