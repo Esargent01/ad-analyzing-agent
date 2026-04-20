@@ -600,6 +600,9 @@ async def import_campaign(
             # that identically to video/mixed (full funnel) so an
             # unexpected creative type can't break the report.
             media_type=str(ad.get("media_type") or "unknown"),
+            # Initial-import provenance. ``sync_campaign_ads`` marks
+            # any ads it picks up post-import as "discovered".
+            source="imported",
         )
         session.add(variant)
         await session.flush()

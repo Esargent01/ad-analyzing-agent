@@ -212,6 +212,17 @@ class Variant(Base):
     media_type: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default="unknown"
     )
+    # Provenance. One of:
+    #   "imported"   — seeded during the initial self-serve
+    #                  ``import_campaign`` flow.
+    #   "discovered" — found by the periodic ``sync_campaign_ads`` step
+    #                  (i.e. user created the ad directly in Meta Ads
+    #                  Manager, bypassing Kleiber).
+    #   "generated"  — produced by Kleiber's LLM variant generator.
+    # Default ``imported`` for legacy rows that predate this column.
+    source: Mapped[str] = mapped_column(
+        String(16), nullable=False, server_default="imported"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )

@@ -104,7 +104,9 @@ def run_cycle(campaign_id: str, with_generate: bool, legacy_no_generate: bool) -
 
         from src.adapters.meta_factory import get_meta_adapter_for_campaign
         from src.db.engine import _get_session_factory, close_db, get_session, init_db
+        from src.db.tables import Campaign
         from src.exceptions import MetaConnectionMissing, MetaTokenExpired
+        from src.services.ad_sync import sync_campaign_ads
         from src.services.orchestrator import Orchestrator
 
         settings = get_settings()
@@ -140,6 +142,26 @@ def run_cycle(campaign_id: str, with_generate: bool, legacy_no_generate: bool) -
                     return
             else:
                 adapter = _get_adapter(platform)
+
+        # Sync any user-created Meta ads into ``deployments`` before
+        # the orchestrator runs. Meta-only — other adapters don't have
+        # a ``list_campaign_ads`` equivalent and the sync helper
+        # early-returns on non-Meta campaigns anyway.
+        if platform == "meta":
+            try:
+                async with get_session() as sync_session:
+                    fresh = await sync_session.get(Campaign, UUID(campaign_id))
+                    if fresh is not None:
+                        n = await sync_campaign_ads(sync_session, fresh)
+                        if n:
+                            click.echo(
+                                f"  + discovered {n} new ad(s) from Meta"
+                            )
+                        await sync_session.commit()
+            except Exception as sync_exc:  # noqa: BLE001
+                click.echo(
+                    f"  ! ad sync failed ({sync_exc}); continuing"
+                )
 
         session_factory = _get_session_factory()
         orchestrator = Orchestrator(
@@ -207,6 +229,7 @@ def run_all_user_campaigns(dry_run: bool, with_generate: bool, concurrency: int)
         from src.db.engine import _get_session_factory, close_db, get_session, init_db
         from src.db.tables import Campaign
         from src.exceptions import MetaConnectionMissing, MetaTokenExpired
+        from src.services.ad_sync import sync_campaign_ads
         from src.services.orchestrator import Orchestrator
 
         settings = get_settings()
@@ -262,6 +285,32 @@ def run_all_user_campaigns(dry_run: bool, with_generate: bool, concurrency: int)
                         except (MetaConnectionMissing, MetaTokenExpired) as exc:
                             click.echo(f"  ! skipped: {exc}")
                             return (str(campaign.id), f"skipped: {exc}")
+
+                    # Sync new Meta-side ads into ``deployments`` before
+                    # the orchestrator runs — without this, any ad the
+                    # user created in Meta Ads Manager outside Kleiber
+                    # stays invisible (poller is DB-driven). Isolated
+                    # so sync failures don't break the cycle.
+                    try:
+                        async with get_session() as sync_session:
+                            fresh = await sync_session.get(Campaign, campaign.id)
+                            if fresh is not None:
+                                n = await sync_campaign_ads(sync_session, fresh)
+                                if n:
+                                    click.echo(
+                                        f"  + {campaign.name}: discovered "
+                                        f"{n} new ad(s) from Meta"
+                                    )
+                                await sync_session.commit()
+                    except Exception as sync_exc:  # noqa: BLE001
+                        logger.warning(
+                            "ad sync failed for %s: %s — continuing",
+                            campaign.id, sync_exc,
+                        )
+                        click.echo(
+                            f"  ! {campaign.name}: ad sync failed "
+                            f"({sync_exc}); continuing"
+                        )
 
                     orchestrator = Orchestrator(
                         adapter=adapter,
@@ -2730,12 +2779,38 @@ def send_daily_reports(report_date: str | None, dry_run: bool) -> None:
 
         from src.adapters.meta_factory import get_meta_adapter_for_campaign
         from src.reports.email import EmailReporter
+        from src.services.ad_sync import sync_campaign_ads
         from src.services.poller import MetricsPoller
 
         sent = 0
         failed: list[tuple[str, str]] = []
         for campaign, owner_email in rows:
             try:
+                # Step 0: sync any ads the user created directly in Meta
+                # Ads Manager (outside Kleiber) into our deployments
+                # table. Without this, the poller below only sees ads
+                # that existed at initial ``import_campaign`` time, so
+                # spend/purchase numbers miss everything Meta launched
+                # without us knowing.
+                try:
+                    async with get_session() as session:
+                        fresh = await session.get(Campaign, campaign.id)
+                        if fresh is not None:
+                            n = await sync_campaign_ads(session, fresh)
+                            if n:
+                                click.echo(
+                                    f"  + {campaign.name}: discovered {n} "
+                                    "new ad(s) from Meta"
+                                )
+                            await session.commit()
+                except Exception as sync_exc:  # noqa: BLE001
+                    # Sync failure shouldn't block the poll — known
+                    # deployments still report; we just warn.
+                    click.echo(
+                        f"  ! {campaign.name}: ad sync failed "
+                        f"({sync_exc}); continuing with known deployments"
+                    )
+
                 # Step 1: re-poll settled metrics for ``report_day`` so the
                 # aggregate sees yesterday's *final* numbers. Without this,
                 # the report only reflects whatever partial-day snapshot the
