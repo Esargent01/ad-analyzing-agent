@@ -1,7 +1,8 @@
-import { GenomePills } from "@/components/GenomePills";
-import { Button } from "@/components/ui/Button";
+import {
+  GenomeSlots,
+  StatusPill,
+} from "@/components/dashboard/primitives";
 import type { ProposedVariant } from "@/lib/api/types";
-import { cn } from "@/lib/cn";
 
 interface ProposedVariantCardProps {
   variant: ProposedVariant;
@@ -14,10 +15,13 @@ interface ProposedVariantCardProps {
 }
 
 /**
- * One pending proposal in the authed experiments page. Mirrors the
- * `.proposal` card from `src/dashboard/templates/review.html`: header
- * with variant code + genome summary + new/expiring badge, genome
- * pills, optional hypothesis, and two action buttons.
+ * Pending variant proposal card on the experiments page.
+ *
+ * Ported to the warm-editorial system — white card with a clear
+ * header row (variant code + PROPOSED status pill + hypothesis snippet),
+ * element-chip genome row, and pill-shaped Approve / Reject buttons
+ * sitting to the right. Matches the layout in the design drop at
+ * ``kleiber-agent-deign/project/src/dashboard/screens-b.jsx::Experiments``.
  */
 export function ProposedVariantCard({
   variant,
@@ -28,59 +32,99 @@ export function ProposedVariantCard({
 }: ProposedVariantCardProps) {
   return (
     <div
-      className={cn(
-        "rounded-lg border border-[var(--border)] p-4 transition-opacity",
-        resolved && "pointer-events-none opacity-40",
-      )}
+      style={{
+        padding: 20,
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "white",
+        transition: "opacity 0.2s",
+        opacity: resolved ? 0.4 : 1,
+        pointerEvents: resolved ? "none" : undefined,
+      }}
     >
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <div className="min-w-0 text-[13px]">
-          <span className="font-mono font-semibold text-[var(--accent)]">
-            {variant.variant_code}
-          </span>
-          <span className="text-[var(--text-tertiary)]"> · </span>
-          <span className="text-[var(--text)]">{variant.genome_summary}</span>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 16,
+          marginBottom: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 14,
+                fontWeight: 500,
+                color: "var(--ink)",
+              }}
+            >
+              {variant.variant_code}
+            </span>
+            <StatusPill kind="new">PROPOSED</StatusPill>
+            {variant.classification === "expiring_soon" && (
+              <StatusPill kind="fatigue">
+                Expires in {variant.days_until_expiry}d
+              </StatusPill>
+            )}
+          </div>
+          <div
+            style={{
+              fontSize: 13.5,
+              color: "var(--muted)",
+              margin: "8px 0 0",
+              maxWidth: 620,
+              lineHeight: 1.5,
+            }}
+          >
+            {variant.genome_summary}
+          </div>
+          {variant.hypothesis && (
+            <div
+              style={{
+                fontSize: 12.5,
+                color: "var(--muted-2)",
+                margin: "6px 0 0",
+                fontStyle: "italic",
+                maxWidth: 620,
+                lineHeight: 1.5,
+              }}
+            >
+              &ldquo;{variant.hypothesis}&rdquo;
+            </div>
+          )}
         </div>
-        {variant.classification === "expiring_soon" ? (
-          <span className="inline-block whitespace-nowrap rounded-[12px] bg-[#FFF4D6] px-2.5 py-0.5 text-[11px] font-medium text-[#B07C1A]">
-            Expires in {variant.days_until_expiry} day
-            {variant.days_until_expiry === 1 ? "" : "s"}
-          </span>
-        ) : (
-          <span className="inline-block whitespace-nowrap rounded-[12px] bg-[#EDF4EC] px-2.5 py-0.5 text-[11px] font-medium text-[#2B6B30]">
-            New
-          </span>
-        )}
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => onReject(variant.approval_id)}
+            disabled={busy || resolved}
+          >
+            Reject
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => onApprove(variant.approval_id)}
+            disabled={busy || resolved}
+          >
+            Approve
+          </button>
+        </div>
       </div>
-
-      <GenomePills genome={variant.genome} />
-
-      {variant.hypothesis ? (
-        <div className="mt-2 text-xs italic leading-relaxed text-[var(--text-secondary)]">
-          &ldquo;{variant.hypothesis}&rdquo;
-        </div>
-      ) : null}
-
-      <div className="mt-3 flex gap-2">
-        <Button
-          type="button"
-          size="sm"
-          className="bg-[var(--green)] hover:brightness-110"
-          onClick={() => onApprove(variant.approval_id)}
-          disabled={busy || resolved}
-        >
-          Approve
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          className="border-[var(--red)] text-[var(--red)] hover:bg-[var(--red)] hover:text-white"
-          onClick={() => onReject(variant.approval_id)}
-          disabled={busy || resolved}
-        >
-          Reject
-        </Button>
+      <div style={{ marginTop: 12 }}>
+        <GenomeSlots genome={variant.genome} />
       </div>
     </div>
   );

@@ -1,8 +1,5 @@
 import { useState, type FormEvent } from "react";
 
-import { Button } from "@/components/ui/Button";
-import { Input } from "@/components/ui/Input";
-import { Label } from "@/components/ui/Label";
 import { ApiError } from "@/lib/api/client";
 import { useSuggestGenome } from "@/lib/api/hooks";
 
@@ -12,10 +9,13 @@ interface SuggestGenomeFormProps {
 }
 
 /**
- * "Suggest your own copy" form for the authed experiments page. Mirrors
- * the form at the bottom of `src/dashboard/templates/review.html`: a
- * slot dropdown restricted to the backend-provided allow-list, a copy
- * field (max 500 chars), an optional notes field, and a submit button.
+ * "Suggest your own copy" form for the authed experiments page.
+ *
+ * Ported to the warm-editorial system — white card, mono eyebrow
+ * labels, ``.ds-input`` fields, primary submit button, flash row
+ * for success / error states. Contents feed the gene pool via the
+ * existing ``useSuggestGenome`` mutation (slot_name + slot_value
+ * + optional description) and are used by next week's generator.
  */
 export function SuggestGenomeForm({
   campaignId,
@@ -72,27 +72,55 @@ export function SuggestGenomeForm({
   }
 
   return (
-    <div className="rounded-lg border border-[var(--border)] p-5">
-      <h3 className="text-[15px] font-medium text-[var(--text)]">
+    <div
+      style={{
+        padding: 22,
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "white",
+      }}
+    >
+      <h3
+        style={{
+          fontSize: 15,
+          fontWeight: 500,
+          color: "var(--ink)",
+          margin: 0,
+          letterSpacing: "-0.01em",
+        }}
+      >
         Suggest your own copy
       </h3>
-      <p className="mt-1 text-xs text-[var(--text-secondary)]">
-        Add your own headline, subhead, or CTA to the gene pool. The next
-        weekly generator will use it when proposing new variants.
+      <p
+        style={{
+          marginTop: 4,
+          fontSize: 12.5,
+          color: "var(--muted)",
+          lineHeight: 1.5,
+          maxWidth: 560,
+        }}
+      >
+        Add your own headline, body, or CTA to the gene pool. The next
+        weekly generator will consider it when proposing new variants.
       </p>
 
       <form
-        className="mt-4 flex flex-col gap-3"
         onSubmit={(e) => void handleSubmit(e)}
+        style={{
+          marginTop: 18,
+          display: "grid",
+          gap: 14,
+          maxWidth: 560,
+        }}
       >
-        <div>
-          <Label htmlFor="suggest-slot">Slot</Label>
+        <FormField label="Slot" htmlFor="suggest-slot">
           <select
             id="suggest-slot"
             value={slotName}
             onChange={(e) => setSlotName(e.target.value)}
-            className="h-10 w-full rounded border border-[var(--border)] bg-[var(--bg)] px-3 text-sm text-[var(--text)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             disabled={suggest.isPending}
+            className="ds-input"
+            style={{ background: "white" }}
           >
             {allowedSlots.map((slot) => (
               <option key={slot} value={slot}>
@@ -100,52 +128,83 @@ export function SuggestGenomeForm({
               </option>
             ))}
           </select>
-        </div>
+        </FormField>
 
-        <div>
-          <Label htmlFor="suggest-value">Your copy</Label>
-          <Input
+        <FormField label="Your copy" htmlFor="suggest-value">
+          <input
             id="suggest-value"
+            type="text"
             value={slotValue}
             onChange={(e) => setSlotValue(e.target.value)}
             maxLength={500}
-            placeholder="e.g., Limited time: 40% off everything"
+            placeholder="e.g., Limited time — 40% off everything"
             disabled={suggest.isPending}
+            className="ds-input"
             required
           />
-        </div>
+        </FormField>
 
-        <div>
-          <Label htmlFor="suggest-description">Notes (optional)</Label>
-          <Input
+        <FormField label="Notes (optional)" htmlFor="suggest-description">
+          <input
             id="suggest-description"
+            type="text"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             maxLength={500}
             placeholder="What is this trying to do?"
             disabled={suggest.isPending}
+            className="ds-input"
           />
-        </div>
+        </FormField>
 
-        <div>
-          <Button type="submit" size="sm" loading={suggest.isPending}>
-            Add to gene pool
-          </Button>
-        </div>
-
-        {flash ? (
-          <p
-            className={`text-xs ${
-              flash.kind === "success"
-                ? "text-[var(--green)]"
-                : "text-[var(--red)]"
-            }`}
-            role="status"
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            type="submit"
+            className="btn btn-primary btn-sm"
+            disabled={suggest.isPending}
           >
-            {flash.text}
-          </p>
-        ) : null}
+            {suggest.isPending ? "Adding…" : "Add to gene pool"}
+          </button>
+          {flash && (
+            <p
+              role="status"
+              style={{
+                margin: 0,
+                fontSize: 12.5,
+                color:
+                  flash.kind === "success"
+                    ? "oklch(40% 0.14 145)"
+                    : "oklch(48% 0.16 28)",
+              }}
+            >
+              {flash.text}
+            </p>
+          )}
+        </div>
       </form>
+    </div>
+  );
+}
+
+function FormField({
+  label,
+  htmlFor,
+  children,
+}: {
+  label: string;
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <label
+        htmlFor={htmlFor}
+        className="eyebrow"
+        style={{ display: "block", fontSize: 10, marginBottom: 6 }}
+      >
+        {label}
+      </label>
+      {children}
     </div>
   );
 }

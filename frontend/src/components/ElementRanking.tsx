@@ -6,18 +6,17 @@ interface ElementRankingProps {
 }
 
 /**
- * Dual-column element leaderboard matching the weekly report's
- * "Element performance" section. One column ranks by hook rate
- * (attention), the other by CTR (efficiency). Top 8 in each.
+ * Dual-column element leaderboard for the weekly report.
  *
- * Sorting happens client-side so we don't need two separate backend
- * responses — the /api/campaigns/{id}/reports/weekly/{w} endpoint
- * returns one `top_elements` list and we slice it here.
+ * Ported to match the warm-editorial palette — white-card columns
+ * with warm-paper header bars, mono numerics, element values shown
+ * inline with their slot label. Sorting is client-side so the
+ * backend only has to serve one ``top_elements`` list.
  */
 export function ElementRanking({ elements }: ElementRankingProps) {
   if (elements.length === 0) {
     return (
-      <p className="text-xs text-[var(--text-tertiary)]">
+      <p style={{ fontSize: 12, color: "var(--muted)" }}>
         No element-level data yet — run a few cycles first.
       </p>
     );
@@ -35,10 +34,17 @@ export function ElementRanking({ elements }: ElementRankingProps) {
     .slice(0, 8);
 
   return (
-    <div className="grid gap-6 md:grid-cols-2">
+    <div
+      data-ds-grid
+      style={{
+        display: "grid",
+        gridTemplateColumns: "1fr 1fr",
+        gap: 14,
+      }}
+    >
       <RankingColumn
         title="Attention ranking"
-        subtitle="By average hook rate"
+        subtitle="by average hook rate"
         rows={byHook.map((e, i) => ({
           key: `${e.slot_name}-${e.slot_value}-${i}`,
           rank: i + 1,
@@ -52,7 +58,7 @@ export function ElementRanking({ elements }: ElementRankingProps) {
       />
       <RankingColumn
         title="Efficiency ranking"
-        subtitle="By CTR"
+        subtitle="by CTR"
         rows={byCtr.map((e, i) => ({
           key: `${e.slot_name}-${e.slot_value}-ctr-${i}`,
           rank: i + 1,
@@ -83,33 +89,107 @@ function RankingColumn({
   rows: RankingRow[];
 }) {
   return (
-    <div>
-      <h3 className="text-sm font-medium">{title}</h3>
-      <p className="mb-2 text-[11px] text-[var(--text-tertiary)]">{subtitle}</p>
-      <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
-        {rows.map((row) => (
+    <div
+      style={{
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "white",
+        overflow: "hidden",
+      }}
+    >
+      <div
+        style={{
+          padding: "12px 16px",
+          borderBottom: "1px solid var(--border)",
+          background: "var(--paper-2)",
+        }}
+      >
+        <div
+          style={{
+            fontSize: 13,
+            fontWeight: 500,
+            color: "var(--ink)",
+            letterSpacing: "-0.01em",
+          }}
+        >
+          {title}
+        </div>
+        <div
+          className="eyebrow"
+          style={{ fontSize: 9.5, marginTop: 3 }}
+        >
+          {subtitle}
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <div
+          style={{
+            padding: "18px 16px",
+            fontSize: 12,
+            color: "var(--muted)",
+          }}
+        >
+          No rows yet.
+        </div>
+      ) : (
+        rows.map((row, i) => (
           <div
             key={row.key}
-            className="grid grid-cols-[28px_1fr_auto] items-baseline gap-2 py-1.5 text-xs"
+            style={{
+              display: "grid",
+              gridTemplateColumns: "32px 1fr auto",
+              alignItems: "center",
+              gap: 10,
+              padding: "11px 16px",
+              borderBottom:
+                i < rows.length - 1
+                  ? "1px solid var(--border-soft)"
+                  : "none",
+            }}
           >
-            <span className="text-[var(--text-tertiary)]">#{row.rank}</span>
-            <div className="min-w-0">
-              <div className="text-[10px] uppercase tracking-[0.3px] text-[var(--text-tertiary)]">
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 10.5,
+                color: "var(--muted)",
+              }}
+            >
+              #{row.rank}
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <div className="eyebrow" style={{ fontSize: 9.5 }}>
                 {row.slot}
               </div>
               <div
-                className="truncate text-[var(--text)]"
+                style={{
+                  fontSize: 13,
+                  color: "var(--ink)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
                 title={row.value}
               >
                 {row.value}
               </div>
             </div>
-            <span className="text-right font-medium text-[var(--text)]">
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 12,
+                fontWeight: 500,
+                color:
+                  row.metric.startsWith("-") || row.metric === "—"
+                    ? "var(--ink-2)"
+                    : "oklch(40% 0.14 145)",
+                textAlign: "right",
+              }}
+            >
               {row.metric}
             </span>
           </div>
-        ))}
-      </div>
+        ))
+      )}
     </div>
   );
 }

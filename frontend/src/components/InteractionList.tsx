@@ -7,9 +7,12 @@ interface InteractionListProps {
 }
 
 /**
- * Mirrors the weekly report's "Top element interactions" section.
- * Each row shows the element pair, the combined CTR + variant count,
- * and the interaction lift (green if positive, red if negative).
+ * Weekly report's "Top pairwise lifts" list.
+ *
+ * Ported to the warm-editorial palette — single white card, each row
+ * compact and mono-flavored. Green lift for synergy, terracotta for
+ * conflict. Matches the layout on the design drop
+ * (``kleiber-agent-deign/project/src/dashboard/screens-b.jsx``).
  */
 export function InteractionList({
   interactions,
@@ -17,9 +20,9 @@ export function InteractionList({
 }: InteractionListProps) {
   if (interactions.length === 0) {
     return (
-      <p className="text-xs text-[var(--text-tertiary)]">
-        No pairwise interactions yet — need at least one variant that
-        shares elements with another.
+      <p style={{ fontSize: 12, color: "var(--muted)" }}>
+        No pairwise interactions yet — need at least one variant that shares
+        elements with another.
       </p>
     );
   }
@@ -27,35 +30,83 @@ export function InteractionList({
   const rows = interactions.slice(0, limit);
 
   return (
-    <div className="divide-y divide-[var(--border)] border-y border-[var(--border)]">
+    <div
+      style={{
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "white",
+        overflow: "hidden",
+      }}
+    >
       {rows.map((i, idx) => {
         const lift = i.interaction_lift != null ? Number(i.interaction_lift) : null;
-        const liftClass =
+        const liftColor =
           lift != null
             ? lift > 0
-              ? "text-[var(--green)]"
-              : "text-[var(--red)]"
-            : "text-[var(--text-tertiary)]";
+              ? "oklch(40% 0.14 145)"
+              : "oklch(48% 0.16 28)"
+            : "var(--muted)";
         return (
           <div
             key={`${i.slot_a_name}-${i.slot_a_value}-${i.slot_b_name}-${i.slot_b_value}-${idx}`}
-            className="flex flex-col gap-1 py-2 text-xs sm:flex-row sm:items-center sm:justify-between"
+            style={{
+              padding: "12px 16px",
+              borderBottom:
+                idx < rows.length - 1 ? "1px solid var(--border-soft)" : "none",
+            }}
           >
-            <div className="min-w-0 flex-1">
-              <span className="font-medium">{i.slot_a_name}</span>:{" "}
-              {truncate(i.slot_a_value, 25)}
-              <span className="mx-1 text-[var(--text-tertiary)]">+</span>
-              <span className="font-medium">{i.slot_b_name}</span>:{" "}
-              {truncate(i.slot_b_value, 25)}
-            </div>
-            <div className="flex items-baseline gap-3">
-              <span className={`font-medium ${liftClass}`}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                gap: 10,
+                flexWrap: "wrap",
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 12.5,
+                  color: "var(--ink-2)",
+                  minWidth: 0,
+                  flex: 1,
+                }}
+              >
+                <span style={{ color: "var(--muted)" }}>
+                  {i.slot_a_name}
+                </span>{" "}
+                <span style={{ fontFamily: "var(--font-mono)" }}>
+                  {truncate(i.slot_a_value, 24)}
+                </span>{" "}
+                <span style={{ color: "var(--muted)" }}>×</span>{" "}
+                <span style={{ color: "var(--muted)" }}>
+                  {i.slot_b_name}
+                </span>{" "}
+                <span style={{ fontFamily: "var(--font-mono)" }}>
+                  {truncate(i.slot_b_value, 24)}
+                </span>
+              </div>
+              <span
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 12.5,
+                  fontWeight: 500,
+                  color: liftColor,
+                }}
+              >
                 {lift != null ? formatSignedPct(lift) : "—"}
               </span>
-              <span className="text-[11px] text-[var(--text-tertiary)]">
-                {formatPct(i.combined_avg_ctr)} CTR · {i.variants_tested}{" "}
-                variant{i.variants_tested === 1 ? "" : "s"}
-              </span>
+            </div>
+            <div
+              style={{
+                marginTop: 4,
+                fontFamily: "var(--font-mono)",
+                fontSize: 10.5,
+                color: "var(--muted)",
+              }}
+            >
+              {formatPct(i.combined_avg_ctr)} CTR · {i.variants_tested}{" "}
+              variant{i.variants_tested === 1 ? "" : "s"}
             </div>
           </div>
         );

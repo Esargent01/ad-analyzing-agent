@@ -9,9 +9,17 @@
  *
  * The row is intentionally dumb — it doesn't own any state. The
  * import page passes `selected` + `onToggle` in.
+ *
+ * Ported to the warm-editorial palette — white rows with warm-paper
+ * highlight for the selected state and a subtle tint for imported
+ * rows. Dashboard primitives supply the status pill so the type
+ * reads consistently across the app.
  */
 
-import { StatusPill } from "@/components/StatusPill";
+import {
+  StatusPill,
+  type StatusKind,
+} from "@/components/dashboard/primitives";
 import type { ImportableCampaign } from "@/lib/api/types";
 
 interface Props {
@@ -29,11 +37,8 @@ function formatBudget(budget: number | null): string {
   })}`;
 }
 
-function statusKind(
-  status: string,
-): "active" | "paused" | "new" | "fatigue" | "winner" {
-  if (status.toUpperCase() === "ACTIVE") return "active";
-  return "paused";
+function statusKind(status: string): StatusKind {
+  return status.toUpperCase() === "ACTIVE" ? "active" : "paused";
 }
 
 export function MetaCampaignRow({
@@ -43,61 +48,111 @@ export function MetaCampaignRow({
   onToggle,
 }: Props) {
   const isLocked = disabled || campaign.already_imported;
-  const rowClasses = [
-    "flex items-start gap-3 rounded-lg border px-4 py-3 transition-colors",
-    isLocked
-      ? "border-[var(--border)] bg-[var(--bg-secondary)] opacity-60"
-      : selected
-      ? "border-[var(--accent)] bg-[var(--bg)]"
-      : "border-[var(--border)] bg-[var(--bg)] hover:border-[var(--accent)]",
-  ].join(" ");
+
+  const background = isLocked
+    ? "var(--paper-2)"
+    : selected
+      ? "oklch(97% 0.04 60 / 0.6)"
+      : "white";
+
+  const borderColor = selected && !isLocked
+    ? "var(--accent)"
+    : "var(--border)";
 
   return (
-    <label className={rowClasses}>
+    <label
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 12,
+        padding: "14px 16px",
+        borderRadius: 12,
+        border: `1px solid ${borderColor}`,
+        background,
+        transition: "all 0.15s",
+        cursor: isLocked ? "not-allowed" : "pointer",
+        opacity: isLocked ? 0.65 : 1,
+      }}
+    >
       <input
         type="checkbox"
-        className="mt-1 h-4 w-4 cursor-pointer accent-[var(--accent)] disabled:cursor-not-allowed"
         checked={selected}
         disabled={isLocked}
         onChange={() => onToggle(campaign.meta_campaign_id)}
+        style={{
+          width: 16,
+          height: 16,
+          marginTop: 2,
+          accentColor: "var(--ink)",
+          cursor: isLocked ? "not-allowed" : "pointer",
+        }}
       />
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-3">
-          <h3 className="truncate text-sm font-medium text-[var(--text)]">
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            gap: 12,
+            alignItems: "center",
+          }}
+        >
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 13.5,
+              fontWeight: 500,
+              color: "var(--ink)",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
             {campaign.name}
+            {campaign.already_imported && (
+              <span
+                style={{
+                  marginLeft: 8,
+                  fontFamily: "var(--font-mono)",
+                  fontSize: 9.5,
+                  color: "oklch(40% 0.14 145)",
+                  letterSpacing: "0.06em",
+                }}
+              >
+                IMPORTED
+              </span>
+            )}
           </h3>
           <StatusPill kind={statusKind(campaign.status)}>
             {campaign.status}
           </StatusPill>
         </div>
-        <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--text-tertiary)]">
-          <div className="flex gap-1">
-            <dt>Budget:</dt>
-            <dd className="text-[var(--text-secondary)]">
-              {formatBudget(campaign.daily_budget)}
-            </dd>
-          </div>
+        <dl
+          style={{
+            margin: "6px 0 0",
+            display: "flex",
+            flexWrap: "wrap",
+            gap: "4px 16px",
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            color: "var(--muted)",
+          }}
+        >
+          <Entry label="budget" value={formatBudget(campaign.daily_budget)} />
           {campaign.objective && (
-            <div className="flex gap-1">
-              <dt>Objective:</dt>
-              <dd className="text-[var(--text-secondary)]">
-                {campaign.objective}
-              </dd>
-            </div>
+            <Entry label="objective" value={campaign.objective} />
           )}
-          <div className="flex gap-1">
-            <dt>Meta ID:</dt>
-            <dd className="font-mono text-[var(--text-secondary)]">
-              {campaign.meta_campaign_id}
-            </dd>
-          </div>
+          <Entry label="id" value={campaign.meta_campaign_id} />
         </dl>
-        {campaign.already_imported && (
-          <p className="mt-1 text-[11px] uppercase tracking-wide text-[var(--text-tertiary)]">
-            Already imported
-          </p>
-        )}
       </div>
     </label>
+  );
+}
+
+function Entry({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "inline-flex", gap: 5 }}>
+      <dt style={{ color: "var(--muted-2)" }}>{label}</dt>
+      <dd style={{ margin: 0, color: "var(--ink-2)" }}>{value}</dd>
+    </div>
   );
 }

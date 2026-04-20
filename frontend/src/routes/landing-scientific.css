@@ -1,50 +1,16 @@
 /*
- * Scoped design tokens + utility classes for the "scientific" landing
- * variant (A/B test partner to /). Every rule is namespaced under
- * ``.kleiber-b-landing`` so it cannot leak into the rest of the
- * dashboard, which runs its own palette + typography.
- *
- * Palette: warm neutrals + terracotta accent + stats-green +
- * stats-red. Editorial-leaning type pairing: Geist sans throughout
- * (including accent spans, which lean on color + a soft underline
- * rather than italic contrast), Geist Mono for stats/code/metadata.
+ * Namespaced utility classes for the "scientific" landing variant
+ * (A/B test partner to /). All design tokens now live in the global
+ * design system (``src/styles/design-system.css``) — this file only
+ * carries ``.b-*`` utility classes scoped under ``.kleiber-b-landing``
+ * so legacy class names in the landing markup keep working without
+ * leaking styles into the dashboard.
  */
 
 .kleiber-b-landing {
-  /* Warm neutrals */
-  --b-paper: oklch(98.5% 0.006 80);
-  --b-paper-2: oklch(96.5% 0.01 78);
-  --b-paper-3: oklch(94% 0.012 75);
-  --b-ink: oklch(22% 0.02 60);
-  --b-ink-2: oklch(35% 0.02 65);
-  --b-muted: oklch(55% 0.015 70);
-  --b-muted-2: oklch(68% 0.012 72);
-  --b-border: oklch(90% 0.01 75);
-  --b-border-soft: oklch(94% 0.008 75);
-
-  /* Accent — warm terracotta/ochre */
-  --b-accent: oklch(62% 0.16 55);
-  --b-accent-soft: oklch(92% 0.05 60);
-  --b-accent-ink: oklch(35% 0.12 50);
-
-  /* Stats colors */
-  --b-win: oklch(58% 0.14 145);
-  --b-win-soft: oklch(94% 0.05 145);
-  --b-lose: oklch(60% 0.16 28);
-  --b-lose-soft: oklch(95% 0.04 28);
-
-  /* Type */
-  --b-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --b-mono: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, monospace;
-
-  /* Shadows — warm-tinted */
-  --b-shadow-sm: 0 1px 2px oklch(30% 0.02 60 / 0.04), 0 1px 1px oklch(30% 0.02 60 / 0.03);
-  --b-shadow-md: 0 4px 16px oklch(30% 0.02 60 / 0.06), 0 1px 2px oklch(30% 0.02 60 / 0.04);
-  --b-shadow-lg: 0 20px 60px oklch(30% 0.02 60 / 0.08), 0 4px 12px oklch(30% 0.02 60 / 0.04);
-
-  background: var(--b-paper);
-  color: var(--b-ink);
-  font-family: var(--b-sans);
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
   font-size: 16px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -89,15 +55,15 @@ html:has(.kleiber-b-landing) {
 
 /* Type utilities */
 .kleiber-b-landing .b-mono {
-  font-family: var(--b-mono);
+  font-family: var(--font-mono);
 }
 
 .kleiber-b-landing .b-eyebrow {
-  font-family: var(--b-mono);
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--b-muted);
+  color: var(--muted);
 }
 
 /*
@@ -121,7 +87,7 @@ html:has(.kleiber-b-landing) {
 .kleiber-b-landing .b-h-display {
   font-size: clamp(36px, 5vw, 64px);
   line-height: 1.02;
-  color: var(--b-ink);
+  color: var(--ink);
   margin: 0;
 }
 
@@ -135,7 +101,7 @@ html:has(.kleiber-b-landing) {
   font-size: clamp(15px, 1.25vw, 18px);
   line-height: 1.45;
   letter-spacing: -0.01em;
-  color: var(--b-muted);
+  color: var(--muted);
   font-weight: 400;
   margin: 0;
 }
@@ -155,10 +121,10 @@ html:has(.kleiber-b-landing) {
   font-style: normal;
   font-weight: 500;
   letter-spacing: inherit;
-  color: var(--b-accent);
+  color: var(--accent);
   text-decoration: underline;
   text-decoration-thickness: 1px;
-  text-decoration-color: var(--b-accent-soft);
+  text-decoration-color: var(--accent-soft);
   text-underline-offset: 0.18em;
 }
 
@@ -180,25 +146,25 @@ html:has(.kleiber-b-landing) {
 }
 
 .kleiber-b-landing .b-btn-primary {
-  background: var(--b-ink);
-  color: var(--b-paper);
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .kleiber-b-landing .b-btn-primary:hover {
-  background: var(--b-ink-2);
+  background: var(--ink-2);
   transform: translateY(-1px);
-  box-shadow: var(--b-shadow-md);
+  box-shadow: var(--shadow-md);
 }
 
 .kleiber-b-landing .b-btn-ghost {
   background: transparent;
-  color: var(--b-ink);
-  border-color: var(--b-border);
+  color: var(--ink);
+  border-color: var(--border);
 }
 
 .kleiber-b-landing .b-btn-ghost:hover {
-  background: var(--b-paper-2);
-  border-color: var(--b-muted-2);
+  background: var(--paper-2);
+  border-color: var(--muted-2);
 }
 
 .kleiber-b-landing .b-btn-sm {
@@ -241,22 +207,22 @@ html:has(.kleiber-b-landing) {
   gap: 6px;
   padding: 4px 10px;
   border-radius: 999px;
-  font-family: var(--b-mono);
+  font-family: var(--font-mono);
   font-size: 11.5px;
   letter-spacing: -0.005em;
-  background: var(--b-paper-2);
-  border: 1px solid var(--b-border);
-  color: var(--b-ink-2);
+  background: var(--paper-2);
+  border: 1px solid var(--border);
+  color: var(--ink-2);
 }
 
 .kleiber-b-landing .b-chip-win {
-  background: var(--b-win-soft);
+  background: var(--win-soft);
   color: oklch(32% 0.14 145);
   border-color: transparent;
 }
 
 .kleiber-b-landing .b-chip-lose {
-  background: var(--b-lose-soft);
+  background: var(--lose-soft);
   color: oklch(38% 0.16 28);
   border-color: transparent;
 }
@@ -273,17 +239,17 @@ html:has(.kleiber-b-landing) {
 .kleiber-b-landing .b-input {
   width: 100%;
   padding: 12px 14px;
-  border: 1px solid var(--b-border);
+  border: 1px solid var(--border);
   border-radius: 10px;
   font-size: 14.5px;
   background: white;
-  color: var(--b-ink);
+  color: var(--ink);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .kleiber-b-landing .b-input:focus {
-  border-color: var(--b-ink);
+  border-color: var(--ink);
   box-shadow: 0 0 0 3px oklch(22% 0.02 60 / 0.06);
 }
 

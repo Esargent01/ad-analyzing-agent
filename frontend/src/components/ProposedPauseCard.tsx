@@ -1,7 +1,8 @@
-import { GenomePills } from "@/components/GenomePills";
-import { Button } from "@/components/ui/Button";
+import {
+  GenomeSlots,
+  StatusPill,
+} from "@/components/dashboard/primitives";
 import type { PendingPauseVariant } from "@/lib/api/types";
-import { cn } from "@/lib/cn";
 
 interface ProposedPauseCardProps {
   proposal: PendingPauseVariant;
@@ -15,13 +16,16 @@ interface ProposedPauseCardProps {
  * Phase H card: agent proposes pausing a currently-running ad.
  *
  * The agent never pauses ads autonomously — it queues this row into
- * ``approval_queue`` with the statistical evidence it used and the
+ * ``approval_queue`` with the statistical evidence it used, and the
  * user's click on "Confirm pause" is what actually fires
  * ``MetaAdapter.pause_ad``. Two flavours of reason land here:
  *
  * - ``statistically_significant_loser`` — the variant lost a
  *   two-proportion z-test against the baseline
  * - ``audience_fatigue`` — CTR has declined for 3+ consecutive days
+ *
+ * Visuals: danger-tinted white card, red status chip, 4-up mono
+ * stats row with the exact numbers that triggered the proposal.
  */
 export function ProposedPauseCard({
   proposal,
@@ -43,98 +47,146 @@ export function ProposedPauseCard({
   const reasonLabel =
     reason === "audience_fatigue"
       ? "Audience fatigue"
-      : "Statistically significant loser";
+      : "Significant loser";
 
   return (
     <div
-      className={cn(
-        "rounded-lg border border-[var(--red)] bg-[var(--bg-secondary)] p-4 transition-opacity",
-        resolved && "pointer-events-none opacity-40",
-      )}
+      style={{
+        padding: 20,
+        border: "1px solid oklch(88% 0.08 28)",
+        borderRadius: 12,
+        background: "oklch(98% 0.02 28)",
+        transition: "opacity 0.2s",
+        opacity: resolved ? 0.4 : 1,
+        pointerEvents: resolved ? "none" : undefined,
+      }}
     >
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <div className="min-w-0 text-[13px]">
-          <span className="font-mono font-semibold text-[var(--red)]">
-            Pause {variant_code ?? platform_ad_id}
-          </span>
-          <span className="text-[var(--text-tertiary)]"> · </span>
-          <span className="text-[var(--text)]">
-            The agent recommends taking this ad offline.
-          </span>
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 16,
+          marginBottom: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 14,
+                fontWeight: 500,
+                color: "oklch(40% 0.16 28)",
+              }}
+            >
+              Pause {variant_code ?? platform_ad_id}
+            </span>
+            <StatusPill kind="danger">{reasonLabel}</StatusPill>
+          </div>
+          <p
+            style={{
+              fontSize: 13.5,
+              color: "var(--ink-2)",
+              margin: "8px 0 0",
+              maxWidth: 620,
+              lineHeight: 1.5,
+            }}
+          >
+            The agent recommends taking this ad offline. Review the
+            numbers, then confirm or keep it running.
+          </p>
         </div>
-        <span className="inline-block whitespace-nowrap rounded-[12px] bg-[#FBE3E3] px-2.5 py-0.5 text-[11px] font-medium text-[#9B2226]">
-          {reasonLabel}
-        </span>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => onReject(proposal.approval_id)}
+            disabled={busy || resolved}
+          >
+            Keep running
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm btn-danger"
+            onClick={() => onApprove(proposal.approval_id)}
+            disabled={busy || resolved}
+          >
+            Confirm pause
+          </button>
+        </div>
       </div>
 
-      {Object.keys(genome_snapshot).length > 0 ? (
-        <GenomePills genome={genome_snapshot} />
-      ) : null}
+      {Object.keys(genome_snapshot).length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <GenomeSlots genome={genome_snapshot} />
+        </div>
+      )}
 
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-[var(--text-secondary)] sm:grid-cols-4">
+      <dl
+        data-ds-grid
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(4, 1fr)",
+          gap: 12,
+          margin: 0,
+        }}
+      >
         {reason === "statistically_significant_loser" ? (
           <>
-            <div>
-              <dt className="text-[var(--text-tertiary)]">Variant CTR</dt>
-              <dd className="font-mono">{formatPct(evidence.variant_ctr)}</dd>
-            </div>
-            <div>
-              <dt className="text-[var(--text-tertiary)]">Baseline CTR</dt>
-              <dd className="font-mono">{formatPct(evidence.baseline_ctr)}</dd>
-            </div>
-            <div>
-              <dt className="text-[var(--text-tertiary)]">p-value</dt>
-              <dd className="font-mono">{formatP(evidence.p_value)}</dd>
-            </div>
-            <div>
-              <dt className="text-[var(--text-tertiary)]">Impressions</dt>
-              <dd className="font-mono">{formatInt(evidence.impressions)}</dd>
-            </div>
+            <EvidenceCell label="Variant CTR" value={formatPct(evidence.variant_ctr)} />
+            <EvidenceCell label="Baseline CTR" value={formatPct(evidence.baseline_ctr)} />
+            <EvidenceCell label="p-value" value={formatP(evidence.p_value)} />
+            <EvidenceCell label="Impressions" value={formatInt(evidence.impressions)} />
           </>
         ) : (
           <>
-            <div>
-              <dt className="text-[var(--text-tertiary)]">Days declining</dt>
-              <dd className="font-mono">
-                {formatInt(evidence.consecutive_decline_days)}
-              </dd>
-            </div>
-            <div>
-              <dt className="text-[var(--text-tertiary)]">Trend slope</dt>
-              <dd className="font-mono">{formatP(evidence.trend_slope)}</dd>
-            </div>
-            <div>
-              <dt className="text-[var(--text-tertiary)]">Current CTR</dt>
-              <dd className="font-mono">{formatPct(evidence.variant_ctr)}</dd>
-            </div>
-            <div>
-              <dt className="text-[var(--text-tertiary)]">Impressions</dt>
-              <dd className="font-mono">{formatInt(evidence.impressions)}</dd>
-            </div>
+            <EvidenceCell
+              label="Days declining"
+              value={formatInt(evidence.consecutive_decline_days)}
+            />
+            <EvidenceCell label="Trend slope" value={formatP(evidence.trend_slope)} />
+            <EvidenceCell label="Current CTR" value={formatPct(evidence.variant_ctr)} />
+            <EvidenceCell label="Impressions" value={formatInt(evidence.impressions)} />
           </>
         )}
       </dl>
+    </div>
+  );
+}
 
-      <div className="mt-3 flex gap-2">
-        <Button
-          type="button"
-          size="sm"
-          className="bg-[var(--red)] hover:brightness-110"
-          onClick={() => onApprove(proposal.approval_id)}
-          disabled={busy || resolved}
-        >
-          Confirm pause
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          onClick={() => onReject(proposal.approval_id)}
-          disabled={busy || resolved}
-        >
-          Keep running
-        </Button>
-      </div>
+function EvidenceCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        padding: 10,
+        background: "white",
+        borderRadius: 8,
+        border: "1px solid var(--border-soft)",
+      }}
+    >
+      <dt className="eyebrow" style={{ fontSize: 9.5 }}>
+        {label}
+      </dt>
+      <dd
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 13,
+          fontWeight: 500,
+          margin: "2px 0 0",
+          color: "var(--ink)",
+        }}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

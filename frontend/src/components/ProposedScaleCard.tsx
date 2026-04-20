@@ -1,7 +1,8 @@
-import { GenomePills } from "@/components/GenomePills";
-import { Button } from "@/components/ui/Button";
+import {
+  GenomeSlots,
+  StatusPill,
+} from "@/components/dashboard/primitives";
 import type { PendingScaleBudget } from "@/lib/api/types";
-import { cn } from "@/lib/cn";
 
 interface ProposedScaleCardProps {
   proposal: PendingScaleBudget;
@@ -14,11 +15,15 @@ interface ProposedScaleCardProps {
 /**
  * Phase H card: agent proposes a budget change for a running ad.
  *
- * Source of the proposal is Thompson sampling — the agent's
- * posterior over each variant's CTR assigns shares of the daily
- * budget, and any variant whose proposed share exceeds its current
- * budget by ≥5% gets a row in ``approval_queue``. The user
- * confirms and the executor pushes the new budget to Meta.
+ * Source of the proposal is Thompson sampling — the agent's posterior
+ * over each variant's CTR assigns shares of the daily budget, and any
+ * variant whose proposed share exceeds its current budget by ≥5%
+ * gets a row in ``approval_queue``. The user confirms and the
+ * executor pushes the new budget to Meta.
+ *
+ * Visuals: warm-paper white card, winning-green status chip (or
+ * fatigue-amber when scaling down), prominent current → proposed
+ * number line, 3-up mono evidence row.
  */
 export function ProposedScaleCard({
   proposal,
@@ -49,86 +54,175 @@ export function ProposedScaleCard({
   const fmtPct = (v: number | null | undefined) =>
     v == null ? "—" : `${(Number(v) * 100).toFixed(2)}%`;
 
+  const arrowColor = increasing
+    ? "oklch(40% 0.14 145)"
+    : "oklch(48% 0.16 28)";
+
   return (
     <div
-      className={cn(
-        "rounded-lg border border-[var(--green)] bg-[var(--bg-secondary)] p-4 transition-opacity",
-        resolved && "pointer-events-none opacity-40",
-      )}
+      style={{
+        padding: 20,
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "white",
+        transition: "opacity 0.2s",
+        opacity: resolved ? 0.4 : 1,
+        pointerEvents: resolved ? "none" : undefined,
+      }}
     >
-      <div className="mb-2 flex items-start justify-between gap-3">
-        <div className="min-w-0 text-[13px]">
-          <span className="font-mono font-semibold text-[var(--green)]">
-            {increasing ? "Scale up" : "Scale down"}{" "}
-            {variant_code ?? platform_ad_id}
-          </span>
-          <span className="text-[var(--text-tertiary)]"> · </span>
-          <span className="text-[var(--text)]">
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "flex-start",
+          gap: 16,
+          marginBottom: 10,
+          flexWrap: "wrap",
+        }}
+      >
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              alignItems: "center",
+              flexWrap: "wrap",
+            }}
+          >
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 14,
+                fontWeight: 500,
+                color: "var(--ink)",
+              }}
+            >
+              {increasing ? "Scale up" : "Scale down"}{" "}
+              {variant_code ?? platform_ad_id}
+            </span>
+            <StatusPill kind={increasing ? "winner" : "fatigue"}>
+              {increasing ? "+" : ""}
+              {deltaPct.toFixed(0)}%
+            </StatusPill>
+          </div>
+          <p
+            style={{
+              fontSize: 13.5,
+              color: "var(--ink-2)",
+              margin: "8px 0 0",
+              maxWidth: 620,
+              lineHeight: 1.5,
+            }}
+          >
             Thompson sampling says this ad deserves
-            {increasing ? " more" : " less"} budget.
-          </span>
+            {increasing ? " more" : " less"} budget. Review the evidence,
+            then confirm the change.
+          </p>
         </div>
-        <span className="inline-block whitespace-nowrap rounded-[12px] bg-[#EDF4EC] px-2.5 py-0.5 text-[11px] font-medium text-[#2B6B30]">
-          {increasing ? "+" : ""}
-          {deltaPct.toFixed(0)}%
-        </span>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => onReject(proposal.approval_id)}
+            disabled={busy || resolved}
+          >
+            Keep budget
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={() => onApprove(proposal.approval_id)}
+            disabled={busy || resolved}
+          >
+            Confirm budget change
+          </button>
+        </div>
       </div>
 
-      {Object.keys(genome_snapshot).length > 0 ? (
-        <GenomePills genome={genome_snapshot} />
-      ) : null}
+      {Object.keys(genome_snapshot).length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <GenomeSlots genome={genome_snapshot} />
+        </div>
+      )}
 
-      <div className="mt-3 flex items-center gap-2 text-[13px] font-mono">
-        <span className="text-[var(--text-secondary)]">{fmtUSD(current)}</span>
-        <span className="text-[var(--text-tertiary)]">→</span>
+      {/* Big number transition */}
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: 14,
+          background: "var(--paper-2)",
+          borderRadius: 10,
+          marginBottom: 14,
+          fontFamily: "var(--font-mono)",
+        }}
+      >
+        <span style={{ fontSize: 16, color: "var(--muted)" }}>
+          {fmtUSD(current)}
+        </span>
+        <span style={{ color: "var(--muted)" }}>→</span>
         <span
-          className={cn(
-            "font-semibold",
-            increasing ? "text-[var(--green)]" : "text-[var(--red)]",
-          )}
+          style={{
+            fontSize: 18,
+            fontWeight: 500,
+            color: arrowColor,
+          }}
         >
           {fmtUSD(proposed)}
         </span>
-        <span className="text-[11px] text-[var(--text-tertiary)]">/ day</span>
+        <span style={{ fontSize: 11, color: "var(--muted)" }}>/ day</span>
       </div>
 
-      <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] text-[var(--text-secondary)] sm:grid-cols-3">
-        <div>
-          <dt className="text-[var(--text-tertiary)]">Posterior mean CTR</dt>
-          <dd className="font-mono">{fmtPct(evidence.posterior_mean)}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--text-tertiary)]">Share of allocation</dt>
-          <dd className="font-mono">{fmtPct(evidence.share_of_allocation)}</dd>
-        </div>
-        <div>
-          <dt className="text-[var(--text-tertiary)]">Method</dt>
-          <dd className="font-mono">
-            {evidence.allocation_method ?? "thompson_sampling"}
-          </dd>
-        </div>
+      <dl
+        data-ds-grid
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: 12,
+          margin: 0,
+        }}
+      >
+        <EvidenceCell
+          label="Posterior mean CTR"
+          value={fmtPct(evidence.posterior_mean)}
+        />
+        <EvidenceCell
+          label="Share of allocation"
+          value={fmtPct(evidence.share_of_allocation)}
+        />
+        <EvidenceCell
+          label="Method"
+          value={evidence.allocation_method ?? "thompson_sampling"}
+        />
       </dl>
+    </div>
+  );
+}
 
-      <div className="mt-3 flex gap-2">
-        <Button
-          type="button"
-          size="sm"
-          className="bg-[var(--green)] hover:brightness-110"
-          onClick={() => onApprove(proposal.approval_id)}
-          disabled={busy || resolved}
-        >
-          Confirm budget change
-        </Button>
-        <Button
-          type="button"
-          size="sm"
-          variant="secondary"
-          onClick={() => onReject(proposal.approval_id)}
-          disabled={busy || resolved}
-        >
-          Keep budget
-        </Button>
-      </div>
+function EvidenceCell({ label, value }: { label: string; value: string }) {
+  return (
+    <div
+      style={{
+        padding: 10,
+        background: "var(--paper-2)",
+        borderRadius: 8,
+      }}
+    >
+      <dt className="eyebrow" style={{ fontSize: 9.5 }}>
+        {label}
+      </dt>
+      <dd
+        style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: 13,
+          fontWeight: 500,
+          margin: "2px 0 0",
+          color: "var(--ink)",
+        }}
+      >
+        {value}
+      </dd>
     </div>
   );
 }

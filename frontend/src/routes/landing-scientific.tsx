@@ -95,7 +95,7 @@ function Nav() {
         backdropFilter: scrolled ? "blur(10px) saturate(1.2)" : "none",
         WebkitBackdropFilter: scrolled ? "blur(10px) saturate(1.2)" : "none",
         borderBottom: scrolled
-          ? "1px solid var(--b-border-soft)"
+          ? "1px solid var(--border-soft)"
           : "1px solid transparent",
         transition: "all .2s",
       }}
@@ -149,13 +149,13 @@ function NavAnchor({ href, children }: { href: string; children: string }) {
       href={href}
       style={{
         fontSize: 14,
-        color: "var(--b-muted)",
+        color: "var(--muted)",
         fontWeight: 400,
         padding: "6px 2px",
         transition: "color .15s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--b-ink)")}
-      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--b-muted)")}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--ink)")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--muted)")}
     >
       {children}
     </a>
@@ -177,7 +177,7 @@ function Wordmark({ size = 22 }: { size?: number }) {
         fontFamily: "'DM Serif Display', serif",
         fontSize: size,
         letterSpacing: "-0.01em",
-        color: "var(--b-ink)",
+        color: "var(--ink)",
         lineHeight: 1,
       }}
       aria-label="Kleiber"
@@ -213,10 +213,10 @@ function Hero() {
             gap: 8,
             padding: "5px 13px",
             borderRadius: 99,
-            border: "1px solid var(--b-border)",
-            background: "var(--b-paper-2)",
+            border: "1px solid var(--border)",
+            background: "var(--paper-2)",
             fontSize: 12.5,
-            color: "var(--b-ink-2)",
+            color: "var(--ink-2)",
             marginBottom: 28,
           }}
         >
@@ -225,7 +225,7 @@ function Hero() {
               width: 6,
               height: 6,
               borderRadius: 99,
-              background: "var(--b-win)",
+              background: "var(--win)",
             }}
           />
           <span
@@ -278,7 +278,7 @@ function Hero() {
         </div>
         <div
           className="b-mono"
-          style={{ fontSize: 11.5, color: "var(--b-muted)", marginTop: 18 }}
+          style={{ fontSize: 11.5, color: "var(--muted)", marginTop: 18 }}
         >
           Connects via Meta OAuth · you own your data
         </div>
@@ -354,7 +354,7 @@ function AppWindow({
       style={{
         borderRadius: 14,
         overflow: "hidden",
-        border: "1px solid var(--b-border)",
+        border: "1px solid var(--border)",
         background: "white",
         boxShadow:
           "0 30px 80px oklch(30% 0.02 60 / 0.12), 0 6px 18px oklch(30% 0.02 60 / 0.06)",
@@ -367,8 +367,8 @@ function AppWindow({
           alignItems: "center",
           justifyContent: "space-between",
           padding: "0 14px",
-          background: "var(--b-paper-2)",
-          borderBottom: "1px solid var(--b-border)",
+          background: "var(--paper-2)",
+          borderBottom: "1px solid var(--border)",
         }}
       >
         <div style={{ display: "flex", gap: 6 }}>
@@ -399,9 +399,9 @@ function AppWindow({
         </div>
         <div
           style={{
-            fontFamily: "var(--b-mono)",
+            fontFamily: "var(--font-mono)",
             fontSize: 11,
-            color: "var(--b-muted)",
+            color: "var(--muted)",
           }}
         >
           {title}
@@ -437,8 +437,8 @@ function DashboardSidebar() {
     <div
       className="b-dash-sidebar"
       style={{
-        background: "var(--b-paper-2)",
-        borderRight: "1px solid var(--b-border)",
+        background: "var(--paper-2)",
+        borderRight: "1px solid var(--border)",
         padding: "16px 12px",
         fontSize: 13,
       }}
@@ -456,7 +456,7 @@ function DashboardSidebar() {
           style={{
             fontWeight: 500,
             letterSpacing: "-0.01em",
-            color: "var(--b-muted)",
+            color: "var(--muted)",
             fontSize: 13,
           }}
         >
@@ -472,9 +472,9 @@ function DashboardSidebar() {
       <div style={{ height: 20 }} />
       <div
         style={{
-          fontFamily: "var(--b-mono)",
+          fontFamily: "var(--font-mono)",
           fontSize: 10,
-          color: "var(--b-muted)",
+          color: "var(--muted)",
           padding: "4px 8px",
           letterSpacing: "0.08em",
         }}
@@ -493,7 +493,7 @@ function DashboardSidebar() {
             padding: 12,
             borderRadius: 10,
             background: "white",
-            border: "1px solid var(--b-border)",
+            border: "1px solid var(--border)",
             fontSize: 11.5,
             lineHeight: 1.4,
           }}
@@ -511,14 +511,14 @@ function DashboardSidebar() {
                 width: 7,
                 height: 7,
                 borderRadius: 99,
-                background: "var(--b-win)",
+                background: "var(--win)",
               }}
             />
             <span
               style={{
-                fontFamily: "var(--b-mono)",
+                fontFamily: "var(--font-mono)",
                 fontSize: 10,
-                color: "var(--b-muted)",
+                color: "var(--muted)",
               }}
             >
               NEXT CYCLE
@@ -548,8 +548,8 @@ function SideItem({
         padding: "7px 10px",
         borderRadius: 7,
         background: active ? "white" : "transparent",
-        border: active ? "1px solid var(--b-border)" : "1px solid transparent",
-        color: subtle ? "var(--b-muted)" : "var(--b-ink-2)",
+        border: active ? "1px solid var(--border)" : "1px solid transparent",
+        color: subtle ? "var(--muted)" : "var(--ink-2)",
         fontSize: subtle ? 12.5 : 13,
         fontWeight: active && !subtle ? 500 : 400,
         display: "flex",
@@ -563,12 +563,12 @@ function SideItem({
         <span
           style={{
             marginLeft: "auto",
-            background: "var(--b-accent)",
+            background: "var(--accent)",
             color: "white",
             fontSize: 10,
             padding: "2px 6px",
             borderRadius: 99,
-            fontFamily: "var(--b-mono)",
+            fontFamily: "var(--font-mono)",
             fontWeight: 500,
           }}
         >
@@ -593,9 +593,9 @@ function DashboardMain() {
         <div>
           <div
             style={{
-              fontFamily: "var(--b-mono)",
+              fontFamily: "var(--font-mono)",
               fontSize: 10.5,
-              color: "var(--b-muted)",
+              color: "var(--muted)",
               letterSpacing: "0.1em",
             }}
           >
@@ -637,7 +637,7 @@ function DashboardMain() {
       <div
         className="b-variant-table"
         style={{
-          border: "1px solid var(--b-border)",
+          border: "1px solid var(--border)",
           borderRadius: 12,
           overflow: "hidden",
         }}
@@ -648,12 +648,12 @@ function DashboardMain() {
             display: "grid",
             gridTemplateColumns: "40px 1.6fr 1fr 1fr 90px 70px",
             padding: "9px 14px",
-            fontFamily: "var(--b-mono)",
+            fontFamily: "var(--font-mono)",
             fontSize: 10,
-            color: "var(--b-muted)",
+            color: "var(--muted)",
             letterSpacing: "0.1em",
-            background: "var(--b-paper-2)",
-            borderBottom: "1px solid var(--b-border)",
+            background: "var(--paper-2)",
+            borderBottom: "1px solid var(--border)",
           }}
         >
           <span />
@@ -689,16 +689,16 @@ function Stat({
     <div
       style={{
         padding: 14,
-        border: "1px solid var(--b-border)",
+        border: "1px solid var(--border)",
         borderRadius: 10,
         background: "white",
       }}
     >
       <div
         style={{
-          fontFamily: "var(--b-mono)",
+          fontFamily: "var(--font-mono)",
           fontSize: 10,
-          color: "var(--b-muted)",
+          color: "var(--muted)",
           letterSpacing: "0.1em",
         }}
       >
@@ -716,9 +716,9 @@ function Stat({
       </div>
       <div
         style={{
-          fontFamily: "var(--b-mono)",
+          fontFamily: "var(--font-mono)",
           fontSize: 11,
-          color: good ? "oklch(40% 0.14 145)" : "var(--b-muted)",
+          color: good ? "oklch(40% 0.14 145)" : "var(--muted)",
           marginTop: 2,
         }}
       >
@@ -738,7 +738,7 @@ function VariantRow({ v, i }: { v: (typeof VARIANTS)[number]; i: number }) {
         padding: "12px 14px",
         alignItems: "center",
         borderBottom:
-          i < VARIANTS.length - 1 ? "1px solid var(--b-border-soft)" : "none",
+          i < VARIANTS.length - 1 ? "1px solid var(--border-soft)" : "none",
         fontSize: 13,
         background:
           v.sig === "win" && i === 0 ? "oklch(98% 0.02 145 / 0.5)" : "white",
@@ -746,9 +746,9 @@ function VariantRow({ v, i }: { v: (typeof VARIANTS)[number]; i: number }) {
     >
       <span
         style={{
-          fontFamily: "var(--b-mono)",
+          fontFamily: "var(--font-mono)",
           fontSize: 11,
-          color: "var(--b-muted)",
+          color: "var(--muted)",
         }}
       >
         #{i + 1}
@@ -756,7 +756,7 @@ function VariantRow({ v, i }: { v: (typeof VARIANTS)[number]; i: number }) {
       <div>
         <div
           style={{
-            fontFamily: "var(--b-mono)",
+            fontFamily: "var(--font-mono)",
             fontSize: 11.5,
             fontWeight: 500,
           }}
@@ -770,11 +770,11 @@ function VariantRow({ v, i }: { v: (typeof VARIANTS)[number]; i: number }) {
               style={{
                 fontSize: 10.5,
                 padding: "1.5px 6px",
-                background: "var(--b-paper-2)",
+                background: "var(--paper-2)",
                 borderRadius: 4,
-                fontFamily: "var(--b-mono)",
-                color: "var(--b-ink-2)",
-                border: "1px solid var(--b-border-soft)",
+                fontFamily: "var(--font-mono)",
+                color: "var(--ink-2)",
+                border: "1px solid var(--border-soft)",
                 maxWidth: 130,
                 overflow: "hidden",
                 textOverflow: "ellipsis",
@@ -788,7 +788,7 @@ function VariantRow({ v, i }: { v: (typeof VARIANTS)[number]; i: number }) {
       </div>
       <div
         style={{
-          fontFamily: "var(--b-mono)",
+          fontFamily: "var(--font-mono)",
           fontSize: 13,
           fontWeight: 500,
         }}
@@ -799,14 +799,14 @@ function VariantRow({ v, i }: { v: (typeof VARIANTS)[number]; i: number }) {
         <ZBar z={v.z} sig={v.sig} />
         <span
           style={{
-            fontFamily: "var(--b-mono)",
+            fontFamily: "var(--font-mono)",
             fontSize: 11.5,
             color:
               v.sig === "win"
                 ? "oklch(40% 0.14 145)"
                 : v.sig === "lose"
                   ? "oklch(45% 0.16 28)"
-                  : "var(--b-muted)",
+                  : "var(--muted)",
           }}
         >
           {v.z}
@@ -832,7 +832,7 @@ function VariantRow({ v, i }: { v: (typeof VARIANTS)[number]; i: number }) {
       <div
         style={{
           textAlign: "right",
-          fontFamily: "var(--b-mono)",
+          fontFamily: "var(--font-mono)",
           fontSize: 12,
         }}
       >
@@ -868,14 +868,14 @@ function VariantCardMobile({
       ? "oklch(40% 0.14 145)"
       : v.sig === "lose"
         ? "oklch(45% 0.16 28)"
-        : "var(--b-muted)";
+        : "var(--muted)";
   return (
     <div
       className="b-variant-card-mobile"
       style={{
         padding: "14px 16px",
         borderBottom:
-          i < VARIANTS.length - 1 ? "1px solid var(--b-border-soft)" : "none",
+          i < VARIANTS.length - 1 ? "1px solid var(--border-soft)" : "none",
         background:
           v.sig === "win" && i === 0 ? "oklch(98% 0.02 145 / 0.5)" : "white",
       }}
@@ -893,16 +893,16 @@ function VariantCardMobile({
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span
             style={{
-              fontFamily: "var(--b-mono)",
+              fontFamily: "var(--font-mono)",
               fontSize: 11,
-              color: "var(--b-muted)",
+              color: "var(--muted)",
             }}
           >
             #{i + 1}
           </span>
           <span
             style={{
-              fontFamily: "var(--b-mono)",
+              fontFamily: "var(--font-mono)",
               fontSize: 12,
               fontWeight: 500,
             }}
@@ -942,11 +942,11 @@ function VariantCardMobile({
             style={{
               fontSize: 10.5,
               padding: "1.5px 6px",
-              background: "var(--b-paper-2)",
+              background: "var(--paper-2)",
               borderRadius: 4,
-              fontFamily: "var(--b-mono)",
-              color: "var(--b-ink-2)",
-              border: "1px solid var(--b-border-soft)",
+              fontFamily: "var(--font-mono)",
+              color: "var(--ink-2)",
+              border: "1px solid var(--border-soft)",
             }}
           >
             {g}
@@ -961,16 +961,16 @@ function VariantCardMobile({
           alignItems: "center",
           justifyContent: "space-between",
           gap: 10,
-          fontFamily: "var(--b-mono)",
+          fontFamily: "var(--font-mono)",
           fontSize: 11,
-          color: "var(--b-muted)",
+          color: "var(--muted)",
         }}
       >
         <span>
           ROAS{" "}
           <span
             style={{
-              color: "var(--b-ink)",
+              color: "var(--ink)",
               fontSize: 12,
               fontWeight: 500,
             }}
@@ -985,7 +985,7 @@ function VariantCardMobile({
         <span>
           <span
             style={{
-              color: "var(--b-ink)",
+              color: "var(--ink)",
               fontSize: 12,
               fontWeight: 500,
             }}
@@ -1013,7 +1013,7 @@ function ZBar({ z, sig }: { z: string; sig: "win" | "lose" | "flat" }) {
       style={{
         width: 60,
         height: 6,
-        background: "var(--b-paper-3)",
+        background: "var(--paper-3)",
         borderRadius: 99,
         position: "relative",
         overflow: "hidden",
@@ -1026,7 +1026,7 @@ function ZBar({ z, sig }: { z: string; sig: "win" | "lose" | "flat" }) {
           top: 0,
           bottom: 0,
           width: 1,
-          background: "var(--b-border)",
+          background: "var(--border)",
         }}
       />
       <div
@@ -1059,9 +1059,9 @@ function TrustStrip() {
     <section
       style={{
         padding: "40px 0",
-        borderTop: "1px solid var(--b-border)",
-        borderBottom: "1px solid var(--b-border)",
-        background: "var(--b-paper-2)",
+        borderTop: "1px solid var(--border)",
+        borderBottom: "1px solid var(--border)",
+        background: "var(--paper-2)",
       }}
     >
       <div
@@ -1090,7 +1090,7 @@ function TrustStrip() {
               <div style={{ fontWeight: 500 }}>{it.t}</div>
               <div
                 className="b-mono"
-                style={{ fontSize: 10.5, color: "var(--b-muted)" }}
+                style={{ fontSize: 10.5, color: "var(--muted)" }}
               >
                 {it.s}
               </div>
@@ -1145,9 +1145,9 @@ function ProblemSection() {
             <div key={it.t}>
               <div
                 style={{
-                  fontFamily: "var(--b-mono)",
+                  fontFamily: "var(--font-mono)",
                   fontSize: 11,
-                  color: "var(--b-muted)",
+                  color: "var(--muted)",
                 }}
               >
                 0{i + 1}
@@ -1166,7 +1166,7 @@ function ProblemSection() {
               <p
                 style={{
                   fontSize: 14.5,
-                  color: "var(--b-muted)",
+                  color: "var(--muted)",
                   lineHeight: 1.6,
                   marginTop: 10,
                 }}
@@ -1182,7 +1182,7 @@ function ProblemSection() {
             margin: "56px auto 0",
             fontSize: 17,
             lineHeight: 1.55,
-            color: "var(--b-ink-2)",
+            color: "var(--ink-2)",
             textAlign: "center",
             textWrap: "pretty",
           }}
@@ -1288,7 +1288,7 @@ function FeatureReel() {
               <p
                 style={{
                   fontSize: 17,
-                  color: "var(--b-muted)",
+                  color: "var(--muted)",
                   lineHeight: 1.6,
                   marginTop: 16,
                   textWrap: "pretty",
@@ -1320,9 +1320,9 @@ function CycleDiagramMock() {
       <div style={{ padding: 28 }}>
         <div
           style={{
-            fontFamily: "var(--b-mono)",
+            fontFamily: "var(--font-mono)",
             fontSize: 10.5,
-            color: "var(--b-muted)",
+            color: "var(--muted)",
             letterSpacing: "0.1em",
           }}
         >
@@ -1349,9 +1349,9 @@ function CycleDiagramMock() {
                 alignItems: "center",
                 gap: 14,
                 padding: "10px 14px",
-                background: "var(--b-paper-2)",
+                background: "var(--paper-2)",
                 borderRadius: 10,
-                border: "1px solid var(--b-border-soft)",
+                border: "1px solid var(--border-soft)",
               }}
             >
               <div
@@ -1360,11 +1360,11 @@ function CycleDiagramMock() {
                   height: 26,
                   borderRadius: 99,
                   background: "white",
-                  border: "1px solid var(--b-border)",
+                  border: "1px solid var(--border)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontFamily: "var(--b-mono)",
+                  fontFamily: "var(--font-mono)",
                   fontSize: 11,
                   fontWeight: 500,
                 }}
@@ -1373,7 +1373,7 @@ function CycleDiagramMock() {
               </div>
               <div>
                 <div style={{ fontWeight: 500, fontSize: 14 }}>{s.t}</div>
-                <div style={{ fontSize: 12, color: "var(--b-muted)" }}>
+                <div style={{ fontSize: 12, color: "var(--muted)" }}>
                   {s.d}
                 </div>
               </div>
@@ -1419,7 +1419,7 @@ function GenePoolMock() {
         </div>
         <div
           style={{
-            border: "1px solid var(--b-border)",
+            border: "1px solid var(--border)",
             borderRadius: 10,
             overflow: "hidden",
           }}
@@ -1429,12 +1429,12 @@ function GenePoolMock() {
               display: "flex",
               justifyContent: "space-between",
               padding: "8px 12px",
-              background: "var(--b-paper-2)",
-              fontFamily: "var(--b-mono)",
+              background: "var(--paper-2)",
+              fontFamily: "var(--font-mono)",
               fontSize: 10.5,
               letterSpacing: "0.1em",
-              color: "var(--b-muted)",
-              borderBottom: "1px solid var(--b-border)",
+              color: "var(--muted)",
+              borderBottom: "1px solid var(--border)",
             }}
           >
             <span>HEADLINES</span>
@@ -1448,14 +1448,14 @@ function GenePoolMock() {
                 justifyContent: "space-between",
                 alignItems: "center",
                 padding: "10px 14px",
-                borderBottom: "1px solid var(--b-border-soft)",
+                borderBottom: "1px solid var(--border-soft)",
                 fontSize: 13,
               }}
             >
               <span>{h.t}</span>
               <span
                 style={{
-                  fontFamily: "var(--b-mono)",
+                  fontFamily: "var(--font-mono)",
                   fontSize: 11.5,
                   color: h.positive
                     ? "oklch(40% 0.14 145)"
@@ -1481,9 +1481,9 @@ function EmailReportMock() {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            fontFamily: "var(--b-mono)",
+            fontFamily: "var(--font-mono)",
             fontSize: 11,
-            color: "var(--b-muted)",
+            color: "var(--muted)",
             marginBottom: 4,
           }}
         >
@@ -1502,10 +1502,10 @@ function EmailReportMock() {
           <span className="b-serif">3 wins, 2 pauses, 2 new variants</span>
         </h3>
         <div
-          style={{ height: 1, background: "var(--b-border)", marginBottom: 20 }}
+          style={{ height: 1, background: "var(--border)", marginBottom: 20 }}
         />
         <div
-          style={{ fontSize: 14, lineHeight: 1.6, color: "var(--b-ink-2)" }}
+          style={{ fontSize: 14, lineHeight: 1.6, color: "var(--ink-2)" }}
         >
           <p style={{ margin: 0 }}>
             Good morning. Since yesterday, summer-sale added <b>$28 in
@@ -1518,7 +1518,7 @@ function EmailReportMock() {
           </p>
           <div
             style={{
-              background: "var(--b-paper-2)",
+              background: "var(--paper-2)",
               borderRadius: 10,
               padding: 14,
               marginTop: 16,
@@ -1565,8 +1565,8 @@ function StatsLanguageSection() {
     <section
       id="stats"
       style={{
-        background: "var(--b-ink)",
-        color: "var(--b-paper)",
+        background: "var(--ink)",
+        color: "var(--paper)",
         padding: "100px 0",
         margin: "40px 0",
       }}
@@ -1649,7 +1649,7 @@ function StatsLanguageSection() {
               background: "oklch(17% 0.02 60)",
               borderRadius: 14,
               padding: 28,
-              fontFamily: "var(--b-mono)",
+              fontFamily: "var(--font-mono)",
               fontSize: 12.5,
               lineHeight: 1.75,
               color: "oklch(80% 0.01 70)",
@@ -1778,7 +1778,7 @@ function HowItWorksPreview() {
       <div className="b-wrap" style={{ marginTop: 56 }}>
         <div
           style={{
-            border: "1px solid var(--b-border)",
+            border: "1px solid var(--border)",
             borderRadius: 16,
             overflow: "hidden",
           }}
@@ -1794,7 +1794,7 @@ function HowItWorksPreview() {
                 padding: "18px 24px",
                 borderBottom:
                   i < rows.length - 1
-                    ? "1px solid var(--b-border-soft)"
+                    ? "1px solid var(--border-soft)"
                     : "none",
                 background: "white",
               }}
@@ -1803,7 +1803,7 @@ function HowItWorksPreview() {
                 className="b-mono"
                 style={{
                   fontSize: 12,
-                  color: "var(--b-muted)",
+                  color: "var(--muted)",
                   letterSpacing: "0.08em",
                 }}
               >
@@ -1815,7 +1815,7 @@ function HowItWorksPreview() {
                 style={{
                   fontSize: 12,
                   textAlign: "right",
-                  color: r.good ? "oklch(40% 0.14 145)" : "var(--b-muted)",
+                  color: r.good ? "oklch(40% 0.14 145)" : "var(--muted)",
                 }}
               >
                 {r.delta}
@@ -1861,7 +1861,7 @@ function SafetySection() {
             <p
               style={{
                 fontSize: 16,
-                color: "var(--b-muted)",
+                color: "var(--muted)",
                 lineHeight: 1.6,
                 marginTop: 16,
               }}
@@ -1876,7 +1876,7 @@ function SafetySection() {
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               gap: 2,
-              background: "var(--b-border)",
+              background: "var(--border)",
               borderRadius: 14,
               overflow: "hidden",
             }}
@@ -1899,7 +1899,7 @@ function SafetySection() {
                       width: 6,
                       height: 6,
                       borderRadius: 99,
-                      background: "var(--b-accent)",
+                      background: "var(--accent)",
                     }}
                   />
                   <span style={{ fontSize: 15, fontWeight: 500 }}>{it.t}</span>
@@ -1907,7 +1907,7 @@ function SafetySection() {
                 <p
                   style={{
                     fontSize: 13.5,
-                    color: "var(--b-muted)",
+                    color: "var(--muted)",
                     margin: 0,
                     lineHeight: 1.55,
                   }}
@@ -1933,9 +1933,9 @@ function PricingSection() {
       id="pricing"
       style={{
         padding: "80px 0",
-        background: "var(--b-paper-2)",
-        borderTop: "1px solid var(--b-border)",
-        borderBottom: "1px solid var(--b-border)",
+        background: "var(--paper-2)",
+        borderTop: "1px solid var(--border)",
+        borderBottom: "1px solid var(--border)",
       }}
     >
       <div
@@ -1973,9 +1973,9 @@ function PricingSection() {
       >
         <div
           style={{
-            background: "var(--b-ink)",
-            color: "var(--b-paper)",
-            border: "1px solid var(--b-ink)",
+            background: "var(--ink)",
+            color: "var(--paper)",
+            border: "1px solid var(--ink)",
             borderRadius: 16,
             padding: 32,
             textAlign: "center",
@@ -2014,7 +2014,7 @@ function PricingSection() {
               fontSize: 13,
               color: "oklch(75% 0.01 70)",
               marginTop: 6,
-              fontFamily: "var(--b-mono)",
+              fontFamily: "var(--font-mono)",
               letterSpacing: "0.02em",
             }}
           >
@@ -2166,9 +2166,9 @@ function SignupSection() {
               marginLeft: "auto",
               marginRight: "auto",
               padding: 24,
-              background: "var(--b-win-soft)",
+              background: "var(--win-soft)",
               borderRadius: 14,
-              border: "1px solid var(--b-border-soft)",
+              border: "1px solid var(--border-soft)",
             }}
           >
             <div
@@ -2207,7 +2207,7 @@ function SignupSection() {
             <p
               style={{
                 fontSize: 14,
-                color: "var(--b-ink-2)",
+                color: "var(--ink-2)",
                 margin: 0,
               }}
             >
@@ -2263,7 +2263,7 @@ function SignupSection() {
               className="b-mono"
               style={{
                 fontSize: 11.5,
-                color: "var(--b-muted)",
+                color: "var(--muted)",
                 textAlign: "center",
                 marginTop: 4,
               }}
@@ -2319,11 +2319,11 @@ function Footer() {
   return (
     <footer
       style={{
-        borderTop: "1px solid var(--b-border)",
+        borderTop: "1px solid var(--border)",
         marginTop: 120,
         paddingTop: 56,
         paddingBottom: 48,
-        background: "var(--b-paper-2)",
+        background: "var(--paper-2)",
       }}
     >
       <div
@@ -2340,7 +2340,7 @@ function Footer() {
           <p
             style={{
               marginTop: 16,
-              color: "var(--b-muted)",
+              color: "var(--muted)",
               fontSize: 14,
               maxWidth: 300,
               lineHeight: 1.55,
@@ -2372,13 +2372,13 @@ function Footer() {
         style={{
           marginTop: 56,
           paddingTop: 20,
-          borderTop: "1px solid var(--b-border)",
+          borderTop: "1px solid var(--border)",
           display: "flex",
           justifyContent: "space-between",
           alignItems: "center",
-          fontFamily: "var(--b-mono)",
+          fontFamily: "var(--font-mono)",
           fontSize: 11.5,
-          color: "var(--b-muted)",
+          color: "var(--muted)",
         }}
       >
         <span>© 2026 Kleiber Labs — All rights reserved</span>
@@ -2401,12 +2401,12 @@ function FootLink({
       style={{
         display: "block",
         padding: "5px 0",
-        color: "var(--b-ink-2)",
+        color: "var(--ink-2)",
         fontSize: 14,
         transition: "color .15s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--b-accent)")}
-      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--b-ink-2)")}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--ink-2)")}
     >
       {children}
     </a>

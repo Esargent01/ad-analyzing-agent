@@ -40,8 +40,6 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 
 import { MetaCampaignRow } from "@/components/MetaCampaignRow";
 import { DashPage } from "@/components/dashboard/DashPage";
-import { Button } from "@/components/ui/Button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/Card";
 import { ApiError } from "@/lib/api/client";
 import {
   useImportCampaigns,
@@ -232,166 +230,159 @@ export function ImportMetaCampaignsRoute() {
     >
 
       {(showAccountPicker || showPagePicker) && (
-        <Card className="mb-4">
-          <CardHeader>
-            <div>
-              <CardTitle>Meta tenancy</CardTitle>
-              <CardDescription>
-                Pick which ad account and Page each imported campaign
-                should run against.
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {showAccountPicker && (
-                <label className="flex flex-col gap-1 text-xs">
-                  <span className="label">Ad account</span>
-                  <select
-                    value={adAccountId ?? ""}
-                    onChange={(e) => setAdAccountId(e.target.value || null)}
-                    className="rounded border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-1 text-xs"
-                  >
-                    <option value="">— pick one —</option>
-                    {availableAccounts.map((a) => (
-                      <option key={a.id} value={a.id}>
-                        {a.name} ({a.id})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-              {showPagePicker && (
-                <label className="flex flex-col gap-1 text-xs">
-                  <span className="label">Page</span>
-                  <select
-                    value={pageId ?? ""}
-                    onChange={(e) => setPageId(e.target.value || null)}
-                    className="rounded border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-1 text-xs"
-                  >
-                    <option value="">— pick one —</option>
-                    {availablePages.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name} ({p.category})
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <Panel
+          title="Meta tenancy"
+          description="Pick which ad account and Page each imported campaign should run against."
+          className="mb-4"
+        >
+          <div
+            data-ds-grid
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 12,
+            }}
+          >
+            {showAccountPicker && (
+              <PickerField label="Ad account">
+                <select
+                  value={adAccountId ?? ""}
+                  onChange={(e) => setAdAccountId(e.target.value || null)}
+                  className="ds-input"
+                >
+                  <option value="">— pick one —</option>
+                  {availableAccounts.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name} ({a.id})
+                    </option>
+                  ))}
+                </select>
+              </PickerField>
+            )}
+            {showPagePicker && (
+              <PickerField label="Page">
+                <select
+                  value={pageId ?? ""}
+                  onChange={(e) => setPageId(e.target.value || null)}
+                  className="ds-input"
+                >
+                  <option value="">— pick one —</option>
+                  {availablePages.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.category})
+                    </option>
+                  ))}
+                </select>
+              </PickerField>
+            )}
+          </div>
+        </Panel>
       )}
 
-      <Card className="mb-4">
-        <CardHeader>
-          <div>
-            <CardTitle>Landing page URL</CardTitle>
-            <CardDescription>
-              Optional — applied to every campaign in this import batch.
-              You can change it per campaign later from the dashboard.
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <input
-            type="url"
-            value={landingPageUrl}
-            onChange={(e) => setLandingPageUrl(e.target.value)}
-            placeholder="https://shop.example.com/spring"
-            className="w-full rounded border border-[var(--border)] bg-[var(--bg-subtle)] px-2 py-1 text-xs"
-          />
-        </CardContent>
-      </Card>
+      <Panel
+        title="Landing page URL"
+        description="Optional — applied to every campaign in this import batch. You can change it per campaign later from the dashboard."
+        className="mb-4"
+      >
+        <input
+          type="url"
+          value={landingPageUrl}
+          onChange={(e) => setLandingPageUrl(e.target.value)}
+          placeholder="https://shop.example.com/spring"
+          className="ds-input"
+        />
+      </Panel>
 
       {errorMessage && (
-        <div
-          role="alert"
-          className="mb-4 rounded border border-red-700/40 bg-red-950/40 px-3 py-2 text-xs text-red-300"
-        >
-          {errorMessage}
-        </div>
+        <BannerAlert tone="error">{errorMessage}</BannerAlert>
       )}
 
       {missingPagesAccess && (
-        <div
-          role="alert"
-          className="mb-4 rounded border border-amber-700/40 bg-amber-950/40 px-3 py-2 text-xs text-amber-200"
-        >
+        <BannerAlert tone="warning">
           Your Meta connection doesn&apos;t have access to any Pages, so we
-          can&apos;t import a campaign (every imported campaign needs a Page
-          to run ads from).{" "}
-          <Link to="/dashboard" className="underline">
+          can&apos;t import a campaign (every imported campaign needs a
+          Page to run ads from).{" "}
+          <Link
+            to="/dashboard"
+            style={{
+              color: "inherit",
+              textDecoration: "underline",
+              textUnderlineOffset: 2,
+            }}
+          >
             Disconnect and reconnect Meta from the dashboard
           </Link>{" "}
           — when the consent screen appears, make sure the Pages
           permission is granted.
-        </div>
+        </BannerAlert>
       )}
 
       {result && (
-        <Card className="mb-4">
-          <CardHeader>
-            <div>
-              <CardTitle>Import complete</CardTitle>
-              <CardDescription>
-                {result.imported.length} imported, {result.failed.length}{" "}
-                failed. Redirecting to the dashboard…
-              </CardDescription>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {result.imported.length > 0 && (
-              <ul className="mb-2 list-disc pl-5 text-xs text-[var(--text-secondary)]">
-                {result.imported.map((c) => (
-                  <li key={c.id}>
-                    <span className="font-medium text-[var(--text)]">
-                      {c.name}
-                    </span>
-                    {" — "}
-                    {c.registered_deployments} deployment
-                    {c.registered_deployments === 1 ? "" : "s"},{" "}
-                    {c.seeded_gene_pool_entries} gene pool entries seeded
-                  </li>
-                ))}
-              </ul>
-            )}
-            {result.failed.length > 0 && (
-              <ul className="list-disc pl-5 text-xs text-red-300">
-                {result.failed.map((f) => (
-                  <li key={f.meta_campaign_id}>
-                    <span className="font-mono">{f.meta_campaign_id}</span>:{" "}
-                    {f.error}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
+        <Panel
+          title="Import complete"
+          description={`${result.imported.length} imported, ${result.failed.length} failed. Redirecting to the dashboard…`}
+          className="mb-4"
+        >
+          {result.imported.length > 0 && (
+            <ul
+              style={{
+                margin: 0,
+                paddingLeft: 18,
+                fontSize: 13,
+                color: "var(--ink-2)",
+                lineHeight: 1.6,
+              }}
+            >
+              {result.imported.map((c) => (
+                <li key={c.id}>
+                  <span style={{ fontWeight: 500, color: "var(--ink)" }}>
+                    {c.name}
+                  </span>
+                  {" — "}
+                  {c.registered_deployments} deployment
+                  {c.registered_deployments === 1 ? "" : "s"},{" "}
+                  {c.seeded_gene_pool_entries} gene pool entries seeded
+                </li>
+              ))}
+            </ul>
+          )}
+          {result.failed.length > 0 && (
+            <ul
+              style={{
+                margin: "8px 0 0",
+                paddingLeft: 18,
+                fontSize: 12.5,
+                color: "oklch(45% 0.16 28)",
+                lineHeight: 1.6,
+              }}
+            >
+              {result.failed.map((f) => (
+                <li key={f.meta_campaign_id}>
+                  <span style={{ fontFamily: "var(--font-mono)" }}>
+                    {f.meta_campaign_id}
+                  </span>
+                  : {f.error}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Panel>
       )}
 
       {!adAccountId ? (
-        <Card>
-          <p className="text-sm text-[var(--text-secondary)]">
-            Pick an ad account above to load its campaigns.
-          </p>
-        </Card>
+        <ZeroStatePanel>
+          Pick an ad account above to load its campaigns.
+        </ZeroStatePanel>
       ) : query.isLoading ? (
-        <Card>
-          <p className="text-sm text-[var(--text-secondary)]">
-            Loading campaigns from Meta…
-          </p>
-        </Card>
+        <ZeroStatePanel>Loading campaigns from Meta…</ZeroStatePanel>
       ) : rows.length === 0 ? (
-        <Card>
-          <p className="text-sm text-[var(--text-secondary)]">
-            {availableAccounts.length === 0
-              ? "Your Meta token has no reachable ad accounts. Create one in Meta Ads Manager, then reconnect."
-              : "No campaigns found in the selected ad account."}
-          </p>
-        </Card>
+        <ZeroStatePanel>
+          {availableAccounts.length === 0
+            ? "Your Meta token has no reachable ad accounts. Create one in Meta Ads Manager, then reconnect."
+            : "No campaigns found in the selected ad account."}
+        </ZeroStatePanel>
       ) : (
-        <div className="space-y-2">
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           {rows.map((row) => (
             <MetaCampaignRow
               key={row.meta_campaign_id}
@@ -404,29 +395,181 @@ export function ImportMetaCampaignsRoute() {
       )}
 
       {rows.length > 0 && (
-        <div className="mt-6 flex items-center justify-between gap-3">
-          <p className="text-xs text-[var(--text-tertiary)]">
-            {selected.size} selected
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginTop: 24,
+            padding: "16px 20px",
+            borderRadius: 12,
+            background: "var(--ink)",
+            color: "var(--paper)",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <div style={{ fontSize: 13.5 }}>
+            <b>{selected.size}</b> campaigns selected
             {overQuota && (
-              <span className="ml-2 text-red-300">
-                over your {remaining}-campaign quota
+              <span
+                style={{
+                  marginLeft: 10,
+                  color: "oklch(78% 0.14 28)",
+                }}
+              >
+                — over your {remaining}-campaign quota
               </span>
             )}
             {!pageId && !missingPagesAccess && (
-              <span className="ml-2 text-red-300">
-                pick a Page above before importing
+              <span
+                style={{
+                  marginLeft: 10,
+                  color: "oklch(78% 0.14 28)",
+                }}
+              >
+                — pick a Page above before importing
               </span>
             )}
-          </p>
-          <Button
+          </div>
+          <button
+            type="button"
             onClick={handleSubmit}
             disabled={!canSubmit}
-            loading={importMutation.isPending}
+            className="btn btn-accent btn-sm"
           >
-            Import selected
-          </Button>
+            {importMutation.isPending
+              ? "Importing…"
+              : selected.size > 0
+                ? `Import ${selected.size} →`
+                : "Import selected"}
+          </button>
         </div>
       )}
     </DashPage>
+  );
+}
+
+/* ---------------------------------------------------------------- */
+/* Local components — warm-paper panels replacing the legacy Card.  */
+/* ---------------------------------------------------------------- */
+
+function Panel({
+  title,
+  description,
+  className,
+  children,
+}: {
+  title: string;
+  description?: string;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className={className}
+      style={{
+        padding: 20,
+        border: "1px solid var(--border)",
+        borderRadius: 12,
+        background: "white",
+      }}
+    >
+      <h3
+        style={{
+          fontSize: 14,
+          fontWeight: 500,
+          color: "var(--ink)",
+          margin: 0,
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {title}
+      </h3>
+      {description && (
+        <p
+          style={{
+            margin: "4px 0 14px",
+            fontSize: 12.5,
+            color: "var(--muted)",
+            lineHeight: 1.5,
+          }}
+        >
+          {description}
+        </p>
+      )}
+      {children}
+    </div>
+  );
+}
+
+function PickerField({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <label style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <span className="eyebrow" style={{ fontSize: 10 }}>
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function BannerAlert({
+  tone,
+  children,
+}: {
+  tone: "error" | "warning";
+  children: React.ReactNode;
+}) {
+  const style =
+    tone === "error"
+      ? {
+          border: "1px solid oklch(88% 0.08 28)",
+          background: "oklch(98% 0.02 28)",
+          color: "oklch(40% 0.16 28)",
+        }
+      : {
+          border: "1px solid oklch(88% 0.09 75)",
+          background: "oklch(98% 0.03 75)",
+          color: "oklch(42% 0.15 65)",
+        };
+  return (
+    <div
+      role="alert"
+      className="mb-4"
+      style={{
+        padding: "12px 14px",
+        borderRadius: 10,
+        fontSize: 13,
+        lineHeight: 1.55,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ZeroStatePanel({ children }: { children: React.ReactNode }) {
+  return (
+    <div
+      style={{
+        padding: 24,
+        border: "1px dashed var(--border)",
+        borderRadius: 12,
+        background: "var(--paper-2)",
+        fontSize: 13.5,
+        color: "var(--muted)",
+        textAlign: "center",
+      }}
+    >
+      {children}
+    </div>
   );
 }
