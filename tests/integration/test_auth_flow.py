@@ -116,15 +116,19 @@ class TestMagicLinkRequest:
 
 
 # ---------------------------------------------------------------------------
-# GET /api/auth/verify
+# /api/auth/verify
+#
+# GET = anti-prefetch landing page (no token consumption). It renders an
+# HTML form whose POST does the actual sign-in. Email-link prefetchers
+# only do GETs, so the single-use token survives until the real click.
+# POST = the consume + cookie + redirect flow (was the old GET handler).
 # ---------------------------------------------------------------------------
 
 
 class TestVerifyEndpoint:
-    def test_invalid_token_redirects_with_error(self, client: TestClient) -> None:
-        session = AsyncMock()
-        _override_session(session)
-
+    def test_get_with_invalid_token_redirects_with_error(self, client: TestClient) -> None:
+        """Bad signature: the GET landing should bounce immediately so the
+        user isn't shown a "Continue" button that's guaranteed to fail."""
         response = client.get(
             "/api/auth/verify",
             params={"token": "garbage"},
@@ -133,7 +137,46 @@ class TestVerifyEndpoint:
         assert response.status_code == 302
         assert "error=invalid_link" in response.headers["location"]
 
-    def test_valid_token_sets_cookies_and_redirects(self, client: TestClient) -> None:
+    def test_get_with_valid_token_renders_landing_without_consuming(
+        self, client: TestClient
+    ) -> None:
+        """Anti-prefetch: a GET on a valid token must NOT consume it.
+        Renders the confirm page with a POST form instead."""
+        token = create_magic_link_token("bob@example.com")
+
+        consume_mock = AsyncMock(return_value=True)
+        with patch("src.dashboard.app.consume_magic_link_token", new=consume_mock):
+            response = client.get(
+                "/api/auth/verify",
+                params={"token": token},
+                follow_redirects=False,
+            )
+
+        # 200 HTML (not a redirect, not a cookie set).
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        body = response.text
+        assert "/api/auth/verify" in body
+        assert 'method="post"' in body
+        assert token in body
+        # The landing page is read-only: token must not be consumed.
+        consume_mock.assert_not_awaited()
+        assert "session_token" not in response.cookies
+        assert "csrf_token" not in response.cookies
+
+    def test_post_with_invalid_token_redirects_with_error(self, client: TestClient) -> None:
+        session = AsyncMock()
+        _override_session(session)
+
+        response = client.post(
+            "/api/auth/verify",
+            data={"token": "garbage"},
+            follow_redirects=False,
+        )
+        assert response.status_code == 302
+        assert "error=invalid_link" in response.headers["location"]
+
+    def test_post_with_valid_token_sets_cookies_and_redirects(self, client: TestClient) -> None:
         user = _make_user("bob@example.com")
         session = AsyncMock()
         token = create_magic_link_token("bob@example.com")
@@ -153,9 +196,9 @@ class TestVerifyEndpoint:
             ),
         ):
             _override_session(session)
-            response = client.get(
+            response = client.post(
                 "/api/auth/verify",
-                params={"token": token},
+                data={"token": token},
                 follow_redirects=False,
             )
 
@@ -166,8 +209,10 @@ class TestVerifyEndpoint:
         assert "session_token" in cookies
         assert "csrf_token" in cookies
 
-    def test_token_for_unknown_email_creates_user_and_signs_in(self, client: TestClient) -> None:
-        """Self-serve: first successful verify for a new email creates the row."""
+    def test_post_token_for_unknown_email_creates_user_and_signs_in(
+        self, client: TestClient
+    ) -> None:
+        """Self-serve: first successful POST verify for a new email creates the row."""
         new_user = _make_user("nobody@example.com")
         session = AsyncMock()
         token = create_magic_link_token("nobody@example.com")
@@ -191,9 +236,9 @@ class TestVerifyEndpoint:
             ),
         ):
             _override_session(session)
-            response = client.get(
+            response = client.post(
                 "/api/auth/verify",
-                params={"token": token},
+                data={"token": token},
                 follow_redirects=False,
             )
 
@@ -203,7 +248,7 @@ class TestVerifyEndpoint:
         assert "session_token" in response.cookies
         assert "csrf_token" in response.cookies
 
-    def test_replayed_token_redirects_with_error(self, client: TestClient) -> None:
+    def test_post_replayed_token_redirects_with_error(self, client: TestClient) -> None:
         """A token whose hash is already in ``magic_links_consumed`` is rejected."""
         session = AsyncMock()
         token = create_magic_link_token("bob@example.com")
@@ -213,9 +258,9 @@ class TestVerifyEndpoint:
             new=AsyncMock(return_value=False),
         ):
             _override_session(session)
-            response = client.get(
+            response = client.post(
                 "/api/auth/verify",
-                params={"token": token},
+                data={"token": token},
                 follow_redirects=False,
             )
 

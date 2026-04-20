@@ -100,9 +100,9 @@ class TestSelfServeSignup:
                 new=AsyncMock(return_value=None),
             ),
         ):
-            verify_resp = client.get(
+            verify_resp = client.post(
                 "/api/auth/verify",
-                params={"token": token},
+                data={"token": token},
                 follow_redirects=False,
             )
 
@@ -134,9 +134,9 @@ class TestSelfServeSignup:
                 new=AsyncMock(return_value=None),
             ),
         ):
-            first = client.get(
+            first = client.post(
                 "/api/auth/verify",
-                params={"token": token},
+                data={"token": token},
                 follow_redirects=False,
             )
         assert first.status_code == 302
@@ -151,9 +151,9 @@ class TestSelfServeSignup:
             "src.dashboard.app.consume_magic_link_token",
             new=AsyncMock(return_value=False),
         ):
-            replay = client.get(
+            replay = client.post(
                 "/api/auth/verify",
-                params={"token": token},
+                data={"token": token},
                 follow_redirects=False,
             )
         assert replay.status_code == 302

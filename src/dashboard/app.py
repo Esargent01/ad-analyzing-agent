@@ -1075,9 +1075,103 @@ async def api_magic_link(
     return Response(status_code=204)
 
 
-@app.get("/api/auth/verify")
-async def api_auth_verify(
+@app.get("/api/auth/verify", response_class=HTMLResponse)
+async def api_auth_verify_landing(
     token: str = Query(...),
+) -> HTMLResponse:
+    """Render the magic-link confirmation page.
+
+    Anti-prefetch design: clicking the magic link in an email used to
+    immediately consume the single-use token, which broke for any inbox
+    behind a link-scanner / preview prefetcher (Gmail, Outlook ATP,
+    Apple Mail). The scanner GETs the URL once → token consumed → the
+    real user click hits the replay branch → bounce to ``invalid_link``.
+
+    The fix: GET only validates the signature (no consumption) and
+    renders an HTML page that POSTs the token back to ``/api/auth/verify``.
+    Prefetchers don't submit forms, so the token survives until the
+    actual click. JS auto-submits the form for legit users so they
+    don't see an extra step; a manual "Continue" button is the
+    no-JS / paranoid fallback.
+
+    The signature check is still cheap and tells us up front when a
+    token is malformed or expired so we can show a friendly message
+    instead of a generic ``invalid_link`` after a wasted form submit.
+    """
+    settings = get_settings()
+    frontend = settings.frontend_base_url.rstrip("/")
+    api = settings.api_base_url.rstrip("/")
+
+    email = verify_magic_link_token(token)
+    if email is None:
+        # Bad signature or expired — bounce now, don't tease the user
+        # with a "Continue" button that won't work.
+        return HTMLResponse(
+            status_code=302,
+            headers={"Location": f"{frontend}/sign-in?error=invalid_link"},
+            content="",
+        )
+
+    # Render the confirmation page. The form posts back to this same
+    # path; the body sets cookies + redirects on success.
+    html = (
+        "<!DOCTYPE html>"
+        '<html lang="en"><head><meta charset="utf-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<meta name="robots" content="noindex">'
+        "<title>Signing you in&hellip; &middot; Kleiber</title>"
+        '<link rel="preconnect" href="https://fonts.googleapis.com">'
+        '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
+        '<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500&family=Instrument+Serif&display=swap" rel="stylesheet">'
+        "<style>"
+        "html,body{margin:0;padding:0;background:#f3efe5;color:#1f1d18;"
+        "font-family:'Geist','Inter',-apple-system,BlinkMacSystemFont,Arial,sans-serif;"
+        "min-height:100vh;display:flex;align-items:center;justify-content:center;}"
+        ".card{max-width:460px;background:#fafaf7;border:1px solid #e2dccf;"
+        "border-radius:14px;padding:36px 36px 32px;text-align:center;}"
+        ".brand{font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:24px;color:#1f1d18;}"
+        ".eyebrow{font-family:ui-monospace,Menlo,monospace;font-size:11px;letter-spacing:.12em;"
+        "text-transform:uppercase;color:#6d6558;margin-top:18px;}"
+        "h1{font-size:26px;line-height:1.1;letter-spacing:-.02em;font-weight:500;"
+        "margin:8px 0 10px;text-transform:lowercase;}"
+        "p{font-size:14px;color:#6d6558;margin:0 0 20px;line-height:1.55;}"
+        ".btn{display:inline-block;background:#1f1d18;color:#fafaf7;font-size:15px;"
+        "font-weight:500;text-decoration:none;padding:13px 26px;border-radius:99px;"
+        "border:0;cursor:pointer;font-family:inherit;}"
+        ".btn:hover{background:#3d3932;}"
+        ".email{font-family:ui-monospace,Menlo,monospace;font-size:12.5px;color:#1f1d18;}"
+        "</style></head><body>"
+        '<div class="card">'
+        '<div class="brand">Kleiber</div>'
+        '<div class="eyebrow">CONFIRM SIGN-IN</div>'
+        f"<h1>signing you in&hellip;</h1>"
+        f'<p>You\'re signing in as <span class="email">{email}</span>.</p>'
+        f'<form id="f" method="post" action="{api}/api/auth/verify">'
+        f'<input type="hidden" name="token" value="{token}">'
+        '<button class="btn" type="submit">Continue to Kleiber &rarr;</button>'
+        "</form>"
+        "<script>"
+        # Auto-submit on real user loads. Prefetchers / link scanners
+        # rarely execute JS; even when they do, many won't follow form
+        # submits. The visible button is the no-JS fallback.
+        "setTimeout(function(){var f=document.getElementById('f');if(f)f.submit();},120);"
+        "</script>"
+        "</div></body></html>"
+    )
+    # Cache-control: don't let scanners (or browsers) cache this page —
+    # the token is sensitive and short-lived.
+    return HTMLResponse(
+        content=html,
+        headers={
+            "Cache-Control": "no-store, no-cache, must-revalidate, private",
+            "Pragma": "no-cache",
+        },
+    )
+
+
+@app.post("/api/auth/verify")
+async def api_auth_verify(
+    token: str = Form(...),
     session: AsyncSession = Depends(get_db_session),
 ) -> RedirectResponse:
     """Consume a magic-link token and redirect to the frontend dashboard.
@@ -1093,7 +1187,9 @@ async def api_auth_verify(
     4. Touch ``last_login_at`` and issue cookies.
 
     On success sets the ``session_token`` + ``csrf_token`` cookies and
-    302-redirects to ``<frontend_base_url>/dashboard``.
+    302-redirects to ``<frontend_base_url>/dashboard``. Driven by the
+    POST form on the GET landing page so email-link prefetchers can't
+    burn the single-use token.
     """
     settings = get_settings()
     frontend = settings.frontend_base_url.rstrip("/")
