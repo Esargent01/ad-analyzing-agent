@@ -591,11 +591,24 @@ export function QuickLink({
   desc,
   onClick,
   badge,
+  count,
+  meta,
+  tone = "neutral",
 }: {
   label: string;
   desc: string;
   onClick: () => void;
+  /** Accent pill in the top-right. Mutually exclusive with ``count``. */
   badge?: number;
+  /** Big mono number rendered in the top-right. When present, the
+   *  card doubles as a StatTile — use ``meta`` for the sub-line. */
+  count?: number;
+  /** Muted mono sub-line under the description. Typically the "latest
+   *  X" tag or "waiting on you" etc. */
+  meta?: string;
+  /** ``"bad"`` tints the count red to flag unfinished work (pending
+   *  approvals). ``"neutral"`` is the default. */
+  tone?: "neutral" | "bad";
 }) {
   return (
     <button
@@ -610,6 +623,9 @@ export function QuickLink({
         cursor: "pointer",
         width: "100%",
         transition: "all 0.15s",
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
       }}
       onMouseEnter={(e) => {
         e.currentTarget.style.borderColor = "var(--ink)";
@@ -622,11 +638,27 @@ export function QuickLink({
         style={{
           display: "flex",
           justifyContent: "space-between",
-          alignItems: "center",
+          alignItems: "flex-start",
+          gap: 12,
         }}
       >
         <span style={{ fontSize: 15, fontWeight: 500 }}>{label}</span>
-        {badge !== undefined && badge > 0 ? (
+        {count !== undefined ? (
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: 22,
+              fontWeight: 500,
+              lineHeight: 1,
+              color:
+                tone === "bad" && count > 0
+                  ? "oklch(48% 0.16 28)"
+                  : "var(--ink)",
+            }}
+          >
+            {count}
+          </span>
+        ) : badge !== undefined && badge > 0 ? (
           <span
             style={{
               background: "var(--accent)",
@@ -647,12 +679,24 @@ export function QuickLink({
         style={{
           fontSize: 12.5,
           color: "var(--muted)",
-          margin: "6px 0 0",
+          margin: 0,
           lineHeight: 1.5,
         }}
       >
         {desc}
       </p>
+      {meta ? (
+        <p
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            color: "var(--muted-2)",
+            margin: "2px 0 0",
+          }}
+        >
+          {meta}
+        </p>
+      ) : null}
     </button>
   );
 }

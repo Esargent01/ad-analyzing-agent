@@ -4,7 +4,6 @@ import { DashPage } from "@/components/dashboard/DashPage";
 import {
   DangerZone,
   QuickLink,
-  StatTile,
   StatusPill,
 } from "@/components/dashboard/primitives";
 import {
@@ -134,57 +133,34 @@ export function CampaignDetailRoute() {
         style={{
           display: "grid",
           gridTemplateColumns: "repeat(3, 1fr)",
-          gap: 16,
-          marginBottom: 28,
-        }}
-      >
-        <StatTile
-          label="DAILY REPORTS"
-          value={dailyCount}
-          sub={
-            latestDaily
-              ? `latest ${formatDateLabel(latestDaily)}`
-              : "no reports yet"
-          }
-        />
-        <StatTile
-          label="WEEKLY REPORTS"
-          value={weeklyCount}
-          sub={latestWeek ? `latest ${latestWeek.label}` : "no reports yet"}
-        />
-        <StatTile
-          label="PENDING APPROVALS"
-          value={pendingCount}
-          sub={pendingCount > 0 ? "waiting on you" : "nothing to review"}
-          bad={pendingCount > 0}
-        />
-      </div>
-
-      <div className="eyebrow" style={{ marginBottom: 14 }}>
-        GO TO
-      </div>
-      <div
-        data-ds-grid
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(3, 1fr)",
           gap: 14,
+          marginBottom: 28,
         }}
       >
         <QuickLink
           label="Daily reports"
           desc="Day-by-day funnel metrics and variant performance."
+          count={dailyCount}
+          meta={
+            latestDaily
+              ? `latest ${formatDateLabel(latestDaily)}`
+              : "no reports yet"
+          }
           onClick={() => navigate(`/campaigns/${campaignId}/reports/daily`)}
         />
         <QuickLink
           label="Weekly reports"
           desc="Leaderboard, element rankings, and pairwise lift."
+          count={weeklyCount}
+          meta={latestWeek ? `latest ${latestWeek.label}` : "no reports yet"}
           onClick={() => navigate(`/campaigns/${campaignId}/reports/weekly`)}
         />
         <QuickLink
           label="Next week's experiments"
           desc="Proposed variants and actions awaiting approval."
-          badge={pendingCount}
+          count={pendingCount}
+          meta={pendingCount > 0 ? "waiting on you" : "nothing to review"}
+          tone={pendingCount > 0 ? "bad" : "neutral"}
           onClick={() => navigate(`/campaigns/${campaignId}/experiments`)}
         />
       </div>
