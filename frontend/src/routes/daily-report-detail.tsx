@@ -138,16 +138,17 @@ function DailyReportBody({ report }: { report: DailyReport }) {
         </div>
       </Section>
 
-      {/* Best-variant spotlight */}
+      {/* Best-variant spotlight — the component emits its own eyebrow,
+          so don't wrap it in a Section or the label renders twice. */}
       {report.best_variant ? (
-        <Section label="Best variant · today">
+        <div style={{ marginBottom: 32 }}>
           <BestVariantSpotlight
             variant={report.best_variant}
             funnel={report.best_variant_funnel}
             diagnostics={report.best_variant_diagnostics}
             projection={report.best_variant_projection}
           />
-        </Section>
+        </div>
       ) : null}
 
       {/* Other active variants */}
