@@ -34,6 +34,13 @@ class AdMetrics:
     purchases: int = 0
     purchase_value: float = 0.0
 
+    # Non-sales action counts for the Leads / Engagement objectives.
+    # Zero by default so ``mock`` and ``google_ads`` adapters don't
+    # need to think about them. Meta populates both in
+    # ``_parse_insights_to_metrics``.
+    leads: int = 0
+    post_engagements: int = 0
+
     collected_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     # -- Derived metrics (computed, not stored) --

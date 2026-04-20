@@ -1567,6 +1567,115 @@ def backfill_media_type(campaign_id: str) -> None:
     asyncio.run(_run())
 
 
+@cli.command(name="backfill-campaign-objective")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    default=False,
+    help="List planned updates without writing.",
+)
+def backfill_campaign_objective(dry_run: bool) -> None:
+    """Refresh ``campaigns.objective`` from Meta for every imported campaign.
+
+    Campaigns imported before migration 017 landed carry the default
+    ``OUTCOME_SALES`` — a safe placeholder that keeps today's reports
+    rendering, but wrong for Leads / Engagement / Traffic / Awareness
+    advertisers. This command re-reads the live objective from Meta for
+    every campaign still at the default and persists the mapped ODAX
+    value.
+
+    The opportunistic re-sync in ``sync_campaign_ads`` eventually
+    backfills the same data on the next cron tick per campaign, so
+    this CLI is optional — run it once post-deploy to avoid waiting a
+    day per campaign.
+
+    Scope: only Meta campaigns with a ``platform_campaign_id`` are
+    touched. Idempotent — re-running after every campaign has a real
+    objective is a no-op.
+
+    Example::
+
+        python -m src.main backfill-campaign-objective
+        python -m src.main backfill-campaign-objective --dry-run
+    """
+
+    async def _run() -> None:
+        from sqlalchemy import text as sa_text
+
+        from src.adapters.meta_factory import get_meta_adapter_for_campaign
+        from src.db.engine import close_db, get_session, init_db
+
+        await init_db()
+        try:
+            async with get_session() as session:
+                rows = await session.execute(
+                    sa_text(
+                        """
+                        SELECT id, name, platform_campaign_id, objective
+                        FROM campaigns
+                        WHERE platform = 'meta'
+                          AND platform_campaign_id IS NOT NULL
+                          AND objective = 'OUTCOME_SALES'
+                        ORDER BY created_at
+                        """
+                    )
+                )
+                candidates = rows.fetchall()
+                if not candidates:
+                    click.echo("No campaigns to backfill.")
+                    return
+
+                click.echo(
+                    f"Checking objective for {len(candidates)} campaign(s)…"
+                )
+                updated = 0
+                skipped = 0
+                failed = 0
+
+                for row in candidates:
+                    local_id: UUID = row[0]
+                    name: str = row[1]
+                    meta_id: str = str(row[2])
+                    current: str = row[3]
+
+                    try:
+                        adapter = await get_meta_adapter_for_campaign(
+                            session, local_id
+                        )
+                        fresh = await adapter.get_campaign_objective(meta_id)
+                    except Exception as exc:  # noqa: BLE001
+                        click.echo(f"  ! {name}: {exc}")
+                        failed += 1
+                        continue
+
+                    if fresh == current or not fresh:
+                        skipped += 1
+                        continue
+
+                    click.echo(f"  {name}: {current} → {fresh}")
+                    if not dry_run:
+                        await session.execute(
+                            sa_text(
+                                "UPDATE campaigns SET objective = :obj "
+                                "WHERE id = :id"
+                            ),
+                            {"obj": fresh, "id": str(local_id)},
+                        )
+                    updated += 1
+
+                if not dry_run:
+                    await session.commit()
+                click.echo(
+                    f"Done. Updated {updated}, skipped {skipped}, "
+                    f"failed {failed}."
+                    + (" (dry run — no writes)" if dry_run else "")
+                )
+        finally:
+            await close_db()
+
+    asyncio.run(_run())
+
+
 @cli.command()
 @click.option("--campaign-id", required=True, type=str, help="Local campaign UUID.")
 @click.option(

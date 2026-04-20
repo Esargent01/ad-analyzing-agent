@@ -144,6 +144,11 @@ def _stub_settings(
 
 
 def _fake_meta_campaigns() -> list[dict[str, object]]:
+    """Simulate what ``MetaAdapter.list_campaigns`` now returns — post
+    normalisation via ``normalize_meta_objective``. The real adapter
+    rewrites legacy strings (``LINK_CLICKS`` etc.) to their ODAX
+    equivalents before the import flow sees them, so the fixture
+    ships with the canonical ODAX values the DB column expects."""
     return [
         {
             "meta_campaign_id": "120200000000001",
@@ -151,7 +156,7 @@ def _fake_meta_campaigns() -> list[dict[str, object]]:
             "status": "ACTIVE",
             "daily_budget": 50.0,
             "created_time": None,
-            "objective": "LINK_CLICKS",
+            "objective": "OUTCOME_TRAFFIC",
         },
         {
             "meta_campaign_id": "120200000000002",
@@ -159,7 +164,7 @@ def _fake_meta_campaigns() -> list[dict[str, object]]:
             "status": "PAUSED",
             "daily_budget": None,
             "created_time": None,
-            "objective": "CONVERSIONS",
+            "objective": "OUTCOME_SALES",
         },
         {
             "meta_campaign_id": "120200000000003",
@@ -167,7 +172,7 @@ def _fake_meta_campaigns() -> list[dict[str, object]]:
             "status": "ACTIVE",
             "daily_budget": 25.0,
             "created_time": None,
-            "objective": "LINK_CLICKS",
+            "objective": "OUTCOME_TRAFFIC",
         },
     ]
 
@@ -588,6 +593,10 @@ class TestImportCampaign:
         assert campaign.meta_ad_account_id == _ALLOWED_ACCOUNT_ID
         assert campaign.meta_page_id == _ALLOWED_PAGE_ID
         assert campaign.landing_page_url == "https://example.com/spring"
+        # The Meta objective (already ODAX-normalised by the adapter)
+        # must land on the campaigns row so the report builders can
+        # later dispatch off it.
+        assert campaign.objective == "OUTCOME_TRAFFIC"
 
         variant_codes = sorted(v.variant_code for v in variants)
         assert variant_codes == ["V1", "V2"]

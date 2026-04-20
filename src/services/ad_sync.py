@@ -126,6 +126,33 @@ async def sync_campaign_ads(
         return 0
 
     adapter = await get_meta_adapter_for_campaign(session, campaign.id)
+
+    # Opportunistic objective re-sync — one cheap API call per campaign
+    # per cron tick that catches cases where the user switched the
+    # objective in Ads Manager after import. We already hold the
+    # adapter, so this is effectively free. Failure is non-fatal: we
+    # log and continue with the stored value rather than abort the
+    # sync.
+    try:
+        fresh_objective = await adapter.get_campaign_objective(
+            str(campaign.platform_campaign_id)
+        )
+        if fresh_objective and fresh_objective != campaign.objective:
+            logger.info(
+                "Campaign %s objective changed: %s -> %s",
+                campaign.id,
+                campaign.objective,
+                fresh_objective,
+            )
+            campaign.objective = fresh_objective
+            # ORM change will be flushed with the session's next write;
+            # the ad-sync path always does one below or the caller
+            # commits. No explicit flush needed.
+    except Exception as exc:  # noqa: BLE001 — re-sync is best-effort
+        logger.warning(
+            "Objective re-sync failed for campaign %s: %s", campaign.id, exc
+        )
+
     ads = await adapter.list_campaign_ads(str(campaign.platform_campaign_id))
 
     known = await _existing_platform_ad_ids(session, campaign.id)

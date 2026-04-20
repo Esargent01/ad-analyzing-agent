@@ -532,6 +532,17 @@ async def import_campaign(
     max_variants = overrides.max_concurrent_variants or settings.max_concurrent_variants
     confidence_threshold = overrides.confidence_threshold or Decimal("0.95")
 
+    # Objective is already normalised by the adapter (see
+    # ``src/adapters/meta.py::list_campaigns``) — safe to persist
+    # directly. Falls back to the column default (``OUTCOME_SALES``)
+    # only if the adapter returned no value at all, which shouldn't
+    # happen for a valid Meta campaign but keeps the row insertable.
+    raw_objective = match.get("objective")
+    objective_value = (
+        str(raw_objective) if isinstance(raw_objective, str) and raw_objective
+        else "OUTCOME_SALES"
+    )
+
     campaign = Campaign(
         name=str(match.get("name") or f"Imported {meta_campaign_id}"),
         platform=PlatformType.meta,
@@ -545,6 +556,7 @@ async def import_campaign(
         meta_ad_account_id=ad_account_id,
         meta_page_id=page_id,
         landing_page_url=landing_page_url,
+        objective=objective_value,
     )
     session.add(campaign)
     await session.flush()

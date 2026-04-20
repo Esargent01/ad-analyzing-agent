@@ -20,6 +20,7 @@ from facebook_business.api import FacebookAdsApi
 from facebook_business.exceptions import FacebookRequestError
 
 from src.adapters.base import AdMetrics, BaseAdapter, MediaAsset
+from src.adapters.meta_objective import normalize_meta_objective
 from src.exceptions import PlatformAPIError
 
 logger = logging.getLogger(__name__)
@@ -490,14 +491,38 @@ class MetaAdapter(BaseAdapter):
             ],
         )
 
-        # Conversions: purchases + leads
-        conversions = purchases + _action_value(
+        # Lead submissions — Meta scatters them across three action
+        # types depending on whether the lead came from an on-site
+        # form, an off-site pixel, or an Instant Form. ``leads`` is
+        # the dedicated field for ``OUTCOME_LEADS`` reports; we also
+        # fold the same count into ``conversions`` below so legacy
+        # CTR/CPA aggregates still see lead campaigns as converting.
+        leads = _action_value(
             actions,
             [
-                "offsite_conversion",
                 "lead",
+                "onsite_conversion.lead_grouped",
                 "offsite_conversion.fb_pixel_lead",
             ],
+        )
+
+        # Post engagements — the ``OUTCOME_ENGAGEMENT`` headline
+        # number. Meta already exposes an aggregate ``post_engagement``
+        # action (sum of reactions, comments, shares) plus individual
+        # breakdowns. Prefer the aggregate when present; fall back to
+        # summing individuals so campaigns that only report the
+        # breakdowns still get a real number.
+        post_engagements = _action_value(actions, ["post_engagement"])
+        if post_engagements == 0:
+            post_engagements = _action_value(
+                actions, ["post_reaction", "comment", "like", "post"]
+            )
+
+        # Conversions: purchases + leads. The ``offsite_conversion``
+        # catch-all is intentionally additive here — it covers custom
+        # pixel events that aren't any of the named types above.
+        conversions = purchases + leads + _action_value(
+            actions, ["offsite_conversion"]
         )
 
         return AdMetrics(
@@ -514,6 +539,8 @@ class MetaAdapter(BaseAdapter):
             add_to_carts=add_to_carts,
             purchases=purchases,
             purchase_value=purchase_value,
+            leads=leads,
+            post_engagements=post_engagements,
         )
 
     async def delete_ad(self, platform_ad_id: str) -> bool:
@@ -568,6 +595,13 @@ class MetaAdapter(BaseAdapter):
                     except (TypeError, ValueError):
                         daily_budget = None
 
+                # Normalise the raw Meta objective (ODAX or legacy) to
+                # the canonical set before it leaves the adapter — every
+                # downstream store / dispatch assumes the canonical
+                # form. See ``src/adapters/meta_objective.py``.
+                raw_objective = c.get("objective") or None
+                normalized_objective = normalize_meta_objective(raw_objective)
+
                 results.append(
                     {
                         "meta_campaign_id": str(c["id"]),
@@ -575,7 +609,7 @@ class MetaAdapter(BaseAdapter):
                         "status": c.get("status", "UNKNOWN"),
                         "daily_budget": daily_budget,
                         "created_time": c.get("created_time"),
-                        "objective": c.get("objective", ""),
+                        "objective": normalized_objective,
                     }
                 )
             return results
@@ -583,6 +617,28 @@ class MetaAdapter(BaseAdapter):
         campaigns_list: list[dict[str, object]] = await self._run_sync(partial(_list))  # type: ignore[assignment]
         logger.info("Found %d campaigns in Meta account", len(campaigns_list))
         return campaigns_list
+
+    async def get_campaign_objective(self, campaign_id: str) -> str:
+        """Fetch the current objective for one Meta campaign.
+
+        A single-resource version of :meth:`list_campaigns` used for
+        opportunistic re-sync — when the cron loop needs to refresh a
+        campaign's objective without pulling every campaign in the
+        account. The returned value is already normalised via
+        :func:`normalize_meta_objective`; ``OUTCOME_UNKNOWN`` is
+        returned when Meta doesn't populate the field.
+        """
+        logger.debug("Fetching objective for Meta campaign %s", campaign_id)
+
+        from facebook_business.adobjects.campaign import Campaign
+
+        def _fetch() -> str | None:
+            c = Campaign(campaign_id).api_get(fields=[Campaign.Field.objective])
+            raw = c.get("objective") or None
+            return str(raw) if raw else None
+
+        raw_objective: str | None = await self._run_sync(partial(_fetch))  # type: ignore[assignment]
+        return normalize_meta_objective(raw_objective)
 
     async def list_campaign_ads(self, campaign_id: str) -> list[dict[str, object]]:
         """List all ads in a Meta campaign with their creative details.

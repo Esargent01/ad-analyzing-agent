@@ -50,6 +50,11 @@ class MetricsSnapshot:
     purchases: int = 0
     purchase_value: float = 0.0
 
+    # Objective-specific action counts (populated by the Meta adapter
+    # from the ``actions`` array on Insights rows; zero elsewhere).
+    leads: int = 0
+    post_engagements: int = 0
+
 
 @dataclass(frozen=True)
 class _DeploymentInfo:
@@ -253,6 +258,8 @@ class MetricsPoller:
             add_to_carts=metrics.add_to_carts,
             purchases=metrics.purchases,
             purchase_value=metrics.purchase_value,
+            leads=metrics.leads,
+            post_engagements=metrics.post_engagements,
         )
 
     async def _delete_snapshots_in_day(
@@ -345,6 +352,8 @@ class MetricsPoller:
             add_to_carts=metrics.add_to_carts,
             purchases=metrics.purchases,
             purchase_value=metrics.purchase_value,
+            leads=metrics.leads,
+            post_engagements=metrics.post_engagements,
         )
 
     async def _save_snapshots(self, snapshots: list[MetricsSnapshot]) -> None:
@@ -355,13 +364,15 @@ class MetricsPoller:
                 impressions, clicks, conversions, spend,
                 reach, video_views_3s, video_views_15s, thruplays,
                 link_clicks, landing_page_views, add_to_carts,
-                purchases, purchase_value
+                purchases, purchase_value,
+                leads, post_engagements
             ) VALUES (
                 :recorded_at, :variant_id, :deployment_id,
                 :impressions, :clicks, :conversions, :spend,
                 :reach, :video_views_3s, :video_views_15s, :thruplays,
                 :link_clicks, :landing_page_views, :add_to_carts,
-                :purchases, :purchase_value
+                :purchases, :purchase_value,
+                :leads, :post_engagements
             )
         """)
 
@@ -383,6 +394,8 @@ class MetricsPoller:
                 "add_to_carts": snap.add_to_carts,
                 "purchases": snap.purchases,
                 "purchase_value": snap.purchase_value,
+                "leads": snap.leads,
+                "post_engagements": snap.post_engagements,
             }
             for snap in snapshots
         ]

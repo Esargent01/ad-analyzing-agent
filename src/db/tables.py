@@ -160,6 +160,14 @@ class Campaign(Base):
     meta_ad_account_id: Mapped[str | None] = mapped_column(Text)
     meta_page_id: Mapped[str | None] = mapped_column(Text)
     landing_page_url: Mapped[str | None] = mapped_column(Text)
+    # Canonical Meta ODAX objective (or ``OUTCOME_UNKNOWN`` sentinel for
+    # values we couldn't map). Captured on import from Meta's Campaign
+    # object; re-read opportunistically each cron cycle so Ads-Manager
+    # edits propagate. Report builders key their headline-metric set
+    # off this column — see ``src/services/objectives.py`` (PR 2).
+    objective: Mapped[str] = mapped_column(
+        String(32), nullable=False, server_default="OUTCOME_SALES"
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default="now()"
     )
