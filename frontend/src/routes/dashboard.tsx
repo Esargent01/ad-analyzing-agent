@@ -1,11 +1,30 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { DashPage } from "@/components/dashboard/DashPage";
 import {
   EmptyState,
   StatusPill,
 } from "@/components/dashboard/primitives";
-import { useMe, useMetaStatus, useMyUsage } from "@/lib/api/hooks";
+import {
+  qk,
+  useConnectMeta,
+  useDisconnectMeta,
+  useMe,
+  useMetaStatus,
+  useMyUsage,
+} from "@/lib/api/hooks";
+
+const META_ERROR_LABELS: Record<string, string> = {
+  declined: "You declined the Meta permissions prompt.",
+  missing_params: "Meta didn't return the expected parameters.",
+  invalid_state: "The OAuth session expired — please try again.",
+  exchange_failed: "Meta rejected the authorization code.",
+  crypto_error: "Couldn't securely store your Meta token.",
+  enumeration_failed:
+    "Connected, but couldn't read your ad accounts or Pages. Reconnect to retry.",
+};
 
 /**
  * Dashboard home — campaign list + Meta connection state + usage tile.
@@ -144,6 +163,71 @@ function MetaConnection({
   connected: boolean;
   status: { available_ad_accounts?: unknown[]; available_pages?: unknown[] } | null | undefined;
 }) {
+  const qc = useQueryClient();
+  const connect = useConnectMeta();
+  const disconnect = useDisconnectMeta();
+  const [banner, setBanner] = useState<
+    { kind: "success" | "error"; text: string } | null
+  >(null);
+
+  // Read meta_connected / meta_error callback params on mount — same
+  // behaviour as the legacy ConnectMetaCard. Strips them from the URL
+  // so a refresh doesn't replay the toast, then re-fetches status.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const connectedParam = params.get("meta_connected");
+    const errorParam = params.get("meta_error");
+    if (!connectedParam && !errorParam) return;
+
+    if (connectedParam === "1") {
+      setBanner({ kind: "success", text: "Connected to Meta." });
+    } else if (errorParam) {
+      setBanner({
+        kind: "error",
+        text: META_ERROR_LABELS[errorParam] ?? "Couldn't connect to Meta.",
+      });
+    }
+
+    params.delete("meta_connected");
+    params.delete("meta_error");
+    const nextQs = params.toString();
+    const nextUrl =
+      window.location.pathname +
+      (nextQs ? `?${nextQs}` : "") +
+      window.location.hash;
+    window.history.replaceState({}, "", nextUrl);
+
+    qc.invalidateQueries({ queryKey: qk.metaStatus });
+  }, [qc]);
+
+  const handleConnect = () => {
+    connect.mutate(undefined, {
+      onSuccess: (data) => {
+        window.location.href = data.auth_url;
+      },
+    });
+  };
+
+  const handleDisconnect = () => {
+    if (
+      typeof window !== "undefined" &&
+      !window.confirm(
+        "Disconnect Meta? The system will stop being able to run cycles for your campaigns until you reconnect.",
+      )
+    ) {
+      return;
+    }
+    disconnect.mutate();
+  };
+
+  const connectError = connect.isError
+    ? "Couldn't start the Meta OAuth flow — please try again."
+    : null;
+  const disconnectError = disconnect.isError
+    ? "Couldn't disconnect — please try again."
+    : null;
+
   if (!connected) {
     return (
       <div
@@ -188,9 +272,29 @@ function MetaConnection({
             metrics and deploy variants.
           </p>
         </div>
-        <button type="button" className="btn btn-primary btn-sm">
-          Connect Meta →
-        </button>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 6,
+          }}
+        >
+          <button
+            type="button"
+            className="btn btn-primary btn-sm"
+            onClick={handleConnect}
+            disabled={connect.isPending}
+          >
+            {connect.isPending ? "Redirecting…" : "Connect Meta →"}
+          </button>
+          {(banner || connectError) && (
+            <BannerLine
+              kind={banner?.kind ?? "error"}
+              text={banner?.text ?? connectError ?? ""}
+            />
+          )}
+        </div>
       </div>
     );
   }
@@ -250,10 +354,50 @@ function MetaConnection({
           </div>
         </div>
       </div>
-      <button type="button" className="btn btn-ghost btn-sm">
-        Disconnect
-      </button>
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: 6,
+        }}
+      >
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={handleDisconnect}
+          disabled={disconnect.isPending}
+        >
+          {disconnect.isPending ? "Disconnecting…" : "Disconnect"}
+        </button>
+        {(banner || disconnectError) && (
+          <BannerLine
+            kind={banner?.kind ?? "error"}
+            text={banner?.text ?? disconnectError ?? ""}
+          />
+        )}
+      </div>
     </div>
+  );
+}
+
+function BannerLine({
+  kind,
+  text,
+}: {
+  kind: "success" | "error";
+  text: string;
+}) {
+  return (
+    <span
+      style={{
+        fontSize: 11.5,
+        color:
+          kind === "success" ? "oklch(40% 0.14 145)" : "oklch(48% 0.16 28)",
+      }}
+    >
+      {text}
+    </span>
   );
 }
 
