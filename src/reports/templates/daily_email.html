@@ -1,415 +1,374 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
+{#
+  Daily digest email. Visual port of the warm-editorial design handed
+  off in `Kleiber Emails.html`:
+
+  - 680px centered card on a warm-paper page (#f3efe5)
+  - Masthead with Instrument Serif wordmark + mono cycle meta
+  - Title block: mono eyebrow (campaign) + lowercase Geist heading (date)
+  - 4-up top-line metric tiles with mono numerics + tone-colored deltas
+  - Best-variant spotlight: white card with variant code + IMG/VID
+    badge + WINNER/STEADY pill, genome chips, 3-up diagnostic tile row
+    (media-type aware: image → CTR · ATC · Checkout; video-ish →
+    Hook · Hold · CTR), horizontal funnel bars, GOOD/WARN notes,
+    terracotta-tinted projection callout, italic serif hypothesis
+    quote with left accent bar
+  - Other active variants table with paper-2 header row
+  - Fatigue alerts in lose-soft tinted panel
+  - Actions + Next cycle side-by-side white cards
+  - Dark pill CTA to the full report, warm-paper footer
+#}
+<!DOCTYPE html>
+<html>
 <head>
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Daily Report — {{ report_date }}</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Daily report — {{ campaign_name }} — {{ report_date_fmt }}</title>
 </head>
-<body style="margin: 0; padding: 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%;">
+<body style="margin:0;padding:0;background:#f3efe5;font-family:-apple-system,BlinkMacSystemFont,'Geist',Arial,Helvetica,sans-serif;color:#1f1d18;">
 
-<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5;">
-<tr><td align="center" style="padding: 20px 0;">
-    <table role="presentation" width="680" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px;">
-    <tr><td style="padding: 32px 28px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3efe5;">
+<tr><td align="center" style="padding:32px 16px;">
 
-        <!-- Section 1: Header -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-        <tr><td>
-            <span style="display: inline-block; color: #7a7468; font-size: 11px; letter-spacing: 1.3px; text-transform: uppercase; font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, 'Courier New', monospace;">DAILY REPORT</span>
-        </td></tr>
-        <tr><td style="padding-top: 10px;">
-            <span style="font-size: 20px; font-weight: 500; color: #1f1d18; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ campaign_name }}</span>
-        </td></tr>
-        <tr><td style="padding-top: 4px;">
-            <span style="font-size: 13px; color: #9a9283; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Day {{ day_number }} &middot; {{ report_date_fmt }} &middot; Cycle {{ cycle_number }}</span>
-        </td></tr>
-        </table>
+<table role="presentation" width="680" cellpadding="0" cellspacing="0" border="0" style="max-width:680px;background:#fafaf7;border:1px solid #e2dccf;border-radius:14px;overflow:hidden;">
 
-        <!-- Spacer -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 24px;"></td></tr></table>
+<!-- Masthead -->
+<tr><td style="padding:26px 32px 20px;border-bottom:1px solid #e2dccf;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+    <td style="font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:22px;color:#1f1d18;letter-spacing:-0.01em;">Kleiber</td>
+    <td align="right" style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.12em;color:#9a9283;text-transform:uppercase;">DAILY · CYCLE {{ cycle_number }} · DAY {{ day_number }}</td>
+  </tr></table>
+</td></tr>
 
-        <!-- Section 2: Top-line metric cards -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+<!-- Title -->
+<tr><td style="padding:28px 32px 6px;">
+  <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;letter-spacing:0.1em;color:#6d6558;text-transform:uppercase;margin-bottom:8px;">{{ campaign_name }}</div>
+  <div style="font-size:30px;line-height:1.05;letter-spacing:-0.03em;font-weight:500;color:#1f1d18;">{{ report_date_fmt|lower }}</div>
+  <div style="font-size:14px;color:#6d6558;margin-top:6px;">Yesterday's performance, one campaign, one screen.</div>
+</td></tr>
+
+{# -------------------------------------------------------------- #}
+{# Top-line metric tiles                                          #}
+{# -------------------------------------------------------------- #}
+<tr><td style="padding:24px 32px 8px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      {# Spend — neutral tone on delta #}
+      <td width="25%" style="padding:4px;"><div style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;padding:14px;">
+        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">SPEND</div>
+        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;margin-top:4px;">{{ total_spend|currency }}</div>
+        {% if prev_spend is not none and prev_spend %}
+          {% set spend_delta = ((total_spend - prev_spend) / prev_spend * 100)|round(1) %}
+          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;color:#9a9283;margin-top:2px;">{% if spend_delta > 0 %}↑{% elif spend_delta < 0 %}↓{% else %}→{% endif %} {{ spend_delta|onedecimal }}% vs. yday</div>
+        {% endif %}
+      </div></td>
+
+      {# Purchases — higher is better #}
+      <td width="25%" style="padding:4px;"><div style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;padding:14px;">
+        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">PURCHASES</div>
+        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;margin-top:4px;">{{ total_purchases|intcomma }}</div>
+        {% if prev_purchases is not none %}
+          {% set purch_diff = total_purchases - prev_purchases %}
+          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;margin-top:2px;color:{% if purch_diff > 0 %}#3c6a24{% elif purch_diff < 0 %}#c14a2b{% else %}#9a9283{% endif %};">{% if purch_diff > 0 %}↑ +{{ purch_diff }} from {{ prev_purchases }}{% elif purch_diff < 0 %}↓ from {{ prev_purchases }}{% else %}→ flat{% endif %}</div>
+        {% endif %}
+      </div></td>
+
+      {# Avg CPA — lower is better, em-dash when null #}
+      <td width="25%" style="padding:4px;"><div style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;padding:14px;">
+        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">AVG CPA</div>
+        {% if avg_cost_per_purchase is not none and avg_cost_per_purchase %}
+          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;margin-top:4px;">{{ avg_cost_per_purchase|currency }}</div>
+          {% if prev_avg_cpa is not none and prev_avg_cpa %}
+            {% set cpa_delta = ((avg_cost_per_purchase - prev_avg_cpa) / prev_avg_cpa * 100)|round(1) %}
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;margin-top:2px;color:{% if cpa_delta < 0 %}#3c6a24{% elif cpa_delta > 0 %}#c14a2b{% else %}#9a9283{% endif %};">{% if cpa_delta < 0 %}↓{% elif cpa_delta > 0 %}↑{% else %}→{% endif %} {{ cpa_delta|onedecimal }}%</div>
+          {% endif %}
+        {% else %}
+          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;color:#9a9283;margin-top:4px;">—</div>
+          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;color:#9a9283;margin-top:2px;">no purchases</div>
+        {% endif %}
+      </div></td>
+
+      {# ROAS — higher is better, em-dash when null #}
+      <td width="25%" style="padding:4px;"><div style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;padding:14px;">
+        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">AVG ROAS</div>
+        {% if avg_roas %}
+          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;margin-top:4px;">{{ avg_roas|onedecimal }}x</div>
+          {% if prev_avg_roas is not none and prev_avg_roas %}
+            {% set roas_delta = ((avg_roas - prev_avg_roas) / prev_avg_roas * 100)|round(1) %}
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;margin-top:2px;color:{% if roas_delta > 0 %}#3c6a24{% elif roas_delta < 0 %}#c14a2b{% else %}#9a9283{% endif %};">{% if roas_delta > 0 %}↑{% elif roas_delta < 0 %}↓{% else %}→{% endif %} {{ roas_delta|onedecimal }}%</div>
+          {% endif %}
+        {% else %}
+          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;color:#9a9283;margin-top:4px;">—</div>
+          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;color:#9a9283;margin-top:2px;">no purchases</div>
+        {% endif %}
+      </div></td>
+    </tr>
+  </table>
+</td></tr>
+
+{# -------------------------------------------------------------- #}
+{# Best-variant spotlight                                          #}
+{# -------------------------------------------------------------- #}
+{% if best_variant %}
+<tr><td style="padding:20px 32px 4px;">
+  <div style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.1em;color:#6d6558;text-transform:uppercase;margin-bottom:10px;">BEST VARIANT YESTERDAY</div>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border:1px solid #e2dccf;border-radius:12px;">
+    <tr><td style="padding:20px;">
+
+      {# Header row: code · media badge · status pill · days active #}
+      <div>
+        <span style="font-family:'Geist Mono',Menlo,monospace;font-size:14px;font-weight:500;color:#1f1d18;">{{ best_variant.variant_code }}</span>
+        {% set _mt = (best_variant.media_type or 'unknown')|lower %}
+        {% if _mt == 'video' %}
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#f3efe5;border:1px solid #e2dccf;color:#6d6558;padding:2px 6px;border-radius:4px;margin-left:6px;letter-spacing:0.05em;">VID</span>
+        {% elif _mt == 'image' %}
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#f3efe5;border:1px solid #e2dccf;color:#6d6558;padding:2px 6px;border-radius:4px;margin-left:6px;letter-spacing:0.05em;">IMG</span>
+        {% elif _mt == 'mixed' %}
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#f3efe5;border:1px solid #e2dccf;color:#6d6558;padding:2px 6px;border-radius:4px;margin-left:6px;letter-spacing:0.05em;">MIX</span>
+        {% endif %}
+        {% set _status = (best_variant.status or '')|lower %}
+        {% if _status == 'winner' %}
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;background:#e4f0d7;color:#3c6a24;padding:3px 9px;border-radius:99px;margin-left:6px;letter-spacing:0.04em;font-weight:500;">● WINNER</span>
+        {% elif _status == 'fatigue' or _status == 'paused' %}
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;background:#f4e0d9;color:#c14a2b;padding:3px 9px;border-radius:99px;margin-left:6px;letter-spacing:0.04em;font-weight:500;">● {{ _status|upper }}</span>
+        {% elif _status == 'new' %}
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;background:#f3e3d2;color:#6b3818;padding:3px 9px;border-radius:99px;margin-left:6px;letter-spacing:0.04em;font-weight:500;">● NEW</span>
+        {% else %}
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;background:#f3efe5;color:#6d6558;padding:3px 9px;border-radius:99px;margin-left:6px;letter-spacing:0.04em;font-weight:500;">● {{ _status|upper }}</span>
+        {% endif %}
+        {% if best_variant.days_active is defined and best_variant.days_active is not none %}
+          <span style="font-size:11.5px;color:#9a9283;margin-left:8px;">· {{ best_variant.days_active }} day{% if best_variant.days_active != 1 %}s{% endif %} active</span>
+        {% endif %}
+      </div>
+
+      <div style="font-size:13px;color:#6d6558;margin-top:6px;">{{ best_variant.genome_summary }}</div>
+
+      {% if best_variant.hypothesis %}
+      <div style="font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:14px;color:#1f1d18;margin-top:10px;padding-left:12px;border-left:2px solid #c46f3f;">"{{ best_variant.hypothesis }}"</div>
+      {% endif %}
+
+      {# Genome chips — rendered inline on one row #}
+      {% if best_variant.genome %}
+      <div style="margin-top:14px;line-height:1.9;">
+        {% for slot, value in best_variant.genome.items() %}
+        <span style="display:inline-block;font-family:'Geist Mono',Menlo,monospace;font-size:11px;background:#f3efe5;color:#1f1d18;padding:4px 8px;border-radius:5px;border:1px solid #e2dccf;margin-right:4px;"><span style="color:#9a9283;font-size:9.5px;text-transform:uppercase;letter-spacing:0.06em;">{{ slot }}</span>&nbsp; {{ value|truncate(40) }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {# 3-up diagnostic tiles — image vs. video branching #}
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
+        {% if _mt == 'image' %}
         <tr>
-            <!-- Spend -->
-            <td width="25%" style="padding: 0 4px 0 0;" valign="top">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                <tr><td style="padding: 12px 14px;">
-                    <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Spend</p>
-                    <p style="font-size: 20px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ total_spend|currency }}</p>
-                    {% if prev_spend is not none and prev_spend %}
-                    {% set spend_delta = ((total_spend - prev_spend) / prev_spend * 100)|round(1) %}
-                    <p style="font-size: 11px; color: #9a9283; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">&rarr; {{ spend_delta|onedecimal }}%</p>
-                    {% endif %}
-                </td></tr>
-                </table>
-            </td>
-            <!-- Purchases -->
-            <td width="25%" style="padding: 0 4px;" valign="top">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                <tr><td style="padding: 12px 14px;">
-                    <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Purchases</p>
-                    <p style="font-size: 20px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ total_purchases|intcomma }}</p>
-                    {% if prev_purchases is not none and prev_purchases %}
-                    {% set purch_delta = ((total_purchases - prev_purchases) / prev_purchases * 100)|round(1) %}
-                    <p style="font-size: 11px; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; color: {% if purch_delta > 0 %}#3c6a24{% elif purch_delta < 0 %}#c14a2b{% else %}#9a9283{% endif %};">{% if purch_delta > 0 %}&uarr;{% elif purch_delta < 0 %}&darr;{% else %}&rarr;{% endif %} {{ purch_delta|onedecimal }}%</p>
-                    {% endif %}
-                </td></tr>
-                </table>
-            </td>
-            <!-- CPA (inverted) -->
-            <td width="25%" style="padding: 0 4px;" valign="top">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                <tr><td style="padding: 12px 14px;">
-                    <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Avg. CPA</p>
-                    <p style="font-size: 20px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ avg_cost_per_purchase|currency }}</p>
-                    {% if prev_avg_cpa is not none and prev_avg_cpa %}
-                    {% set cpa_delta = ((avg_cost_per_purchase - prev_avg_cpa) / prev_avg_cpa * 100)|round(1) %}
-                    <p style="font-size: 11px; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; color: {% if cpa_delta < 0 %}#3c6a24{% elif cpa_delta > 0 %}#c14a2b{% else %}#9a9283{% endif %};">{% if cpa_delta < 0 %}&uarr;{% elif cpa_delta > 0 %}&darr;{% else %}&rarr;{% endif %} {{ cpa_delta|onedecimal }}%</p>
-                    {% endif %}
-                </td></tr>
-                </table>
-            </td>
-            <!-- ROAS -->
-            <td width="25%" style="padding: 0 0 0 4px;" valign="top">
-                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                <tr><td style="padding: 12px 14px;">
-                    <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">ROAS</p>
-                    <p style="font-size: 20px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{% if avg_roas %}{{ avg_roas|onedecimal }}x{% else %}N/A{% endif %}</p>
-                    {% if prev_avg_roas is not none and prev_avg_roas and avg_roas %}
-                    {% set roas_delta = ((avg_roas - prev_avg_roas) / prev_avg_roas * 100)|round(1) %}
-                    <p style="font-size: 11px; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; color: {% if roas_delta > 0 %}#3c6a24{% elif roas_delta < 0 %}#c14a2b{% else %}#9a9283{% endif %};">{% if roas_delta > 0 %}&uarr;{% elif roas_delta < 0 %}&darr;{% else %}&rarr;{% endif %} {{ roas_delta|onedecimal }}%</p>
-                    {% endif %}
-                </td></tr>
-                </table>
-            </td>
+          <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">CTR</div>
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:{% if best_variant.ctr_pct is not none and best_variant.ctr_pct > 1.5 %}#3c6a24{% else %}#1f1d18{% endif %};margin-top:2px;">{% if best_variant.ctr_pct is not none %}{{ best_variant.ctr_pct|round(1) }}%{% else %}—{% endif %}</div>
+          </div></td>
+          <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">ATC RATE</div>
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:#1f1d18;margin-top:2px;">{% if best_variant.atc_rate_pct is not none %}{{ best_variant.atc_rate_pct|round(1) }}%{% else %}—{% endif %}</div>
+          </div></td>
+          <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">CHECKOUT</div>
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:#1f1d18;margin-top:2px;">{% if best_variant.checkout_rate_pct is not none %}{{ best_variant.checkout_rate_pct|round(1) }}%{% else %}—{% endif %}</div>
+          </div></td>
         </tr>
-        </table>
-
-        <!-- Section 3: Best performing ad spotlight -->
-        {% if best_variant %}
-        <!-- Spacer -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
-
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e2dccf; border-radius: 12px;">
-        <tr><td style="padding: 20px;">
-
-            <!-- Spotlight header -->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-                <td style="font-size: 16px; font-weight: 500; color: #1f1d18; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ best_variant.variant_code }} &middot; {{ best_variant.genome_summary }}</td>
-                <td align="right"><span style="display: inline-block; background-color: #e4f0d7; color: #3c6a24; font-size: 11px; padding: 2px 10px; border-radius: 12px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Best CPA today</span></td>
-            </tr>
-            </table>
-
-            {% if best_variant.hypothesis %}
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            <tr><td style="padding-top: 6px;">
-                <span style="font-size: 12px; color: #6d6558; font-style: italic; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ best_variant.hypothesis }}</span>
-            </td></tr>
-            </table>
-            {% endif %}
-
-            <!-- Spacer -->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 14px;"></td></tr></table>
-
-            <!-- 6 metric tiles: 3x2 grid -->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            <tr>
-                <td width="33%" style="padding: 0 4px 8px 0;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                    <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Cost per purchase</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ best_variant.cost_per_purchase|currency }}</p>
-                        {% if best_variant.cost_per_purchase %}
-                        <p style="font-size: 10px; color: #9a9283; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">target: &lt; ${{ (best_variant.cost_per_purchase * 1.2)|round(0)|int }}</p>
-                        {% endif %}
-                    </td></tr>
-                    </table>
-                </td>
-                <td width="33%" style="padding: 0 4px 8px;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                    <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">ROAS</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{% if best_variant.roas %}{{ best_variant.roas|onedecimal }}x{% else %}N/A{% endif %}</p>
-                    </td></tr>
-                    </table>
-                </td>
-                <td width="33%" style="padding: 0 0 8px 4px;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                    <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Purchases</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ best_variant.purchases|intcomma }}</p>
-                    </td></tr>
-                    </table>
-                </td>
-            </tr>
-            {# Three-up diagnostic row under the spotlight. Video/mixed/unknown
-               keep Hook rate · Hold rate · CTR; image ads swap to
-               CTR · ATC rate · Checkout rate — the same three-column
-               visual shape, just with metrics that actually have meaning
-               for a static creative. #}
-            {% if best_variant.media_type == "image" %}
-            <tr>
-                <td width="33%" style="padding: 0 4px 0 0;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                    <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">CTR</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{% if best_variant.ctr_pct is not none %}{{ best_variant.ctr_pct|round(1) }}%{% else %}N/A{% endif %}</p>
-                        <p style="font-size: 10px; color: #9a9283; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">benchmark 1.5%</p>
-                    </td></tr>
-                    </table>
-                </td>
-                <td width="33%" style="padding: 0 4px;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                    <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">ATC rate</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{% if best_variant.atc_rate_pct is not none %}{{ best_variant.atc_rate_pct|round(1) }}%{% else %}N/A{% endif %}</p>
-                        <p style="font-size: 10px; color: #9a9283; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">benchmark 5-10%</p>
-                    </td></tr>
-                    </table>
-                </td>
-                <td width="33%" style="padding: 0 0 0 4px;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                    <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Checkout rate</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{% if best_variant.checkout_rate_pct is not none %}{{ best_variant.checkout_rate_pct|round(1) }}%{% else %}N/A{% endif %}</p>
-                        <p style="font-size: 10px; color: #9a9283; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">benchmark 30%</p>
-                    </td></tr>
-                    </table>
-                </td>
-            </tr>
-            {% else %}
-            <tr>
-                <td width="33%" style="padding: 0 4px 0 0;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                    <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Hook rate</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{% if best_variant.hook_rate_pct is not none %}{{ best_variant.hook_rate_pct|round(1) }}%{% else %}N/A{% endif %}</p>
-                        <p style="font-size: 10px; color: #9a9283; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">benchmark 30%</p>
-                    </td></tr>
-                    </table>
-                </td>
-                <td width="33%" style="padding: 0 4px;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                    <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Hold rate</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{% if best_variant.hold_rate_pct is not none %}{{ best_variant.hold_rate_pct|round(1) }}%{% else %}N/A{% endif %}</p>
-                        <p style="font-size: 10px; color: #9a9283; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">benchmark 25%</p>
-                    </td></tr>
-                    </table>
-                </td>
-                <td width="33%" style="padding: 0 0 0 4px;" valign="top">
-                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-                    <tr><td style="padding: 10px 12px;">
-                        <p style="font-size: 11px; color: #9a9283; margin: 0; text-transform: uppercase; letter-spacing: 0.4px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">CTR</p>
-                        <p style="font-size: 18px; font-weight: 500; color: #1f1d18; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{% if best_variant.ctr_pct is not none %}{{ best_variant.ctr_pct|round(1) }}%{% else %}N/A{% endif %}</p>
-                        <p style="font-size: 10px; color: #9a9283; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">benchmark 1.5%</p>
-                    </td></tr>
-                    </table>
-                </td>
-            </tr>
-            {% endif %}
-            </table>
-
-            <!-- Funnel visualization -->
-            {% if best_variant_funnel %}
-            {% set max_count = best_variant_funnel[0].count if best_variant_funnel else 1 %}
-            <!-- Spacer -->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 14px;"></td></tr></table>
-
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            {% for stage in best_variant_funnel %}
-                <tr>
-                    <td width="90" align="right" style="padding: 3px 8px 3px 0; font-size: 12px; color: #6d6558; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; vertical-align: middle;">{{ stage.label }}</td>
-                    <td style="padding: 3px 0; vertical-align: middle;">
-                        {% set bar_w = (stage.count / max_count * 400)|int if max_count > 0 else 0 %}
-                        {% if bar_w < 30 %}{% set bar_w = 30 %}{% endif %}
-                        <table role="presentation" cellpadding="0" cellspacing="0">
-                        <tr><td style="background-color: {{ stage.bar_color }}; border-radius: 4px; padding: 6px 10px; color: #ffffff; font-size: 12px; font-weight: 500; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; width: {{ bar_w }}px;">{{ stage.count|intcomma }}</td></tr>
-                        </table>
-                    </td>
-                    <td style="padding: 3px 0 3px 8px; font-size: 11px; color: #6d6558; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; vertical-align: middle;">{% if stage.rate_pct is not none %}{{ stage.rate_pct|round(1) }}% {{ stage.rate_label }}{% endif %}</td>
-                </tr>
-                {% if stage.dropoff_pct is not none and not loop.last %}
-                <tr>
-                    <td width="90"></td>
-                    <td colspan="2" style="padding: 2px 0; font-size: 10px; color: #9a9283; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">&darr; {{ stage.dropoff_pct|round(0)|int }}% didn't {{ best_variant_funnel[loop.index].label|lower }}</td>
-                </tr>
-                {% endif %}
-            {% endfor %}
-            </table>
-            {% endif %}
-
-            <!-- Diagnostics -->
-            {% if best_variant_diagnostics %}
-            <!-- Spacer -->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 14px;"></td></tr></table>
-
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3efe5; border-radius: 8px;">
-            <tr><td style="padding: 12px 14px;">
-                <p style="font-size: 12px; font-weight: 600; color: #1f1d18; margin: 0 0 6px 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Diagnostics</p>
-                {% for d in best_variant_diagnostics %}
-                <p style="font-size: 12px; margin: 3px 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; color: {% if d.severity == 'good' %}#3c6a24{% elif d.severity == 'warning' %}#c46f3f{% elif d.severity == 'bad' %}#c14a2b{% else %}#6d6558{% endif %};">{{ d.text }}</p>
-                {% endfor %}
-                {% if best_variant_projection %}
-                <p style="font-size: 12px; color: #6d6558; margin: 6px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ best_variant_projection }}</p>
-                {% endif %}
-            </td></tr>
-            </table>
-            {% endif %}
-
-            <!-- Creative DNA / Genome pills -->
-            {% if best_variant.genome %}
-            <!-- Spacer -->
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 12px;"></td></tr></table>
-
-            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-            <tr><td>
-                {% for slot, value in best_variant.genome.items() %}
-                <span style="display: inline-block; background-color: #f3efe5; border-radius: 8px; padding: 3px 10px; margin: 0 4px 4px 0; font-size: 11px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;"><span style="color: #9a9283;">{{ slot }}:</span> <span style="color: #1f1d18;">{{ value }}</span></span>
-                {% endfor %}
-            </td></tr>
-            </table>
-            {% endif %}
-
-        </td></tr>
-        </table>
-        {% endif %}
-
-        <!-- Section 4: Other active variants -->
-        {% if variants %}
-        <!-- Spacer -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
-
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="padding-bottom: 10px;">
-            <span style="font-size: 16px; font-weight: 500; color: #1f1d18; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Other active variants</span>
-        </td></tr>
-        </table>
-
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 12px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">
-        <tr style="border-bottom: 1px solid #e2dccf;">
-            <td style="padding: 6px 8px 6px 0; font-size: 10px; text-transform: uppercase; color: #9a9283; letter-spacing: 0.4px; border-bottom: 1px solid #e2dccf;">Variant</td>
-            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #9a9283; letter-spacing: 0.4px; border-bottom: 1px solid #e2dccf;">Hook</td>
-            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #9a9283; letter-spacing: 0.4px; border-bottom: 1px solid #e2dccf;">CTR</td>
-            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #9a9283; letter-spacing: 0.4px; border-bottom: 1px solid #e2dccf;">CPA</td>
-            <td style="padding: 6px 8px; font-size: 10px; text-transform: uppercase; color: #9a9283; letter-spacing: 0.4px; border-bottom: 1px solid #e2dccf;">ROAS</td>
-            <td style="padding: 6px 0 6px 8px; font-size: 10px; text-transform: uppercase; color: #9a9283; letter-spacing: 0.4px; border-bottom: 1px solid #e2dccf;">Status</td>
-        </tr>
-        {% for v in variants %}
+        {% else %}
         <tr>
-            <td style="padding: 6px 8px 6px 0; color: #1f1d18; border-bottom: 1px solid #e2dccf; font-family: 'Geist Mono', ui-monospace, 'SF Mono', Menlo, 'Courier New', monospace; font-size: 12px;">{{ v.variant_code }}</td>
-            {# Image variants have no meaningful hook rate — render an em-dash
-               instead of a misleading 0.0%. Video, mixed, and unknown variants
-               keep the computed value. #}
-            <td style="padding: 6px 8px; color: #1f1d18; border-bottom: 1px solid #e2dccf;">{% if v.media_type == "image" or v.hook_rate_pct is none %}&mdash;{% else %}{{ v.hook_rate_pct|round(1) }}%{% endif %}</td>
-            <td style="padding: 6px 8px; color: #1f1d18; border-bottom: 1px solid #e2dccf;">{% if v.ctr_pct is not none %}{{ v.ctr_pct|round(1) }}%{% else %}&mdash;{% endif %}</td>
-            <td style="padding: 6px 8px; color: #1f1d18; border-bottom: 1px solid #e2dccf;">{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}&mdash;{% endif %}</td>
-            <td style="padding: 6px 8px; color: #1f1d18; border-bottom: 1px solid #e2dccf;">{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}&mdash;{% endif %}</td>
-            <td style="padding: 6px 0 6px 8px; border-bottom: 1px solid #e2dccf;">
-                {% if v.status == 'winner' %}
-                <span style="display: inline-block; background-color: #e4f0d7; color: #3c6a24; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ v.status }}</span>
-                {% elif v.status == 'steady' %}
-                <span style="display: inline-block; background-color: #f3efe5; color: #3d3932; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ v.status }}</span>
-                {% elif v.status == 'new' %}
-                <span style="display: inline-block; background-color: #f3efe5; color: #3d3932; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ v.status }}</span>
-                {% elif v.status == 'fatigue' or v.status == 'paused' %}
-                <span style="display: inline-block; background-color: #f3e3d2; color: #6b3818; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ v.status }}</span>
-                {% else %}
-                <span style="display: inline-block; background-color: #f3efe5; color: #6d6558; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ v.status }}</span>
-                {% endif %}
-            </td>
+          <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">HOOK</div>
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:#1f1d18;margin-top:2px;">{% if best_variant.hook_rate_pct is not none %}{{ best_variant.hook_rate_pct|round(1) }}%{% else %}—{% endif %}</div>
+          </div></td>
+          <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">HOLD</div>
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:#1f1d18;margin-top:2px;">{% if best_variant.hold_rate_pct is not none %}{{ best_variant.hold_rate_pct|round(1) }}%{% else %}—{% endif %}</div>
+          </div></td>
+          <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">CTR</div>
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:{% if best_variant.ctr_pct is not none and best_variant.ctr_pct > 1.5 %}#3c6a24{% else %}#1f1d18{% endif %};margin-top:2px;">{% if best_variant.ctr_pct is not none %}{{ best_variant.ctr_pct|round(1) }}%{% else %}—{% endif %}</div>
+          </div></td>
+        </tr>
+        {% endif %}
+      </table>
+
+      {# Funnel — horizontal bars, widths proportional to first stage #}
+      {% if best_variant_funnel %}
+      {% set max_count = best_variant_funnel[0].count if best_variant_funnel[0].count else 1 %}
+      <div style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.1em;color:#9a9283;text-transform:uppercase;margin-top:20px;margin-bottom:8px;">FUNNEL</div>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        {% for stage in best_variant_funnel %}
+        {% set w_pct = (stage.count / max_count * 100)|round(0)|int if max_count else 0 %}
+        {% if w_pct < 2 and stage.count > 0 %}{% set w_pct = 2 %}{% endif %}
+        <tr>
+          <td width="120" style="font-size:12.5px;color:#1f1d18;padding:6px 0;">{{ stage.label }}</td>
+          <td style="padding:6px 0;">
+            <table cellpadding="0" cellspacing="0" border="0" style="width:100%;"><tr><td>
+              <div style="height:14px;width:{{ w_pct }}%;background:{{ stage.bar_color or '#1f1d18' }};border-radius:3px;min-width:{% if stage.count > 0 %}10px{% else %}0{% endif %};"></div>
+            </td></tr></table>
+          </td>
+          <td width="110" align="right" style="font-family:'Geist Mono',Menlo,monospace;font-size:11.5px;padding:6px 0 6px 10px;">{{ stage.count|intcomma }}{% if stage.rate_pct is not none and not loop.first %} <span style="color:#9a9283;">· {{ stage.rate_pct|round(1) }}%</span>{% endif %}</td>
         </tr>
         {% endfor %}
-        </table>
-        {% endif %}
+      </table>
+      {% endif %}
 
-        <!-- Section 5: Fatigue alerts -->
-        {% if fatigue_alerts %}
-        <!-- Spacer -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
-
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="padding-bottom: 10px;">
-            <span style="font-size: 16px; font-weight: 500; color: #1f1d18; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Fatigue alerts</span>
+      {# Notes — GOOD / WARN / BAD severity chips #}
+      {% if best_variant_diagnostics %}
+      <div style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.1em;color:#9a9283;text-transform:uppercase;margin-top:20px;margin-bottom:6px;">NOTES</div>
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        {% for d in best_variant_diagnostics %}
+        <tr><td style="padding:8px 0;{% if not loop.last %}border-bottom:1px solid #e2dccf;{% endif %}">
+          {% if d.severity == 'good' %}
+            <span style="display:inline-block;font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#e4f0d7;color:#3c6a24;padding:2px 7px;border-radius:4px;font-weight:500;letter-spacing:0.06em;">GOOD</span>
+          {% elif d.severity == 'warning' %}
+            <span style="display:inline-block;font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#f3e3d2;color:#6b3818;padding:2px 7px;border-radius:4px;font-weight:500;letter-spacing:0.06em;">WARN</span>
+          {% elif d.severity == 'bad' %}
+            <span style="display:inline-block;font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#f4e0d9;color:#c14a2b;padding:2px 7px;border-radius:4px;font-weight:500;letter-spacing:0.06em;">BAD</span>
+          {% else %}
+            <span style="display:inline-block;font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#f3efe5;color:#6d6558;padding:2px 7px;border-radius:4px;font-weight:500;letter-spacing:0.06em;">NOTE</span>
+          {% endif %}
+          <span style="font-size:13px;color:#1f1d18;margin-left:8px;">{{ d.text }}</span>
         </td></tr>
-        </table>
-
-        {% for alert in fatigue_alerts %}
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f3e3d2; border-radius: 8px; margin-bottom: 6px;">
-        <tr><td style="padding: 10px 14px; font-size: 13px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">
-            <span style="font-weight: 600; color: #1f1d18;">{{ alert.variant_code }}</span>
-            <span style="color: #1f1d18;"> &mdash; {{ alert.reason }}</span>
-            <span style="color: #6d6558;"> {{ alert.recommendation }}</span>
-        </td></tr>
-        </table>
         {% endfor %}
-        {% endif %}
+      </table>
+      {% endif %}
 
-        <!-- Section 6: Actions taken -->
-        {% if actions %}
-        <!-- Spacer -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
-
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="padding-bottom: 10px;">
-            <span style="font-size: 16px; font-weight: 500; color: #1f1d18; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Actions taken</span>
-        </td></tr>
-        </table>
-
-        {% for action in actions %}
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 6px;">
-        <tr><td style="padding: 6px 0; font-size: 13px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif; border-bottom: 1px solid #e2dccf;">
-            {% if action.action_type == 'launch' %}
-            <span style="display: inline-block; background-color: #e4f0d7; color: #3c6a24; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ action.action_type }}</span>
-            {% elif action.action_type == 'pause' %}
-            <span style="display: inline-block; background-color: #f3e3d2; color: #6b3818; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ action.action_type }}</span>
-            {% elif action.action_type == 'scale' %}
-            <span style="display: inline-block; background-color: #f3efe5; color: #3d3932; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ action.action_type }}</span>
-            {% else %}
-            <span style="display: inline-block; background-color: #f3efe5; color: #6d6558; font-size: 11px; padding: 1px 8px; border-radius: 8px; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ action.action_type }}</span>
-            {% endif %}
-            <span style="font-weight: 600; color: #1f1d18; padding-left: 4px;">{{ action.variant_code }}</span>
-            <span style="color: #6d6558; padding-left: 4px;">{{ action.details }}</span>
-        </td></tr>
-        </table>
-        {% endfor %}
-        {% endif %}
-
-        <!-- Section 7: Next cycle preview -->
-        {% if next_cycle %}
-        <!-- Spacer -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
-
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="padding-bottom: 10px;">
-            <span style="font-size: 16px; font-weight: 500; color: #1f1d18; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Next cycle preview</span>
-        </td></tr>
-        </table>
-
-        {% for preview in next_cycle %}
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="padding: 6px 0; border-bottom: 1px solid #e2dccf;">
-            <p style="font-size: 13px; font-weight: 500; color: #1f1d18; margin: 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ preview.hypothesis }}</p>
-            <p style="font-size: 12px; color: #6d6558; margin: 2px 0 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">{{ preview.genome_summary }}</p>
-        </td></tr>
-        </table>
-        {% endfor %}
-        {% endif %}
-
-        <!-- Section 8: Footer -->
-        <!-- Spacer -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding-top: 28px;"></td></tr></table>
-
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
-        <tr><td style="padding-top: 16px; border-top: 1px solid #e2dccf;">
-            <p style="font-size: 12px; color: #9a9283; margin: 0; font-family: 'Geist', 'Inter', -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;">Generated by Kleiber &middot; <a href="{{ base_url }}" style="color: #1f1d18; text-decoration: none;">View all reports</a></p>
-        </td></tr>
-        </table>
-
+      {# Projection — terracotta-tinted callout #}
+      {% if best_variant_projection %}
+      <div style="margin-top:14px;padding:12px 14px;background:#f3e3d2;border-radius:8px;font-size:13px;color:#6b3818;line-height:1.5;">
+        <b style="color:#1f1d18;">Projection.</b> {{ best_variant_projection }}
+      </div>
+      {% endif %}
     </td></tr>
-    </table>
+  </table>
+</td></tr>
+{% endif %}
+
+{# -------------------------------------------------------------- #}
+{# Other active variants                                           #}
+{# -------------------------------------------------------------- #}
+{% if variants %}
+<tr><td style="padding:24px 32px 4px;">
+  <div style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.1em;color:#6d6558;text-transform:uppercase;margin-bottom:10px;">OTHER ACTIVE VARIANTS</div>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;overflow:hidden;">
+    <tr style="background:#f3efe5;">
+      <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">VARIANT</td>
+      <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">HOOK</td>
+      <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">CTR</td>
+      <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">CPA</td>
+      <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">ROAS</td>
+      <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">STATUS</td>
+    </tr>
+    {% for v in variants %}
+    <tr style="border-top:1px solid #e2dccf;">
+      <td style="padding:11px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:12px;font-weight:500;">{{ v.variant_code }}</td>
+      {# Image variants have no meaningful hook rate — em-dash instead of 0.0%. #}
+      <td style="padding:11px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:12px;{% if v.media_type == 'image' or v.hook_rate_pct is none %}color:#9a9283;{% endif %}">{% if v.media_type == 'image' or v.hook_rate_pct is none %}—{% else %}{{ v.hook_rate_pct|round(1) }}%{% endif %}</td>
+      <td style="padding:11px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:12px;">{% if v.ctr_pct is not none %}{{ v.ctr_pct|round(1) }}%{% else %}<span style="color:#9a9283;">—</span>{% endif %}</td>
+      <td style="padding:11px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:12px;{% if not v.cost_per_purchase %}color:#9a9283;{% endif %}">{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}—{% endif %}</td>
+      <td style="padding:11px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:12px;{% if not v.roas %}color:#9a9283;{% endif %}">{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}—{% endif %}</td>
+      <td style="padding:11px 14px;">
+        {% if v.status == 'winner' %}
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#e4f0d7;color:#3c6a24;padding:2px 7px;border-radius:99px;letter-spacing:0.04em;font-weight:500;">WINNER</span>
+        {% elif v.status == 'new' %}
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#f3e3d2;color:#6b3818;padding:2px 7px;border-radius:99px;letter-spacing:0.04em;font-weight:500;">NEW</span>
+        {% elif v.status == 'fatigue' or v.status == 'paused' %}
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#f4e0d9;color:#c14a2b;padding:2px 7px;border-radius:99px;letter-spacing:0.04em;font-weight:500;">{{ v.status|upper }}</span>
+        {% else %}
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#f3efe5;color:#6d6558;padding:2px 7px;border-radius:99px;letter-spacing:0.04em;font-weight:500;">{{ v.status|upper }}</span>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</td></tr>
+{% endif %}
+
+{# -------------------------------------------------------------- #}
+{# Fatigue alerts                                                  #}
+{# -------------------------------------------------------------- #}
+{% if fatigue_alerts %}
+<tr><td style="padding:24px 32px 4px;">
+  <div style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.1em;color:#6d6558;text-transform:uppercase;margin-bottom:10px;">FATIGUE ALERTS</div>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f4e0d9;border:1px solid #e8c5b8;border-radius:10px;">
+    <tr><td style="padding:14px 16px;">
+      {% for alert in fatigue_alerts %}
+      <div style="{% if not loop.first %}margin-top:12px;padding-top:12px;border-top:1px solid #e8c5b8;{% endif %}">
+        <div><span style="font-family:'Geist Mono',Menlo,monospace;font-size:12px;font-weight:500;color:#1f1d18;">{{ alert.variant_code }}</span> <span style="font-size:13px;color:#6b3818;margin-left:8px;">{{ alert.reason }}</span></div>
+        <div style="font-size:12.5px;color:#6d6558;margin-top:5px;">→ {{ alert.recommendation }}</div>
+      </div>
+      {% endfor %}
+    </td></tr>
+  </table>
+</td></tr>
+{% endif %}
+
+{# -------------------------------------------------------------- #}
+{# Actions + Next cycle (50/50 row)                                #}
+{# -------------------------------------------------------------- #}
+{% if actions or next_cycle %}
+<tr><td style="padding:24px 32px 4px;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td width="50%" valign="top" style="padding-right:6px;">
+        {% if actions %}
+        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.1em;color:#6d6558;text-transform:uppercase;margin-bottom:10px;">ACTIONS TAKEN</div>
+        <div style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;padding:14px;">
+          {% for action in actions %}
+          <div style="{% if not loop.first %}margin-top:12px;padding-top:12px;border-top:1px solid #e2dccf;{% endif %}">
+            <div>
+              {% if action.action_type == 'launch' %}
+                <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;background:#e4f0d7;color:#3c6a24;padding:2px 7px;border-radius:4px;font-weight:500;letter-spacing:0.06em;">LAUNCH</span>
+              {% elif action.action_type == 'pause' %}
+                <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;background:#f4e0d9;color:#c14a2b;padding:2px 7px;border-radius:4px;font-weight:500;letter-spacing:0.06em;">PAUSE</span>
+              {% elif action.action_type == 'scale' or action.action_type == 'increase_budget' %}
+                <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;background:#f3e3d2;color:#6b3818;padding:2px 7px;border-radius:4px;font-weight:500;letter-spacing:0.06em;">SCALE</span>
+              {% elif action.action_type == 'decrease_budget' %}
+                <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;background:#f4e0d9;color:#c14a2b;padding:2px 7px;border-radius:4px;font-weight:500;letter-spacing:0.06em;">SCALE DOWN</span>
+              {% else %}
+                <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;background:#f3efe5;color:#6d6558;padding:2px 7px;border-radius:4px;font-weight:500;letter-spacing:0.06em;">{{ action.action_type|upper }}</span>
+              {% endif %}
+              <span style="font-family:'Geist Mono',Menlo,monospace;font-size:12px;font-weight:500;margin-left:6px;">{{ action.variant_code }}</span>
+            </div>
+            {% if action.details %}<div style="font-size:12.5px;color:#6d6558;margin-top:6px;">{{ action.details }}</div>{% endif %}
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </td>
+      <td width="50%" valign="top" style="padding-left:6px;">
+        {% if next_cycle %}
+        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.1em;color:#6d6558;text-transform:uppercase;margin-bottom:10px;">NEXT CYCLE</div>
+        <div style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;padding:14px;">
+          {% for preview in next_cycle %}
+          <div style="{% if not loop.first %}margin-top:12px;padding-top:12px;border-top:1px solid #e2dccf;{% endif %}">
+            <div style="font-size:13px;color:#1f1d18;line-height:1.45;">{{ preview.hypothesis }}</div>
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;color:#9a9283;margin-top:6px;">{{ preview.genome_summary }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </td>
+    </tr>
+  </table>
+</td></tr>
+{% endif %}
+
+{# -------------------------------------------------------------- #}
+{# CTA                                                             #}
+{# -------------------------------------------------------------- #}
+<tr><td style="padding:32px 32px 28px;" align="center">
+  <a href="{{ base_url }}" style="display:inline-block;background:#1f1d18;color:#fafaf7;font-size:14px;font-weight:500;text-decoration:none;padding:12px 22px;border-radius:99px;">Open full report →</a>
+</td></tr>
+
+{# Footer #}
+<tr><td style="padding:18px 32px 26px;border-top:1px solid #e2dccf;background:#f3efe5;">
+  <table width="100%"><tr>
+    <td style="font-size:11.5px;color:#9a9283;">Generated {{ generated_at }} UTC · cycle {{ cycle_number }}</td>
+    <td align="right" style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;color:#9a9283;letter-spacing:0.1em;">KLEIBER · AUTONOMOUS AD TESTING</td>
+  </tr></table>
+</td></tr>
+
+</table>
 </td></tr>
 </table>
 
