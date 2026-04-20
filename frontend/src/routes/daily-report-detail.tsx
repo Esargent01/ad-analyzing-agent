@@ -4,7 +4,7 @@ import { BestVariantSpotlight } from "@/components/BestVariantSpotlight";
 import { MetricCard } from "@/components/MetricCard";
 import { DailyVariantTable } from "@/components/VariantTable";
 import { DashPage } from "@/components/dashboard/DashPage";
-import { EmptyState } from "@/components/dashboard/primitives";
+import { EmptyState, StatusPill } from "@/components/dashboard/primitives";
 import { SkeletonReportBody } from "@/components/ui/Skeleton";
 import { useDailyReport, useMe } from "@/lib/api/hooks";
 import { ApiError } from "@/lib/api/client";
@@ -16,10 +16,10 @@ import { formatCurrency, formatDateLabel, formatIntComma, formatOneDecimal } fro
  * header, 4-card top-line metrics, best-variant spotlight, "other active
  * variants" table, fatigue alerts, actions, next-cycle preview.
  *
- * Wraps the rich existing data components inside the new ``DashPage``
- * frame so the outer chrome (nav, breadcrumbs, editorial title)
- * matches the rest of the dashboard. Body-level styling of the
- * spotlight + variant table lives in those components.
+ * Ported to the warm-editorial system: sections get eyebrow labels +
+ * warm-paper card containers, action chips use the shared ``StatusPill``
+ * primitive, and text colors map onto ``--ink`` / ``--muted`` rather
+ * than the legacy ``--text-*`` tokens.
  */
 export function DailyReportDetailRoute() {
   const { campaignId = "", reportDate = "" } = useParams();
@@ -88,62 +88,72 @@ function DailyReportBody({ report }: { report: DailyReport }) {
   return (
     <>
       {/* Top-line metric cards */}
-      <div className="mb-8 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <MetricCard
-          label="Spend"
-          value={formatCurrency(report.total_spend)}
-          trend={renderDelta(report.total_spend, report.prev_spend)}
-          tone="neutral"
-        />
-        <MetricCard
-          label="Purchases"
-          value={formatIntComma(report.total_purchases)}
-          trend={renderDelta(report.total_purchases, report.prev_purchases)}
-          tone={
-            changeTone(report.total_purchases, report.prev_purchases, "higher-is-better")
-          }
-        />
-        <MetricCard
-          label="Avg. CPA"
-          value={
-            report.avg_cost_per_purchase != null && report.avg_cost_per_purchase !== ""
-              ? formatCurrency(report.avg_cost_per_purchase)
-              : "—"
-          }
-          trend={renderDelta(report.avg_cost_per_purchase, report.prev_avg_cpa)}
-          tone={
-            changeTone(report.avg_cost_per_purchase, report.prev_avg_cpa, "lower-is-better")
-          }
-        />
-        <MetricCard
-          label="ROAS"
-          value={
-            report.avg_roas != null && report.avg_roas !== ""
-              ? `${formatOneDecimal(report.avg_roas)}x`
-              : "N/A"
-          }
-          trend={renderDelta(report.avg_roas, report.prev_avg_roas)}
-          tone={
-            changeTone(report.avg_roas, report.prev_avg_roas, "higher-is-better")
-          }
-        />
-      </div>
+      <Section label="Top-line · today">
+        <div
+          data-ds-grid
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 10,
+          }}
+        >
+          <MetricCard
+            label="Spend"
+            value={formatCurrency(report.total_spend)}
+            trend={renderDelta(report.total_spend, report.prev_spend)}
+            tone="neutral"
+          />
+          <MetricCard
+            label="Purchases"
+            value={formatIntComma(report.total_purchases)}
+            trend={renderDelta(report.total_purchases, report.prev_purchases)}
+            tone={
+              changeTone(report.total_purchases, report.prev_purchases, "higher-is-better")
+            }
+          />
+          <MetricCard
+            label="Avg. CPA"
+            value={
+              report.avg_cost_per_purchase != null && report.avg_cost_per_purchase !== ""
+                ? formatCurrency(report.avg_cost_per_purchase)
+                : "—"
+            }
+            trend={renderDelta(report.avg_cost_per_purchase, report.prev_avg_cpa)}
+            tone={
+              changeTone(report.avg_cost_per_purchase, report.prev_avg_cpa, "lower-is-better")
+            }
+          />
+          <MetricCard
+            label="ROAS"
+            value={
+              report.avg_roas != null && report.avg_roas !== ""
+                ? `${formatOneDecimal(report.avg_roas)}x`
+                : "N/A"
+            }
+            trend={renderDelta(report.avg_roas, report.prev_avg_roas)}
+            tone={
+              changeTone(report.avg_roas, report.prev_avg_roas, "higher-is-better")
+            }
+          />
+        </div>
+      </Section>
 
       {/* Best-variant spotlight */}
       {report.best_variant ? (
-        <BestVariantSpotlight
-          variant={report.best_variant}
-          funnel={report.best_variant_funnel}
-          diagnostics={report.best_variant_diagnostics}
-          projection={report.best_variant_projection}
-        />
+        <Section label="Best variant · today">
+          <BestVariantSpotlight
+            variant={report.best_variant}
+            funnel={report.best_variant_funnel}
+            diagnostics={report.best_variant_diagnostics}
+            projection={report.best_variant_projection}
+          />
+        </Section>
       ) : null}
 
       {/* Other active variants */}
-      <section className="mb-8">
-        <h2 className="mb-3 text-[15px] font-medium">Other active variants</h2>
+      <Section label="Other active variants">
         <DailyVariantTable variants={report.variants} />
-      </section>
+      </Section>
 
       {/* Fatigue alerts */}
       {report.fatigue_alerts.length > 0 ? (
@@ -157,21 +167,47 @@ function DailyReportBody({ report }: { report: DailyReport }) {
 
       {/* Next cycle preview */}
       {report.next_cycle.length > 0 ? (
-        <section className="mb-8">
-          <h2 className="mb-3 text-[15px] font-medium">Next cycle preview</h2>
-          <div className="divide-y divide-[var(--border)]">
+        <Section label="Next cycle preview">
+          <div
+            style={{
+              border: "1px solid var(--border)",
+              borderRadius: 12,
+              background: "white",
+              overflow: "hidden",
+            }}
+          >
             {report.next_cycle.map((n, i) => (
-              <div key={i} className="py-2">
-                <div className="text-sm font-medium text-[var(--text)]">
+              <div
+                key={i}
+                style={{
+                  padding: "14px 16px",
+                  borderTop: i === 0 ? "none" : "1px solid var(--border-soft)",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13.5,
+                    fontWeight: 500,
+                    color: "var(--ink)",
+                    lineHeight: 1.45,
+                  }}
+                >
                   {n.hypothesis}
                 </div>
-                <div className="text-xs text-[var(--text-secondary)]">
+                <div
+                  style={{
+                    marginTop: 4,
+                    fontFamily: "var(--font-mono)",
+                    fontSize: 11.5,
+                    color: "var(--muted)",
+                  }}
+                >
                   {n.genome_summary}
                 </div>
               </div>
             ))}
           </div>
-        </section>
+        </Section>
       ) : null}
     </>
   );
@@ -179,50 +215,111 @@ function DailyReportBody({ report }: { report: DailyReport }) {
 
 function FatigueAlertsSection({ alerts }: { alerts: FatigueAlert[] }) {
   return (
-    <section className="mb-8">
-      <h2 className="mb-3 text-[15px] font-medium">Fatigue alerts</h2>
-      <div className="divide-y divide-[var(--border)]">
+    <Section label="Fatigue alerts">
+      <div
+        style={{
+          border: "1px solid oklch(88% 0.08 28)",
+          borderRadius: 12,
+          background: "oklch(98% 0.02 28)",
+          overflow: "hidden",
+        }}
+      >
         {alerts.map((a, i) => (
           <div
             key={`${a.variant_code}-${i}`}
-            className="grid gap-1 py-2 text-xs sm:grid-cols-[100px_1fr_1fr] sm:gap-3"
+            data-ds-grid
+            style={{
+              display: "grid",
+              gridTemplateColumns: "90px 1fr 1fr",
+              gap: 16,
+              padding: "12px 16px",
+              borderTop: i === 0 ? "none" : "1px solid oklch(90% 0.06 28)",
+              alignItems: "center",
+              fontSize: 12.5,
+            }}
           >
-            <strong className="font-mono text-[var(--text)]">
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontWeight: 500,
+                fontSize: 13,
+                color: "oklch(40% 0.16 28)",
+              }}
+            >
               {a.variant_code}
-            </strong>
-            <span className="text-[var(--text)]">{a.reason}</span>
-            <span className="text-[var(--text-secondary)]">
-              {a.recommendation}
             </span>
+            <span style={{ color: "var(--ink)" }}>{a.reason}</span>
+            <span style={{ color: "var(--muted)" }}>{a.recommendation}</span>
           </div>
         ))}
       </div>
-    </section>
+    </Section>
   );
 }
 
 function ActionsSection({ actions }: { actions: ReportCycleAction[] }) {
   return (
-    <section className="mb-8">
-      <h2 className="mb-3 text-[15px] font-medium">Actions taken</h2>
-      <div className="divide-y divide-[var(--border)]">
+    <Section label="Actions taken">
+      <div
+        style={{
+          border: "1px solid var(--border)",
+          borderRadius: 12,
+          background: "white",
+          overflow: "hidden",
+        }}
+      >
         {actions.map((a, i) => (
           <div
             key={`${a.variant_code}-${i}`}
-            className="grid items-center gap-2 py-2 text-xs sm:grid-cols-[100px_100px_1fr] sm:gap-3"
+            data-ds-grid
+            style={{
+              display: "grid",
+              gridTemplateColumns: "110px 90px 1fr",
+              gap: 16,
+              padding: "12px 16px",
+              borderTop: i === 0 ? "none" : "1px solid var(--border-soft)",
+              alignItems: "center",
+              fontSize: 12.5,
+            }}
           >
-            <span className="rounded bg-[var(--bg-secondary)] px-2 py-0.5 text-center text-[10px] uppercase tracking-[0.3px] text-[var(--text-tertiary)]">
+            <StatusPill kind={actionKind(a.action_type)}>
               {a.action_type}
-            </span>
-            <strong className="font-mono text-[var(--text)]">
+            </StatusPill>
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontWeight: 500,
+                fontSize: 13,
+                color: "var(--ink)",
+              }}
+            >
               {a.variant_code}
-            </strong>
-            <span className="text-[var(--text-secondary)]">
-              {a.details ?? ""}
             </span>
+            <span style={{ color: "var(--muted)" }}>{a.details ?? ""}</span>
           </div>
         ))}
       </div>
+    </Section>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Section frame — eyebrow label + consistent vertical rhythm.
+// ---------------------------------------------------------------------------
+
+function Section({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section style={{ marginBottom: 32 }}>
+      <div className="eyebrow" style={{ marginBottom: 12 }}>
+        {label}
+      </div>
+      {children}
     </section>
   );
 }
@@ -265,3 +362,13 @@ function changeTone(
   return better ? "up" : "down";
 }
 
+function actionKind(
+  actionType: string,
+): "winner" | "paused" | "fatigue" | "new" | "steady" {
+  const t = actionType.toLowerCase();
+  if (t.includes("pause")) return "paused";
+  if (t.includes("scale") || t.includes("winner")) return "winner";
+  if (t.includes("launch") || t.includes("deploy") || t.includes("new")) return "new";
+  if (t.includes("fatigue") || t.includes("retire")) return "fatigue";
+  return "steady";
+}
