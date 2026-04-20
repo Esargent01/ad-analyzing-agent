@@ -47,60 +47,28 @@
 </td></tr>
 
 {# -------------------------------------------------------------- #}
-{# Top-line metric tiles                                          #}
+{# Top-line metric tiles — data-driven loop over the objective's   #}
+{# headline_metrics. Layout is a 4-up 25%-width grid; the list is  #}
+{# always exactly four items per ObjectiveProfile.daily_headline_specs. #}
 {# -------------------------------------------------------------- #}
+{% macro headline_tone_color(tone) -%}
+  {%- if tone == 'good' -%}#3c6a24
+  {%- elif tone == 'bad' -%}#c14a2b
+  {%- else -%}#9a9283
+  {%- endif -%}
+{%- endmacro %}
 <tr><td style="padding:24px 32px 8px;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0">
     <tr>
-      {# Spend — neutral tone on delta #}
+      {% for card in headline_metrics %}
       <td width="25%" style="padding:4px;"><div style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;padding:14px;">
-        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">SPEND</div>
-        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;margin-top:4px;">{{ total_spend|currency }}</div>
-        {% if prev_spend is not none and prev_spend %}
-          {% set spend_delta = ((total_spend - prev_spend) / prev_spend * 100)|round(1) %}
-          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;color:#9a9283;margin-top:2px;">{% if spend_delta > 0 %}↑{% elif spend_delta < 0 %}↓{% else %}→{% endif %} {{ spend_delta|onedecimal }}% vs. yday</div>
+        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">{{ card.label }}</div>
+        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;margin-top:4px;{% if card.value == '—' or card.value == 'N/A' %}color:#9a9283;{% endif %}">{{ card.value }}</div>
+        {% if card.sub %}
+        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;margin-top:2px;color:{{ headline_tone_color(card.tone) }};">{{ card.sub }}</div>
         {% endif %}
       </div></td>
-
-      {# Purchases — higher is better #}
-      <td width="25%" style="padding:4px;"><div style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;padding:14px;">
-        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">PURCHASES</div>
-        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;margin-top:4px;">{{ total_purchases|intcomma }}</div>
-        {% if prev_purchases is not none %}
-          {% set purch_diff = total_purchases - prev_purchases %}
-          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;margin-top:2px;color:{% if purch_diff > 0 %}#3c6a24{% elif purch_diff < 0 %}#c14a2b{% else %}#9a9283{% endif %};">{% if purch_diff > 0 %}↑ +{{ purch_diff }} from {{ prev_purchases }}{% elif purch_diff < 0 %}↓ from {{ prev_purchases }}{% else %}→ flat{% endif %}</div>
-        {% endif %}
-      </div></td>
-
-      {# Avg CPA — lower is better, em-dash when null #}
-      <td width="25%" style="padding:4px;"><div style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;padding:14px;">
-        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">AVG CPA</div>
-        {% if avg_cost_per_purchase is not none and avg_cost_per_purchase %}
-          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;margin-top:4px;">{{ avg_cost_per_purchase|currency }}</div>
-          {% if prev_avg_cpa is not none and prev_avg_cpa %}
-            {% set cpa_delta = ((avg_cost_per_purchase - prev_avg_cpa) / prev_avg_cpa * 100)|round(1) %}
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;margin-top:2px;color:{% if cpa_delta < 0 %}#3c6a24{% elif cpa_delta > 0 %}#c14a2b{% else %}#9a9283{% endif %};">{% if cpa_delta < 0 %}↓{% elif cpa_delta > 0 %}↑{% else %}→{% endif %} {{ cpa_delta|onedecimal }}%</div>
-          {% endif %}
-        {% else %}
-          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;color:#9a9283;margin-top:4px;">—</div>
-          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;color:#9a9283;margin-top:2px;">no purchases</div>
-        {% endif %}
-      </div></td>
-
-      {# ROAS — higher is better, em-dash when null #}
-      <td width="25%" style="padding:4px;"><div style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;padding:14px;">
-        <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">AVG ROAS</div>
-        {% if avg_roas %}
-          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;margin-top:4px;">{{ avg_roas|onedecimal }}x</div>
-          {% if prev_avg_roas is not none and prev_avg_roas %}
-            {% set roas_delta = ((avg_roas - prev_avg_roas) / prev_avg_roas * 100)|round(1) %}
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;margin-top:2px;color:{% if roas_delta > 0 %}#3c6a24{% elif roas_delta < 0 %}#c14a2b{% else %}#9a9283{% endif %};">{% if roas_delta > 0 %}↑{% elif roas_delta < 0 %}↓{% else %}→{% endif %} {{ roas_delta|onedecimal }}%</div>
-          {% endif %}
-        {% else %}
-          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;letter-spacing:-0.02em;color:#9a9283;margin-top:4px;">—</div>
-          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;color:#9a9283;margin-top:2px;">no purchases</div>
-        {% endif %}
-      </div></td>
+      {% endfor %}
     </tr>
   </table>
 </td></tr>
@@ -149,21 +117,17 @@
             <div style="font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:14px;color:#1f1d18;margin-top:10px;padding-left:12px;border-left:2px solid #c46f3f;">"{{ best_variant.hypothesis }}"</div>
             {% endif %}
           </td>
-          {# Summary numbers — mirror dashboard's SummaryNumber row. #}
+          {# Summary numbers — 3-up driven by best_variant_summary.
+             Keys swap per objective (CPA/ROAS/PURCH for SALES,
+             CPL/CTR/LEADS for LEADS, etc.). #}
           <td valign="top" align="right" style="padding-left:16px;white-space:nowrap;">
             <table cellpadding="0" cellspacing="0" border="0"><tr>
-              <td style="padding:0 14px;text-align:right;">
-                <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">CPA</div>
-                <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;margin-top:2px;color:{% if best_variant.cost_per_purchase %}#1f1d18{% else %}#9a9283{% endif %};">{% if best_variant.cost_per_purchase %}{{ best_variant.cost_per_purchase|currency }}{% else %}—{% endif %}</div>
+              {% for summary in best_variant_summary %}
+              <td style="padding:0 {% if loop.last %}0 0 14px{% elif loop.first %}0 14px 0 0{% else %}0 14px{% endif %};text-align:right;">
+                <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">{{ summary.label }}</div>
+                <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;margin-top:2px;color:{% if summary.tone == 'good' %}#3c6a24{% elif summary.tone == 'bad' %}#c14a2b{% elif summary.value in ('—', 'N/A') %}#9a9283{% else %}#1f1d18{% endif %};">{{ summary.value }}</div>
               </td>
-              <td style="padding:0 14px;text-align:right;">
-                <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">ROAS</div>
-                <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;margin-top:2px;color:{% if best_variant.roas %}#3c6a24{% else %}#9a9283{% endif %};">{% if best_variant.roas %}{{ best_variant.roas|onedecimal }}x{% else %}N/A{% endif %}</div>
-              </td>
-              <td style="padding:0 0 0 14px;text-align:right;">
-                <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">PURCH</div>
-                <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;margin-top:2px;color:#1f1d18;">{{ best_variant.purchases|intcomma }}</div>
-              </td>
+              {% endfor %}
             </tr></table>
           </td>
         </tr>
@@ -182,46 +146,22 @@
       </div>
       {% endif %}
 
-      {# 3-up diagnostic tiles — image vs. video branching, with the same
-         benchmark text as the dashboard's DiagnosticTile primitive. #}
+      {# 3-up diagnostic tiles — data-driven. Profile's
+         image_diagnostic_specs / video_diagnostic_specs + media_type
+         branching happen in the builder. Tone "good" tints the value
+         green when a benchmark is cleared. #}
       <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:16px;">
-        {% if _mt == 'image' %}
         <tr>
+          {% for tile in best_variant_diagnostic_tiles %}
           <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">CTR</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:{% if best_variant.ctr_pct is not none and best_variant.ctr_pct > 1.5 %}#3c6a24{% else %}#1f1d18{% endif %};margin-top:2px;">{% if best_variant.ctr_pct is not none %}{{ best_variant.ctr_pct|round(1) }}%{% else %}—{% endif %}</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;color:#9a9283;margin-top:3px;">benchmark 1.5%</div>
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">{{ tile.label }}</div>
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:{% if tile.tone == 'good' %}#3c6a24{% elif tile.tone == 'bad' %}#c14a2b{% elif tile.value == '—' %}#9a9283{% else %}#1f1d18{% endif %};margin-top:2px;">{{ tile.value }}</div>
+            {% if tile.benchmark %}
+            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;color:#9a9283;margin-top:3px;">{{ tile.benchmark }}</div>
+            {% endif %}
           </div></td>
-          <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">ATC RATE</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:#1f1d18;margin-top:2px;">{% if best_variant.atc_rate_pct is not none %}{{ best_variant.atc_rate_pct|round(1) }}%{% else %}—{% endif %}</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;color:#9a9283;margin-top:3px;">benchmark 5–10%</div>
-          </div></td>
-          <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">CHECKOUT</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:#1f1d18;margin-top:2px;">{% if best_variant.checkout_rate_pct is not none %}{{ best_variant.checkout_rate_pct|round(1) }}%{% else %}—{% endif %}</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;color:#9a9283;margin-top:3px;">benchmark 30%</div>
-          </div></td>
+          {% endfor %}
         </tr>
-        {% else %}
-        <tr>
-          <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">HOOK</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:#1f1d18;margin-top:2px;">{% if best_variant.hook_rate_pct is not none %}{{ best_variant.hook_rate_pct|round(1) }}%{% else %}—{% endif %}</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;color:#9a9283;margin-top:3px;">benchmark 30%</div>
-          </div></td>
-          <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">HOLD</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:#1f1d18;margin-top:2px;">{% if best_variant.hold_rate_pct is not none %}{{ best_variant.hold_rate_pct|round(1) }}%{% else %}—{% endif %}</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;color:#9a9283;margin-top:3px;">benchmark 25%</div>
-          </div></td>
-          <td width="33%" style="padding:2px;"><div style="background:#f3efe5;border-radius:8px;padding:11px 12px;">
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">CTR</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;color:{% if best_variant.ctr_pct is not none and best_variant.ctr_pct > 1.5 %}#3c6a24{% else %}#1f1d18{% endif %};margin-top:2px;">{% if best_variant.ctr_pct is not none %}{{ best_variant.ctr_pct|round(1) }}%{% else %}—{% endif %}</div>
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;color:#9a9283;margin-top:3px;">benchmark 1.5%</div>
-          </div></td>
-        </tr>
-        {% endif %}
       </table>
 
       {# Funnel — horizontal bars, widths proportional to first stage #}
@@ -283,14 +223,34 @@
 {% if variants %}
 <tr><td style="padding:24px 32px 4px;">
   <div style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.1em;color:#6d6558;text-transform:uppercase;margin-bottom:10px;">OTHER ACTIVE VARIANTS</div>
+  {# Variant table — data-driven column list. ``variant_table_columns``
+     is populated per objective (HOOK/CTR/CPA/ROAS for SALES,
+     HOOK/CTR/CPL/LEADS for LEADS, etc.). VARIANT + TYPE + STATUS are
+     fixed on either side of the objective-keyed middle columns.
+
+     ``cell_value_for_column`` (see macro below) does the string
+     formatting per column fmt, reusing the Jinja filters already
+     registered in src/reports/email.py. #}
+  {% macro format_cell(v, col) -%}
+    {%- set raw = v|attr(col.key) -%}
+    {%- if col.image_em_dash and (v.media_type or '')|lower == 'image' -%}—
+    {%- elif raw is none or raw == '' -%}—
+    {%- elif col.fmt == 'currency' -%}{{ raw|currency }}
+    {%- elif col.fmt == 'int_comma' -%}{{ raw|intcomma }}
+    {%- elif col.fmt == 'int' -%}{{ raw|intcomma }}
+    {%- elif col.fmt == 'pct' -%}{{ raw|onedecimal }}%
+    {%- elif col.fmt == 'roas' -%}{% if raw %}{{ raw|onedecimal }}x{% else %}—{% endif %}
+    {%- elif col.fmt == 'onedecimal' -%}{{ raw|onedecimal }}
+    {%- else -%}{{ raw }}
+    {%- endif -%}
+  {%- endmacro %}
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;overflow:hidden;">
     <tr style="background:#f3efe5;">
       <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">VARIANT</td>
       <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">TYPE</td>
-      <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">HOOK</td>
-      <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">CTR</td>
-      <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">CPA</td>
-      <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">ROAS</td>
+      {% for col in variant_table_columns %}
+      <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">{{ col.label }}</td>
+      {% endfor %}
       <td style="padding:8px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">STATUS</td>
     </tr>
     {% for v in variants %}
@@ -308,11 +268,10 @@
           <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#f3efe5;border:1px solid #e2dccf;color:#9a9283;padding:2px 6px;border-radius:4px;letter-spacing:0.05em;">?</span>
         {% endif %}
       </td>
-      {# Image variants have no meaningful hook rate — em-dash instead of 0.0%. #}
-      <td style="padding:11px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:12px;{% if _vt == 'image' or v.hook_rate_pct is none %}color:#9a9283;{% endif %}">{% if _vt == 'image' or v.hook_rate_pct is none %}—{% else %}{{ v.hook_rate_pct|round(1) }}%{% endif %}</td>
-      <td style="padding:11px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:12px;">{% if v.ctr_pct is not none %}{{ v.ctr_pct|round(1) }}%{% else %}<span style="color:#9a9283;">—</span>{% endif %}</td>
-      <td style="padding:11px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:12px;{% if not v.cost_per_purchase %}color:#9a9283;{% endif %}">{% if v.cost_per_purchase %}{{ v.cost_per_purchase|currency }}{% else %}—{% endif %}</td>
-      <td style="padding:11px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:12px;{% if not v.roas %}color:#9a9283;{% endif %}">{% if v.roas %}{{ v.roas|onedecimal }}x{% else %}—{% endif %}</td>
+      {% for col in variant_table_columns %}
+      {% set cell = format_cell(v, col)|trim %}
+      <td style="padding:11px 14px;font-family:'Geist Mono',Menlo,monospace;font-size:12px;{% if cell == '—' %}color:#9a9283;{% endif %}">{{ cell }}</td>
+      {% endfor %}
       <td style="padding:11px 14px;">
         {% if v.status == 'winner' %}
           <span style="font-family:'Geist Mono',Menlo,monospace;font-size:9px;background:#e4f0d7;color:#3c6a24;padding:2px 7px;border-radius:99px;letter-spacing:0.04em;font-weight:500;">WINNER</span>

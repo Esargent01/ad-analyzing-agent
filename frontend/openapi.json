@@ -1,9 +1,8 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Kleiber Dashboard",
-    "description": "Read-only monitoring dashboard + authenticated JSON API",
-    "version": "0.1.0"
+    "title": "Kleiber",
+    "version": "1.0"
   },
   "paths": {
     "/api/health": {
@@ -963,9 +962,9 @@
     },
     "/api/auth/verify": {
       "get": {
-        "summary": "Api Auth Verify",
-        "description": "Consume a magic-link token and redirect to the frontend dashboard.\n\nOrdering matters:\n\n1. Verify the HMAC + expiry. Bad \u2192 302 invalid_link.\n2. Atomically insert the token hash into ``magic_links_consumed``.\n   If the hash already exists it's a replay \u2192 302 invalid_link. This\n   is the single-use guarantee.\n3. Look up the user by email; if missing, create one (self-serve).\n   The create is race-safe: on ``IntegrityError`` we re-read.\n4. Touch ``last_login_at`` and issue cookies.\n\nOn success sets the ``session_token`` + ``csrf_token`` cookies and\n302-redirects to ``<frontend_base_url>/dashboard``.",
-        "operationId": "api_auth_verify_api_auth_verify_get",
+        "summary": "Api Auth Verify Landing",
+        "description": "Render the magic-link confirmation page.\n\nAnti-prefetch design: clicking the magic link in an email used to\nimmediately consume the single-use token, which broke for any inbox\nbehind a link-scanner / preview prefetcher (Gmail, Outlook ATP,\nApple Mail). The scanner GETs the URL once \u2192 token consumed \u2192 the\nreal user click hits the replay branch \u2192 bounce to ``invalid_link``.\n\nThe fix: GET only validates the signature (no consumption) and\nrenders an HTML page that POSTs the token back to ``/api/auth/verify``.\nPrefetchers don't submit forms, so the token survives until the\nactual click. JS auto-submits the form for legit users so they\ndon't see an extra step; a manual \"Continue\" button is the\nno-JS / paranoid fallback.\n\nThe signature check is still cheap and tells us up front when a\ntoken is malformed or expired so we can show a friendly message\ninstead of a generic ``invalid_link`` after a wasted form submit.",
+        "operationId": "api_auth_verify_landing_api_auth_verify_get",
         "parameters": [
           {
             "name": "token",
@@ -977,6 +976,43 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Api Auth Verify",
+        "description": "Consume a magic-link token and redirect to the frontend dashboard.\n\nOrdering matters:\n\n1. Verify the HMAC + expiry. Bad \u2192 302 invalid_link.\n2. Atomically insert the token hash into ``magic_links_consumed``.\n   If the hash already exists it's a replay \u2192 302 invalid_link. This\n   is the single-use guarantee.\n3. Look up the user by email; if missing, create one (self-serve).\n   The create is race-safe: on ``IntegrityError`` we re-read.\n4. Touch ``last_login_at`` and issue cookies.\n\nOn success sets the ``session_token`` + ``csrf_token`` cookies and\n302-redirects to ``<frontend_base_url>/dashboard``. Driven by the\nPOST form on the GET landing page so email-link prefetchers can't\nburn the single-use token.",
+        "operationId": "api_auth_verify_api_auth_verify_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_api_auth_verify_api_auth_verify_post"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Successful Response",
@@ -2304,6 +2340,19 @@
         ],
         "title": "Body_api_approve_api_approvals__approval_id__approve_post"
       },
+      "Body_api_auth_verify_api_auth_verify_post": {
+        "properties": {
+          "token": {
+            "type": "string",
+            "title": "Token"
+          }
+        },
+        "type": "object",
+        "required": [
+          "token"
+        ],
+        "title": "Body_api_auth_verify_api_auth_verify_post"
+      },
       "Body_api_reject_api_approvals__approval_id__reject_post": {
         "properties": {
           "token": {
@@ -2541,6 +2590,11 @@
             "type": "integer",
             "title": "Day Number"
           },
+          "objective": {
+            "type": "string",
+            "title": "Objective",
+            "default": "OUTCOME_SALES"
+          },
           "total_spend": {
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -2575,6 +2629,74 @@
           "avg_hook_rate_pct": {
             "type": "number",
             "title": "Avg Hook Rate Pct"
+          },
+          "total_leads": {
+            "type": "integer",
+            "title": "Total Leads",
+            "default": 0
+          },
+          "total_post_engagements": {
+            "type": "integer",
+            "title": "Total Post Engagements",
+            "default": 0
+          },
+          "total_impressions": {
+            "type": "integer",
+            "title": "Total Impressions",
+            "default": 0
+          },
+          "total_reach": {
+            "type": "integer",
+            "title": "Total Reach",
+            "default": 0
+          },
+          "total_link_clicks": {
+            "type": "integer",
+            "title": "Total Link Clicks",
+            "default": 0
+          },
+          "avg_cost_per_lead": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cost Per Lead"
+          },
+          "avg_cost_per_engagement": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cost Per Engagement"
+          },
+          "avg_cpc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cpc"
+          },
+          "avg_cpm": {
+            "type": "number",
+            "title": "Avg Cpm",
+            "default": 0.0
+          },
+          "avg_ctr": {
+            "type": "number",
+            "title": "Avg Ctr",
+            "default": 0.0
           },
           "prev_spend": {
             "anyOf": [
@@ -2621,6 +2743,116 @@
             ],
             "title": "Prev Avg Roas"
           },
+          "prev_leads": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Leads"
+          },
+          "prev_post_engagements": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Post Engagements"
+          },
+          "prev_link_clicks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Link Clicks"
+          },
+          "prev_impressions": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Impressions"
+          },
+          "prev_reach": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Reach"
+          },
+          "prev_avg_cpl": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Avg Cpl"
+          },
+          "prev_avg_cpe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Avg Cpe"
+          },
+          "prev_avg_cpc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Avg Cpc"
+          },
+          "prev_avg_cpm": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Avg Cpm"
+          },
+          "prev_avg_ctr": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prev Avg Ctr"
+          },
           "variants": {
             "items": {
               "$ref": "#/components/schemas/VariantReport"
@@ -2664,6 +2896,38 @@
               }
             ],
             "title": "Best Variant Projection"
+          },
+          "headline_metrics": {
+            "items": {
+              "$ref": "#/components/schemas/HeadlineMetric"
+            },
+            "type": "array",
+            "title": "Headline Metrics",
+            "default": []
+          },
+          "best_variant_summary": {
+            "items": {
+              "$ref": "#/components/schemas/SummaryNumber"
+            },
+            "type": "array",
+            "title": "Best Variant Summary",
+            "default": []
+          },
+          "best_variant_diagnostic_tiles": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticTile"
+            },
+            "type": "array",
+            "title": "Best Variant Diagnostic Tiles",
+            "default": []
+          },
+          "variant_table_columns": {
+            "items": {
+              "$ref": "#/components/schemas/VariantTableColumn"
+            },
+            "type": "array",
+            "title": "Variant Table Columns",
+            "default": []
           },
           "fatigue_alerts": {
             "items": {
@@ -2733,6 +2997,46 @@
         ],
         "title": "Diagnostic",
         "description": "Single diagnostic observation."
+      },
+      "DiagnosticTile": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "benchmark": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Benchmark"
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "good",
+              "bad",
+              "neutral"
+            ],
+            "title": "Tone",
+            "default": "neutral"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "DiagnosticTile",
+        "description": "One of the 3 diagnostic tiles under the spotlight card.\n\nMedia-type aware: image creatives get one set, video/mixed/unknown\nget another (see ``src/services/objectives.py`` per-profile\n``image_diagnostic_specs`` / ``video_diagnostic_specs``)."
       },
       "ElementInsight": {
         "properties": {
@@ -3072,6 +3376,46 @@
         },
         "type": "object",
         "title": "HTTPValidationError"
+      },
+      "HeadlineMetric": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "sub": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sub"
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "good",
+              "bad",
+              "neutral"
+            ],
+            "title": "Tone",
+            "default": "neutral"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "HeadlineMetric",
+        "description": "One card in the top-line metric grid (daily 4-up / weekly 4-up rows).\n\n``value`` and ``sub`` are pre-formatted strings; the renderer only\ndecides layout + color tone. ``tone`` comes from the per-objective\ntone-direction spec (``up`` = higher-is-better \u2192 up-arrow is green,\n``down`` = lower-is-better \u2192 down-arrow is green)."
       },
       "ImportableCampaign": {
         "properties": {
@@ -4199,6 +4543,35 @@
         ],
         "title": "SuggestResponse"
       },
+      "SummaryNumber": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "value": {
+            "type": "string",
+            "title": "Value"
+          },
+          "tone": {
+            "type": "string",
+            "enum": [
+              "good",
+              "bad",
+              "neutral"
+            ],
+            "title": "Tone",
+            "default": "neutral"
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "SummaryNumber",
+        "description": "One of the 3 summary numbers in the best-variant spotlight header\n(e.g. CPA / ROAS / PURCH for a Sales campaign; CPL / CTR / LEADS\nfor a Leads campaign)."
+      },
       "UsageCampaignBreakdown": {
         "properties": {
           "campaign_id": {
@@ -4546,6 +4919,59 @@
           "frequency": {
             "type": "number",
             "title": "Frequency"
+          },
+          "leads": {
+            "type": "integer",
+            "title": "Leads",
+            "default": 0
+          },
+          "post_engagements": {
+            "type": "integer",
+            "title": "Post Engagements",
+            "default": 0
+          },
+          "cost_per_lead": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Lead"
+          },
+          "cost_per_engagement": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Engagement"
+          },
+          "engagement_rate_pct": {
+            "type": "number",
+            "title": "Engagement Rate Pct",
+            "default": 0.0
+          },
+          "cpc": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpc"
+          },
+          "cpm": {
+            "type": "number",
+            "title": "Cpm",
+            "default": 0.0
           }
         },
         "type": "object",
@@ -4714,6 +5140,79 @@
             "type": "string",
             "title": "Media Type",
             "default": "unknown"
+          },
+          "leads": {
+            "type": "integer",
+            "title": "Leads",
+            "default": 0
+          },
+          "post_engagements": {
+            "type": "integer",
+            "title": "Post Engagements",
+            "default": 0
+          },
+          "cost_per_lead": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Lead"
+          },
+          "cost_per_engagement": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Per Engagement"
+          },
+          "cpc": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpc"
+          },
+          "cpm": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Cpm",
+            "default": "0"
+          },
+          "frequency": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Frequency",
+            "default": "0"
+          },
+          "hook_rate_pct": {
+            "type": "number",
+            "title": "Hook Rate Pct",
+            "default": 0.0
+          },
+          "hold_rate_pct": {
+            "type": "number",
+            "title": "Hold Rate Pct",
+            "default": 0.0
+          },
+          "ctr_pct": {
+            "type": "number",
+            "title": "Ctr Pct",
+            "default": 0.0
           }
         },
         "type": "object",
@@ -4730,6 +5229,35 @@
         ],
         "title": "VariantSummary",
         "description": "Full-funnel variant summary used inside reports."
+      },
+      "VariantTableColumn": {
+        "properties": {
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "key": {
+            "type": "string",
+            "title": "Key"
+          },
+          "fmt": {
+            "type": "string",
+            "title": "Fmt"
+          },
+          "image_em_dash": {
+            "type": "boolean",
+            "title": "Image Em Dash",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "label",
+          "key",
+          "fmt"
+        ],
+        "title": "VariantTableColumn",
+        "description": "One data column (between TYPE and STATUS) in the variant\nleaderboard table. ``key`` names the accessor on a VariantReport\n/ VariantSummary; ``fmt`` tells the renderer how to stringify the\nraw value; ``image_em_dash`` when true prints ``\u2014`` instead of the\nraw value on image-ad rows (the Hook-rate convention)."
       },
       "WeekDescriptor": {
         "properties": {
@@ -4772,6 +5300,28 @@
         ],
         "title": "WeeklyIndexResponse"
       },
+      "WeeklyMetricRow": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/HeadlineMetric"
+            },
+            "type": "array",
+            "title": "Cards",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "WeeklyMetricRow",
+        "description": "One row of the weekly report's 3-row metric grid. Title is the\nmono eyebrow above the row; ``cards`` are 4 :class:`HeadlineMetric`."
+      },
       "WeeklyReport": {
         "properties": {
           "campaign_id": {
@@ -4792,6 +5342,11 @@
             "type": "string",
             "format": "date",
             "title": "Week End"
+          },
+          "objective": {
+            "type": "string",
+            "title": "Objective",
+            "default": "OUTCOME_SALES"
           },
           "total_spend": {
             "type": "string",
@@ -4891,6 +5446,12 @@
             "title": "Avg Cpm",
             "default": "0"
           },
+          "avg_cpc": {
+            "type": "string",
+            "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
+            "title": "Avg Cpc",
+            "default": "0"
+          },
           "avg_frequency": {
             "type": "string",
             "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$",
@@ -4920,6 +5481,45 @@
               }
             ],
             "title": "Avg Cost Per Purchase"
+          },
+          "total_leads": {
+            "type": "integer",
+            "title": "Total Leads",
+            "default": 0
+          },
+          "total_post_engagements": {
+            "type": "integer",
+            "title": "Total Post Engagements",
+            "default": 0
+          },
+          "avg_cost_per_lead": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cost Per Lead"
+          },
+          "avg_cost_per_engagement": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^(?!^[-+.]*$)[+-]?0*\\d*\\.?\\d*$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Cost Per Engagement"
+          },
+          "lpv_rate_pct": {
+            "type": "number",
+            "title": "Lpv Rate Pct",
+            "default": 0.0
           },
           "funnel_stages": {
             "items": {
@@ -5015,6 +5615,38 @@
               }
             ],
             "title": "Review Url"
+          },
+          "metric_rows": {
+            "items": {
+              "$ref": "#/components/schemas/WeeklyMetricRow"
+            },
+            "type": "array",
+            "title": "Metric Rows",
+            "default": []
+          },
+          "best_variant_summary": {
+            "items": {
+              "$ref": "#/components/schemas/SummaryNumber"
+            },
+            "type": "array",
+            "title": "Best Variant Summary",
+            "default": []
+          },
+          "best_variant_diagnostic_tiles": {
+            "items": {
+              "$ref": "#/components/schemas/DiagnosticTile"
+            },
+            "type": "array",
+            "title": "Best Variant Diagnostic Tiles",
+            "default": []
+          },
+          "variant_table_columns": {
+            "items": {
+              "$ref": "#/components/schemas/VariantTableColumn"
+            },
+            "type": "array",
+            "title": "Variant Table Columns",
+            "default": []
           }
         },
         "type": "object",

@@ -356,12 +356,16 @@ class TestBuildDailyReport:
     async def test_empty_campaign_returns_empty_daily_report(self, campaign_id):
         session = _FakeSession(
             [
-                ("FROM campaigns WHERE id", _FakeResult([("Test Campaign",)])),
+                (
+                    "FROM campaigns WHERE id",
+                    _FakeResult([("Test Campaign", "OUTCOME_SALES")]),
+                ),
                 ("FROM test_cycles", _FakeResult([])),
-                # Aggregate metrics — all zeros
+                # Aggregate metrics — 15 zero columns now that leads +
+                # post_engagements are in the SUM set (migration 017).
                 (
                     "FROM metrics m\n            JOIN variants v",
-                    _FakeResult([(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)]),
+                    _FakeResult([(0,) * 15]),
                 ),
                 # Variant leaderboard — empty
                 ("FROM variants v\n            LEFT JOIN LATERAL", _FakeResult([])),
@@ -370,8 +374,10 @@ class TestBuildDailyReport:
                     "FROM variants v\n            WHERE v.campaign_id = :id AND v.status IN",
                     _FakeResult([]),
                 ),
-                # Previous day totals — all zeros
-                ("COALESCE(SUM(m.spend), 0)", _FakeResult([(0, 0, 0)])),
+                # Previous day totals — 9 zero columns (spend +
+                # purchases + revenue + leads + engagements +
+                # link_clicks + impressions + reach + clicks).
+                ("COALESCE(SUM(m.spend), 0)", _FakeResult([(0,) * 9])),
             ]
         )
 
@@ -409,11 +415,14 @@ class TestBuildWeeklyReport:
 
         session = _FakeSession(
             [
-                ("FROM campaigns WHERE id", _FakeResult([("Test Campaign",)])),
+                (
+                    "FROM campaigns WHERE id",
+                    _FakeResult([("Test Campaign", "OUTCOME_SALES")]),
+                ),
                 ("FROM test_cycles", _FakeResult([])),
                 (
                     "FROM metrics m\n            JOIN variants v",
-                    _FakeResult([(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)]),
+                    _FakeResult([(0,) * 15]),
                 ),
                 ("FROM variants v\n            LEFT JOIN LATERAL", _FakeResult([])),
                 ("FROM element_performance", _FakeResult([])),
@@ -451,11 +460,14 @@ class TestBuildWeeklyReport:
 
         session = _FakeSession(
             [
-                ("FROM campaigns WHERE id", _FakeResult([("Test Campaign",)])),
+                (
+                    "FROM campaigns WHERE id",
+                    _FakeResult([("Test Campaign", "OUTCOME_SALES")]),
+                ),
                 ("FROM test_cycles", _FakeResult([])),
                 (
                     "FROM metrics m\n            JOIN variants v",
-                    _FakeResult([(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)]),
+                    _FakeResult([(0,) * 15]),
                 ),
                 ("FROM variants v\n            LEFT JOIN LATERAL", _FakeResult([])),
                 ("FROM element_performance", _FakeResult([])),

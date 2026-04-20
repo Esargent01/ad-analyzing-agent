@@ -8,14 +8,11 @@ import {
 } from "@/components/dashboard/primitives";
 import type {
   Diagnostic as DiagnosticType,
+  DiagnosticTile as DiagnosticTileType,
   ReportFunnelStage,
+  SummaryNumber as SummaryNumberType,
   VariantReport,
 } from "@/lib/api/types";
-import {
-  formatCurrency,
-  formatIntComma,
-  formatOneDecimal,
-} from "@/lib/format";
 
 /**
  * "Best variant today" spotlight for daily report detail pages.
@@ -37,6 +34,16 @@ interface BestVariantSpotlightProps {
   funnel: ReportFunnelStage[];
   diagnostics: DiagnosticType[];
   projection: string | null;
+  /** Pre-built 3-up summary numbers in the spotlight header. Contents
+   *  change per objective (CPA/ROAS/PURCH for Sales, CPL/CTR/LEADS for
+   *  Leads, CPM/REACH/FREQ for Awareness, etc.). Optional for backward
+   *  compatibility; when omitted the component falls back to the
+   *  Sales-style static row. */
+  summaryNumbers?: SummaryNumberType[];
+  /** Pre-built 3-up diagnostic tile row. Already media-type-branched
+   *  server-side. Falls back to the media_type-aware static set when
+   *  omitted. */
+  diagnosticTiles?: DiagnosticTileType[];
 }
 
 const VARIANT_STATUSES = new Set<StatusKind>([
@@ -60,6 +67,8 @@ export function BestVariantSpotlight({
   funnel,
   diagnostics,
   projection,
+  summaryNumbers,
+  diagnosticTiles,
 }: BestVariantSpotlightProps) {
   return (
     <>
@@ -139,32 +148,19 @@ export function BestVariantSpotlight({
               flexShrink: 0,
             }}
           >
-            <SummaryNumber
-              label="CPA"
-              value={
-                variant.cost_per_purchase != null &&
-                variant.cost_per_purchase !== ""
-                  ? formatCurrency(variant.cost_per_purchase)
-                  : "—"
-              }
-            />
-            <SummaryNumber
-              label="ROAS"
-              value={
-                variant.roas != null && variant.roas !== ""
-                  ? `${formatOneDecimal(variant.roas)}x`
-                  : "N/A"
-              }
-              tone="good"
-            />
-            <SummaryNumber
-              label="Purchases"
-              value={formatIntComma(variant.purchases)}
-            />
+            {(summaryNumbers ?? []).map((s, i) => (
+              <SummaryNumber
+                key={`${s.label}-${i}`}
+                label={s.label}
+                value={s.value}
+                tone={s.tone === "good" ? "good" : undefined}
+              />
+            ))}
           </div>
         </div>
 
-        {/* Three-up diagnostic tile row — media-type aware */}
+        {/* Three-up diagnostic tile row — objective + media-type aware
+            (built server-side). */}
         <div
           data-ds-grid
           style={{
@@ -174,67 +170,15 @@ export function BestVariantSpotlight({
             marginBottom: 20,
           }}
         >
-          {variant.media_type === "image" ? (
-            <>
-              <DiagnosticTile
-                label="CTR"
-                value={
-                  variant.ctr_pct != null
-                    ? `${variant.ctr_pct.toFixed(1)}%`
-                    : "N/A"
-                }
-                benchmark="benchmark 1.5%"
-              />
-              <DiagnosticTile
-                label="ATC rate"
-                value={
-                  variant.atc_rate_pct != null
-                    ? `${variant.atc_rate_pct.toFixed(1)}%`
-                    : "N/A"
-                }
-                benchmark="benchmark 5–10%"
-              />
-              <DiagnosticTile
-                label="Checkout rate"
-                value={
-                  variant.checkout_rate_pct != null
-                    ? `${variant.checkout_rate_pct.toFixed(1)}%`
-                    : "N/A"
-                }
-                benchmark="benchmark 30%"
-              />
-            </>
-          ) : (
-            <>
-              <DiagnosticTile
-                label="Hook rate"
-                value={
-                  variant.hook_rate_pct != null
-                    ? `${variant.hook_rate_pct.toFixed(1)}%`
-                    : "N/A"
-                }
-                benchmark="benchmark 30%"
-              />
-              <DiagnosticTile
-                label="Hold rate"
-                value={
-                  variant.hold_rate_pct != null
-                    ? `${variant.hold_rate_pct.toFixed(1)}%`
-                    : "N/A"
-                }
-                benchmark="benchmark 25%"
-              />
-              <DiagnosticTile
-                label="CTR"
-                value={
-                  variant.ctr_pct != null
-                    ? `${variant.ctr_pct.toFixed(1)}%`
-                    : "N/A"
-                }
-                benchmark="benchmark 1.5%"
-              />
-            </>
-          )}
+          {(diagnosticTiles ?? []).map((t, i) => (
+            <DiagnosticTile
+              key={`${t.label}-${i}`}
+              label={t.label}
+              value={t.value}
+              benchmark={t.benchmark ?? undefined}
+              tone={t.tone}
+            />
+          ))}
         </div>
 
         {/* Two-column split: funnel | notes + projection */}
@@ -364,11 +308,19 @@ function DiagnosticTile({
   label,
   value,
   benchmark,
+  tone = "neutral",
 }: {
   label: string;
   value: string;
   benchmark?: string | null;
+  tone?: "good" | "bad" | "neutral";
 }) {
+  const valueColor =
+    tone === "good"
+      ? "oklch(40% 0.14 145)"
+      : tone === "bad"
+        ? "oklch(48% 0.16 28)"
+        : "var(--ink)";
   return (
     <div
       style={{
@@ -386,7 +338,7 @@ function DiagnosticTile({
           fontSize: 20,
           fontWeight: 500,
           marginTop: 3,
-          color: "var(--ink)",
+          color: valueColor,
         }}
       >
         {value}

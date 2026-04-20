@@ -3,13 +3,53 @@ import {
   StatusPill,
   type StatusKind,
 } from "@/components/dashboard/primitives";
-import type { VariantReport, VariantSummary } from "@/lib/api/types";
+import type {
+  VariantReport,
+  VariantSummary,
+  VariantTableColumn,
+} from "@/lib/api/types";
 import {
   formatCurrency,
   formatIntComma,
   formatOneDecimal,
-  formatPct,
 } from "@/lib/format";
+
+/** Stringify one VariantReport/VariantSummary field based on the
+ *  VariantTableColumn spec shipped by the server. Mirrors the Jinja
+ *  ``format_cell`` macro in ``src/reports/templates/daily_email.html``
+ *  so email + dashboard render the same text. */
+function formatColumnValue<T extends Record<string, unknown>>(
+  row: T,
+  col: VariantTableColumn,
+  mediaType: string,
+): string {
+  const raw = row[col.key as keyof T];
+
+  if (col.image_em_dash && (mediaType || "").toLowerCase() === "image") {
+    return "—";
+  }
+  if (raw == null || raw === "") return "—";
+
+  switch (col.fmt) {
+    case "currency":
+      return formatCurrency(raw as string | number);
+    case "int_comma":
+    case "int":
+      return formatIntComma(raw as string | number);
+    case "pct": {
+      const n = typeof raw === "number" ? raw : Number(raw);
+      return Number.isFinite(n) ? `${n.toFixed(1)}%` : "—";
+    }
+    case "roas": {
+      const n = typeof raw === "number" ? raw : Number(raw);
+      return !n ? "—" : `${formatOneDecimal(n)}x`;
+    }
+    case "onedecimal":
+      return formatOneDecimal(raw as string | number);
+    default:
+      return String(raw);
+  }
+}
 
 /**
  * Variant leaderboard tables used inside daily / weekly reports.
@@ -46,9 +86,28 @@ function toStatusKind(status: string): StatusKind {
 // Daily table
 // ---------------------------------------------------------------------------
 
-const DAILY_COLS = "90px 48px 70px 70px 70px 70px 90px";
+/** Default column spec (Sales) used when the caller doesn't supply
+ *  one — keeps existing callers of ``DailyVariantTable`` working. */
+const DEFAULT_DAILY_COLUMNS: VariantTableColumn[] = [
+  { label: "HOOK", key: "hook_rate_pct", fmt: "pct", image_em_dash: true },
+  { label: "CTR", key: "ctr_pct", fmt: "pct", image_em_dash: false },
+  { label: "CPA", key: "cost_per_purchase", fmt: "currency", image_em_dash: false },
+  { label: "ROAS", key: "roas", fmt: "roas", image_em_dash: false },
+];
 
-export function DailyVariantTable({ variants }: { variants: VariantReport[] }) {
+export function DailyVariantTable({
+  variants,
+  columns,
+}: {
+  variants: VariantReport[];
+  columns?: VariantTableColumn[];
+}) {
+  const cols = columns && columns.length > 0 ? columns : DEFAULT_DAILY_COLUMNS;
+
+  // ``VARIANT``, ``TYPE``, N middle columns, ``STATUS``.
+  const gridTemplate =
+    `90px 48px ${cols.map(() => "72px").join(" ")} 90px`;
+
   if (variants.length === 0) {
     return (
       <p style={{ fontSize: 12, color: "var(--muted)" }}>
@@ -70,7 +129,7 @@ export function DailyVariantTable({ variants }: { variants: VariantReport[] }) {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: DAILY_COLS,
+          gridTemplateColumns: gridTemplate,
           padding: "10px 16px",
           background: "var(--paper-2)",
           borderBottom: "1px solid var(--border)",
@@ -84,10 +143,9 @@ export function DailyVariantTable({ variants }: { variants: VariantReport[] }) {
       >
         <span>VARIANT</span>
         <span>TYPE</span>
-        <span>HOOK</span>
-        <span>CTR</span>
-        <span>CPA</span>
-        <span>ROAS</span>
+        {cols.map((col) => (
+          <span key={col.label}>{col.label}</span>
+        ))}
         <span>STATUS</span>
       </div>
       {variants.map((v, i) => (
@@ -95,7 +153,7 @@ export function DailyVariantTable({ variants }: { variants: VariantReport[] }) {
           key={v.variant_id}
           style={{
             display: "grid",
-            gridTemplateColumns: DAILY_COLS,
+            gridTemplateColumns: gridTemplate,
             padding: "12px 16px",
             alignItems: "center",
             borderBottom:
@@ -111,29 +169,27 @@ export function DailyVariantTable({ variants }: { variants: VariantReport[] }) {
             {v.variant_code}
           </span>
           <MediaBadge type={v.media_type} />
-          <span style={{ color: "var(--ink-2)" }}>
-            {v.media_type === "image" || v.hook_rate_pct == null
-              ? "—"
-              : `${v.hook_rate_pct.toFixed(1)}%`}
-          </span>
-          <span style={{ color: "var(--ink-2)" }}>
-            {v.ctr_pct != null ? `${v.ctr_pct.toFixed(1)}%` : "—"}
-          </span>
-          <span style={{ color: "var(--ink-2)" }}>
-            {v.cost_per_purchase != null && v.cost_per_purchase !== ""
-              ? formatCurrency(v.cost_per_purchase)
-              : "—"}
-          </span>
-          <span
-            style={{
-              color:
-                v.roas != null && v.roas !== "" ? "oklch(40% 0.14 145)" : "var(--ink-2)",
-            }}
-          >
-            {v.roas != null && v.roas !== ""
-              ? `${formatOneDecimal(v.roas)}x`
-              : "—"}
-          </span>
+          {cols.map((col) => {
+            const cell = formatColumnValue(
+              v as unknown as Record<string, unknown>,
+              col,
+              v.media_type,
+            );
+            // Tint the value green only for the ROAS column when
+            // it's populated — preserves the current Sales visual
+            // cue without needing per-column tone metadata.
+            const greenTint = col.key === "roas" && cell !== "—";
+            return (
+              <span
+                key={col.label}
+                style={{
+                  color: greenTint ? "oklch(40% 0.14 145)" : "var(--ink-2)",
+                }}
+              >
+                {cell}
+              </span>
+            );
+          })}
           <span>
             <StatusPill kind={toStatusKind(v.status)}>{v.status}</StatusPill>
           </span>
@@ -147,13 +203,49 @@ export function DailyVariantTable({ variants }: { variants: VariantReport[] }) {
 // Weekly table — two extra columns (hold, spend, purchases)
 // ---------------------------------------------------------------------------
 
-const WEEKLY_COLS = "80px 48px 70px 70px 70px 80px 70px 90px 70px";
+/** Sales-flavoured weekly default (matches the legacy fixed layout:
+ *  HOOK · HOLD · CTR · CPA · ROAS · SPEND · PURCH). Used when the
+ *  caller doesn't pass objective-keyed ``columns``. */
+const DEFAULT_WEEKLY_COLUMNS: VariantTableColumn[] = [
+  { label: "HOOK", key: "hook_rate_pct", fmt: "pct", image_em_dash: true },
+  { label: "HOLD", key: "hold_rate_pct", fmt: "pct", image_em_dash: true },
+  { label: "CTR", key: "ctr_pct", fmt: "pct", image_em_dash: false },
+  { label: "CPA", key: "cost_per_purchase", fmt: "currency", image_em_dash: false },
+  { label: "ROAS", key: "roas", fmt: "roas", image_em_dash: false },
+  { label: "SPEND", key: "spend", fmt: "currency", image_em_dash: false },
+  { label: "PURCH", key: "purchases", fmt: "int_comma", image_em_dash: false },
+];
 
 export function WeeklyVariantTable({
   variants,
+  columns,
 }: {
   variants: VariantSummary[];
+  columns?: VariantTableColumn[];
 }) {
+  // When the caller passes objective-keyed columns, slot them in
+  // between CODE/TYPE and SPEND/PURCH. The profile's
+  // ``variant_col_specs`` is tuned for the daily (4 cols); weekly
+  // traditionally tacks SPEND + PURCH on the end. To keep the weekly
+  // table as useful for non-Sales as it is for Sales, we append the
+  // same SPEND + PURCH columns regardless of objective when a
+  // custom column set is provided.
+  const middleCols = columns && columns.length > 0 ? columns : DEFAULT_WEEKLY_COLUMNS;
+  const cols =
+    columns && columns.length > 0
+      ? [
+          ...middleCols,
+          {
+            label: "SPEND",
+            key: "spend",
+            fmt: "currency",
+            image_em_dash: false,
+          } as VariantTableColumn,
+        ]
+      : middleCols;
+  const gridTemplate =
+    `80px 48px ${cols.map(() => "72px").join(" ")}`;
+
   if (variants.length === 0) {
     return (
       <p style={{ fontSize: 12, color: "var(--muted)" }}>
@@ -174,7 +266,7 @@ export function WeeklyVariantTable({
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: WEEKLY_COLS,
+          gridTemplateColumns: gridTemplate,
           padding: "10px 16px",
           background: "var(--paper-2)",
           borderBottom: "1px solid var(--border)",
@@ -188,20 +280,16 @@ export function WeeklyVariantTable({
       >
         <span>CODE</span>
         <span>TYPE</span>
-        <span>HOOK</span>
-        <span>HOLD</span>
-        <span>CTR</span>
-        <span>CPA</span>
-        <span>ROAS</span>
-        <span>SPEND</span>
-        <span>PURCH</span>
+        {cols.map((col) => (
+          <span key={col.label}>{col.label}</span>
+        ))}
       </div>
       {variants.map((v, i) => (
         <div
           key={v.variant_id}
           style={{
             display: "grid",
-            gridTemplateColumns: WEEKLY_COLS,
+            gridTemplateColumns: gridTemplate,
             padding: "12px 16px",
             alignItems: "center",
             borderBottom:
@@ -217,36 +305,24 @@ export function WeeklyVariantTable({
             {v.variant_code}
           </span>
           <MediaBadge type={v.media_type} />
-          <span style={{ color: "var(--ink-2)" }}>
-            {v.media_type === "image" ? "—" : formatPct(v.hook_rate)}
-          </span>
-          <span style={{ color: "var(--ink-2)" }}>
-            {v.media_type === "image" ? "—" : formatPct(v.hold_rate)}
-          </span>
-          <span style={{ color: "var(--ink-2)" }}>{formatPct(v.ctr)}</span>
-          <span style={{ color: "var(--ink-2)" }}>
-            {v.cost_per_purchase != null && v.cost_per_purchase !== ""
-              ? formatCurrency(v.cost_per_purchase)
-              : "—"}
-          </span>
-          <span
-            style={{
-              color:
-                v.roas != null && v.roas !== ""
-                  ? "oklch(40% 0.14 145)"
-                  : "var(--ink-2)",
-            }}
-          >
-            {v.roas != null && v.roas !== ""
-              ? `${formatOneDecimal(v.roas)}x`
-              : "—"}
-          </span>
-          <span style={{ color: "var(--ink-2)" }}>
-            {formatCurrency(v.spend)}
-          </span>
-          <span style={{ color: "var(--ink-2)" }}>
-            {formatIntComma(v.purchases)}
-          </span>
+          {cols.map((col) => {
+            const cell = formatColumnValue(
+              v as unknown as Record<string, unknown>,
+              col,
+              v.media_type,
+            );
+            const greenTint = col.key === "roas" && cell !== "—";
+            return (
+              <span
+                key={col.label}
+                style={{
+                  color: greenTint ? "oklch(40% 0.14 145)" : "var(--ink-2)",
+                }}
+              >
+                {cell}
+              </span>
+            );
+          })}
         </div>
       ))}
     </div>

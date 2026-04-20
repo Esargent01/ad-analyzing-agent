@@ -376,6 +376,58 @@ export interface VariantReport {
   atc_rate_pct: number;
   checkout_rate_pct: number;
   frequency: number;
+
+  // Objective-specific counts + derived metrics (post PR 2).
+  leads: number;
+  post_engagements: number;
+  cost_per_lead: number | null;
+  cost_per_engagement: number | null;
+  engagement_rate_pct: number;
+  cpc: number | null;
+  cpm: number;
+}
+
+// --- Objective-aware display view-models ---------------------------------
+// These mirror the Pydantic models in src/models/reports.py and are
+// built server-side per the campaign's Meta objective. Both the daily
+// and weekly reports carry lists of these so the React components can
+// iterate without branching on objective themselves.
+
+export interface HeadlineMetric {
+  label: string;
+  value: string;
+  sub: string | null;
+  tone: "good" | "bad" | "neutral";
+}
+
+export interface SummaryNumber {
+  label: string;
+  value: string;
+  tone: "good" | "bad" | "neutral";
+}
+
+export interface DiagnosticTile {
+  label: string;
+  value: string;
+  benchmark: string | null;
+  tone: "good" | "bad" | "neutral";
+}
+
+export interface VariantTableColumn {
+  label: string;
+  /** Attr name on VariantReport / VariantSummary. */
+  key: string;
+  /** Format code: ``currency`` | ``int_comma`` | ``int`` | ``pct`` |
+   *  ``roas`` | ``onedecimal``. */
+  fmt: string;
+  /** When true, image-media variants render ``—`` instead of the raw
+   *  value (the Hook-rate convention). */
+  image_em_dash: boolean;
+}
+
+export interface WeeklyMetricRow {
+  title: string;
+  cards: HeadlineMetric[];
 }
 
 export interface ReportFunnelStage {
@@ -416,12 +468,24 @@ export interface DailyReport {
   cycle_number: number;
   report_date: string; // ISO YYYY-MM-DD
   day_number: number;
+  /** Canonical ODAX objective. Drives the display lists below. */
+  objective: string;
 
   total_spend: Num;
   total_purchases: number;
   avg_cost_per_purchase: Num;
   avg_roas: Num;
   avg_hook_rate_pct: number;
+  total_leads: number;
+  total_post_engagements: number;
+  total_impressions: number;
+  total_reach: number;
+  total_link_clicks: number;
+  avg_cost_per_lead: Num;
+  avg_cost_per_engagement: Num;
+  avg_cpc: Num;
+  avg_cpm: number;
+  avg_ctr: number;
 
   prev_spend: Num;
   prev_purchases: number | null;
@@ -434,6 +498,12 @@ export interface DailyReport {
   best_variant_funnel: ReportFunnelStage[];
   best_variant_diagnostics: Diagnostic[];
   best_variant_projection: string | null;
+
+  // Objective-aware display lists (pre-built server-side).
+  headline_metrics: HeadlineMetric[];
+  best_variant_summary: SummaryNumber[];
+  best_variant_diagnostic_tiles: DiagnosticTile[];
+  variant_table_columns: VariantTableColumn[];
 
   fatigue_alerts: FatigueAlert[];
   actions: ReportCycleAction[];
@@ -474,6 +544,18 @@ export interface VariantSummary {
    * for image-only variants.
    */
   media_type: string;
+
+  // Objective-aware fields.
+  leads: number;
+  post_engagements: number;
+  cost_per_lead: Num;
+  cost_per_engagement: Num;
+  cpc: Num;
+  cpm: Num;
+  frequency: Num;
+  hook_rate_pct: number;
+  hold_rate_pct: number;
+  ctr_pct: number;
 }
 
 export interface FunnelStage {
@@ -520,6 +602,8 @@ export interface WeeklyReport {
   campaign_name: string;
   week_start: string;
   week_end: string;
+  /** Canonical ODAX objective. */
+  objective: string;
 
   total_spend: Num;
   total_impressions: number;
@@ -540,9 +624,15 @@ export interface WeeklyReport {
   avg_hook_rate: Num;
   avg_hold_rate: Num;
   avg_cpm: Num;
+  avg_cpc: Num;
   avg_frequency: Num;
   avg_roas: Num;
   avg_cost_per_purchase: Num;
+  total_leads: number;
+  total_post_engagements: number;
+  avg_cost_per_lead: Num;
+  avg_cost_per_engagement: Num;
+  lpv_rate_pct: number;
 
   funnel_stages: FunnelStage[];
 
@@ -562,4 +652,10 @@ export interface WeeklyReport {
   expired_count: number;
   generation_paused: boolean;
   review_url: string | null;
+
+  // Objective-aware display lists.
+  metric_rows: WeeklyMetricRow[];
+  best_variant_summary: SummaryNumber[];
+  best_variant_diagnostic_tiles: DiagnosticTile[];
+  variant_table_columns: VariantTableColumn[];
 }

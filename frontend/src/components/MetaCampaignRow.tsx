@@ -21,6 +21,7 @@ import {
   type StatusKind,
 } from "@/components/dashboard/primitives";
 import type { ImportableCampaign } from "@/lib/api/types";
+import { objectiveLabel } from "@/lib/objectives";
 
 interface Props {
   campaign: ImportableCampaign;
@@ -139,7 +140,10 @@ export function MetaCampaignRow({
         >
           <Entry label="budget" value={formatBudget(campaign.daily_budget)} />
           {campaign.objective && (
-            <Entry label="objective" value={campaign.objective} />
+            <Entry
+              label="objective"
+              value={objectiveLabel(campaign.objective).toLowerCase()}
+            />
           )}
           <Entry label="id" value={campaign.meta_campaign_id} />
         </dl>

@@ -30,6 +30,7 @@ from src.models.reports import (
     FunnelStage,
     VariantReport,
     VariantSummary,
+    WeeklyMetricRow,
     WeeklyReport,
 )
 from src.reports.builder import (
@@ -37,6 +38,19 @@ from src.reports.builder import (
     build_funnel,
     build_projection,
     select_best_variant,
+)
+from src.services.objectives import (
+    build_diagnostic_tiles,
+    build_headline_metrics,
+    build_summary_numbers,
+    build_variant_table_columns,
+    compute_cost_per_engagement,
+    compute_cost_per_lead,
+    compute_cpc,
+    compute_cpm,
+    compute_engagement_rate_pct,
+    compute_lpv_rate_pct,
+    profile_for,
 )
 from src.services.weekly import load_proposed_variants
 
@@ -81,7 +95,8 @@ async def build_weekly_report(
         days=1
     )
 
-    campaign_name = await _get_campaign_name(session, campaign_id)
+    campaign_name, objective = await _get_campaign_meta(session, campaign_id)
+    profile = profile_for(objective)
 
     cycle_rows = await _get_cycles_in_range(session, campaign_id, week_start_ts, week_end_ts)
 
@@ -101,11 +116,38 @@ async def build_weekly_report(
     total_launched = sum(c[2] or 0 for c in cycle_rows) if cycle_rows else 0
     # variants_retired is not tracked in cycles; leave at 0 to match historical behavior.
 
+    # Compose the weekly totals view that the objective profiles read.
+    weekly_view = _weekly_totals_view(totals)
+
+    # Build the 3-row metric grid per objective.
+    metric_rows: list[WeeklyMetricRow] = [
+        WeeklyMetricRow(
+            title=profile.weekly_row_titles[i],
+            cards=build_headline_metrics(profile.weekly_row_specs[i], weekly_view),
+        )
+        for i in range(3)
+    ]
+
+    # Spotlight summary + diagnostic tiles for the weekly best variant.
+    best_variant_summary: list = []
+    best_variant_diagnostic_tiles: list = []
+    if best_variant is not None:
+        best_variant_summary = build_summary_numbers(profile.summary_specs, best_variant)
+        spec_set = (
+            profile.image_diagnostic_specs
+            if (best_variant.media_type or "").lower() == "image"
+            else profile.video_diagnostic_specs
+        )
+        best_variant_diagnostic_tiles = build_diagnostic_tiles(spec_set, best_variant)
+
+    variant_table_columns = build_variant_table_columns(profile.variant_col_specs)
+
     return WeeklyReport(
         campaign_id=campaign_id,
         campaign_name=campaign_name,
         week_start=week_start,
         week_end=week_end,
+        objective=objective,
         total_spend=totals.spend,
         total_impressions=totals.impressions,
         total_clicks=totals.clicks,
@@ -124,9 +166,15 @@ async def build_weekly_report(
         avg_hook_rate=totals.hook_rate,
         avg_hold_rate=totals.hold_rate,
         avg_cpm=totals.cpm,
+        avg_cpc=totals.cpc if totals.cpc else Decimal("0"),
         avg_frequency=totals.frequency,
         avg_roas=totals.roas,
         avg_cost_per_purchase=totals.cost_per_purchase,
+        total_leads=totals.leads,
+        total_post_engagements=totals.post_engagements,
+        avg_cost_per_lead=totals.cost_per_lead,
+        avg_cost_per_engagement=totals.cost_per_engagement,
+        lpv_rate_pct=float(totals.lpv_rate) * 100 if totals.lpv_rate else 0.0,
         funnel_stages=funnel_stages,
         best_variant=best_variant,
         worst_variant=worst_variant,
@@ -141,7 +189,110 @@ async def build_weekly_report(
         expired_count=expired_count,
         generation_paused=generation_paused,
         review_url=review_url,
+        metric_rows=metric_rows,
+        best_variant_summary=best_variant_summary,
+        best_variant_diagnostic_tiles=best_variant_diagnostic_tiles,
+        variant_table_columns=variant_table_columns,
     )
+
+
+class _WeeklyTotalsView:
+    """Attribute-accessible wrapper for weekly-aggregate values that
+    matches the ``value_key`` / ``prev_key`` names used in
+    ``src/services/objectives.py``.
+
+    Weekly reports don't compute week-over-week deltas (today), so
+    every ``prev_*`` attribute is None — the headline-metric builder
+    handles that cleanly by skipping the delta sub-line.
+
+    The slot set intentionally mirrors :class:`_DailyTotalsView` so
+    both views are interchangeable where only the shared subset is
+    read.
+    """
+
+    __slots__ = (
+        "total_spend",
+        "total_purchases",
+        "total_leads",
+        "total_post_engagements",
+        "total_impressions",
+        "total_reach",
+        "total_link_clicks",
+        "total_landing_page_views",
+        "avg_cost_per_purchase",
+        "avg_cost_per_lead",
+        "avg_cost_per_engagement",
+        "avg_cpc",
+        "avg_cpm",
+        "avg_ctr",
+        "avg_roas",
+        "avg_hook_rate",
+        "avg_hold_rate",
+        "avg_frequency",
+        "total_purchase_value",
+        "lpv_rate_pct",
+        "prev_spend",
+        "prev_purchases",
+        "prev_leads",
+        "prev_post_engagements",
+        "prev_link_clicks",
+        "prev_impressions",
+        "prev_reach",
+        "prev_avg_cpa",
+        "prev_avg_cpl",
+        "prev_avg_cpe",
+        "prev_avg_cpc",
+        "prev_avg_cpm",
+        "prev_avg_ctr",
+        "prev_avg_roas",
+    )
+
+
+def _weekly_totals_view(totals: _AggregateTotals) -> _WeeklyTotalsView:
+    view = _WeeklyTotalsView()
+    view.total_spend = totals.spend
+    view.total_purchases = totals.purchases
+    view.total_leads = totals.leads
+    view.total_post_engagements = totals.post_engagements
+    view.total_impressions = totals.impressions
+    view.total_reach = totals.reach
+    view.total_link_clicks = totals.link_clicks
+    view.total_landing_page_views = totals.landing_page_views
+    view.avg_cost_per_purchase = (
+        float(totals.cost_per_purchase) if totals.cost_per_purchase else None
+    )
+    view.avg_cost_per_lead = (
+        float(totals.cost_per_lead) if totals.cost_per_lead else None
+    )
+    view.avg_cost_per_engagement = (
+        float(totals.cost_per_engagement) if totals.cost_per_engagement else None
+    )
+    view.avg_cpc = float(totals.cpc) if totals.cpc else None
+    view.avg_cpm = float(totals.cpm) if totals.cpm else 0.0
+    view.avg_ctr = float(totals.ctr) * 100 if totals.ctr else 0.0
+    view.avg_roas = float(totals.roas) if totals.roas else None
+    view.avg_hook_rate = float(totals.hook_rate) * 100 if totals.hook_rate else 0.0
+    view.avg_hold_rate = float(totals.hold_rate) * 100 if totals.hold_rate else 0.0
+    view.avg_frequency = float(totals.frequency) if totals.frequency else 0.0
+    view.total_purchase_value = totals.purchase_value
+    view.lpv_rate_pct = float(totals.lpv_rate) * 100 if totals.lpv_rate else 0.0
+
+    # No previous-period delta on weekly today.
+    view.prev_spend = None
+    view.prev_purchases = None
+    view.prev_leads = None
+    view.prev_post_engagements = None
+    view.prev_link_clicks = None
+    view.prev_impressions = None
+    view.prev_reach = None
+    view.prev_avg_cpa = None
+    view.prev_avg_cpl = None
+    view.prev_avg_cpe = None
+    view.prev_avg_cpc = None
+    view.prev_avg_cpm = None
+    view.prev_avg_ctr = None
+    view.prev_avg_roas = None
+    return view
 
 
 async def build_daily_report(
@@ -163,7 +314,8 @@ async def build_daily_report(
     day_start = datetime(report_day.year, report_day.month, report_day.day, tzinfo=UTC)
     day_end = day_start + timedelta(days=1)
 
-    campaign_name = await _get_campaign_name(session, campaign_id)
+    campaign_name, objective = await _get_campaign_meta(session, campaign_id)
+    profile = profile_for(objective)
 
     cycle_rows = await _get_cycles_in_range(session, campaign_id, day_start, day_end)
 
@@ -180,7 +332,40 @@ async def build_daily_report(
 
     # Convert leaderboard VariantSummary rows to the richer VariantReport shape.
     v2_variants = [_variant_summary_to_variant_report(vs, genome_map) for vs in all_variants]
-    best_v2 = select_best_variant(v2_variants)
+
+    # Pick the best variant via the objective's ranker. Fall back to
+    # the Sales-flavoured ``select_best_variant`` helper only if the
+    # ranker returns None — this keeps the "minimum purchases" gate
+    # intact for SALES campaigns.
+    best_v2 = profile.best_variant_ranker(v2_variants)
+    if best_v2 is None and objective in ("OUTCOME_SALES", "OUTCOME_UNKNOWN"):
+        best_v2 = select_best_variant(v2_variants)
+
+    # Compose the flat header-card + weekly-style aggregate object that
+    # the objectives module reads. Attribute names must line up with
+    # the ``value_key`` / ``prev_key`` strings on HeadlineSpec /
+    # SummarySpec.
+    totals_view = _daily_totals_view(totals, prev_totals)
+
+    headline_metrics = build_headline_metrics(
+        profile.daily_headline_specs, totals_view
+    )
+    best_variant_summary = (
+        build_summary_numbers(profile.summary_specs, best_v2) if best_v2 else []
+    )
+
+    # Diagnostic tiles: branch on media_type, same as today but via
+    # the profile's specs.
+    best_variant_diagnostic_tiles: list = []
+    if best_v2:
+        spec_set = (
+            profile.image_diagnostic_specs
+            if (best_v2.media_type or "").lower() == "image"
+            else profile.video_diagnostic_specs
+        )
+        best_variant_diagnostic_tiles = build_diagnostic_tiles(spec_set, best_v2)
+
+    variant_table_columns = build_variant_table_columns(profile.variant_col_specs)
 
     return DailyReport(
         campaign_name=campaign_name,
@@ -188,6 +373,7 @@ async def build_daily_report(
         cycle_number=len(cycle_rows),
         report_date=report_day,
         day_number=1,
+        objective=objective,
         total_spend=totals.spend,
         total_purchases=totals.purchases,
         avg_cost_per_purchase=(
@@ -195,12 +381,34 @@ async def build_daily_report(
         ),
         avg_roas=float(totals.roas) if totals.roas else None,
         avg_hook_rate_pct=float(totals.hook_rate) * 100 if totals.hook_rate else 0.0,
+        total_leads=totals.leads,
+        total_post_engagements=totals.post_engagements,
+        total_impressions=totals.impressions,
+        total_reach=totals.reach,
+        total_link_clicks=totals.link_clicks,
+        avg_cost_per_lead=float(totals.cost_per_lead) if totals.cost_per_lead else None,
+        avg_cost_per_engagement=(
+            float(totals.cost_per_engagement) if totals.cost_per_engagement else None
+        ),
+        avg_cpc=float(totals.cpc) if totals.cpc else None,
+        avg_cpm=float(totals.cpm) if totals.cpm else 0.0,
+        avg_ctr=float(totals.ctr) * 100 if totals.ctr else 0.0,
         prev_spend=prev_totals.spend,
         prev_purchases=prev_totals.purchases
         if prev_totals.purchases and prev_totals.purchases > 0
         else None,
         prev_avg_cpa=prev_totals.avg_cpa,
         prev_avg_roas=prev_totals.avg_roas,
+        prev_leads=prev_totals.leads,
+        prev_post_engagements=prev_totals.post_engagements,
+        prev_link_clicks=prev_totals.link_clicks,
+        prev_impressions=prev_totals.impressions,
+        prev_reach=prev_totals.reach,
+        prev_avg_cpl=prev_totals.avg_cpl,
+        prev_avg_cpe=prev_totals.avg_cpe,
+        prev_avg_cpc=prev_totals.avg_cpc,
+        prev_avg_cpm=prev_totals.avg_cpm,
+        prev_avg_ctr=prev_totals.avg_ctr,
         variants=sorted(
             v2_variants,
             key=lambda v: (v.cost_per_purchase is None, v.cost_per_purchase or 0),
@@ -209,7 +417,109 @@ async def build_daily_report(
         best_variant_funnel=build_funnel(best_v2) if best_v2 else [],
         best_variant_diagnostics=build_diagnostics(best_v2) if best_v2 else [],
         best_variant_projection=build_projection(best_v2) if best_v2 else None,
+        headline_metrics=headline_metrics,
+        best_variant_summary=best_variant_summary,
+        best_variant_diagnostic_tiles=best_variant_diagnostic_tiles,
+        variant_table_columns=variant_table_columns,
     )
+
+
+class _DailyTotalsView:
+    """Attribute-accessible view that maps objective-profile metric
+    keys onto their values from this and yesterday's rollups.
+
+    ``build_headline_metrics`` reads ``value_key`` / ``prev_key``
+    strings off HeadlineSpec and looks them up with ``getattr`` — this
+    struct is what keeps that lookup one-line and keeps the profiles
+    readable (``HeadlineSpec("AVG CPA", "avg_cost_per_purchase", ...)``).
+    """
+
+    __slots__ = (
+        "total_spend",
+        "total_purchases",
+        "total_leads",
+        "total_post_engagements",
+        "total_impressions",
+        "total_reach",
+        "total_link_clicks",
+        "total_landing_page_views",
+        "avg_cost_per_purchase",
+        "avg_cost_per_lead",
+        "avg_cost_per_engagement",
+        "avg_cpc",
+        "avg_cpm",
+        "avg_ctr",
+        "avg_roas",
+        "avg_hook_rate",
+        "avg_hold_rate",
+        "avg_frequency",
+        "total_purchase_value",
+        "lpv_rate_pct",
+        # Previous-day equivalents.
+        "prev_spend",
+        "prev_purchases",
+        "prev_leads",
+        "prev_post_engagements",
+        "prev_link_clicks",
+        "prev_impressions",
+        "prev_reach",
+        "prev_avg_cpa",
+        "prev_avg_cpl",
+        "prev_avg_cpe",
+        "prev_avg_cpc",
+        "prev_avg_cpm",
+        "prev_avg_ctr",
+        "prev_avg_roas",
+    )
+
+
+def _daily_totals_view(
+    totals: _AggregateTotals, prev: _PreviousDayTotals
+) -> _DailyTotalsView:
+    view = _DailyTotalsView()
+    view.total_spend = totals.spend
+    view.total_purchases = totals.purchases
+    view.total_leads = totals.leads
+    view.total_post_engagements = totals.post_engagements
+    view.total_impressions = totals.impressions
+    view.total_reach = totals.reach
+    view.total_link_clicks = totals.link_clicks
+    view.total_landing_page_views = totals.landing_page_views
+    view.avg_cost_per_purchase = (
+        float(totals.cost_per_purchase) if totals.cost_per_purchase else None
+    )
+    view.avg_cost_per_lead = (
+        float(totals.cost_per_lead) if totals.cost_per_lead else None
+    )
+    view.avg_cost_per_engagement = (
+        float(totals.cost_per_engagement) if totals.cost_per_engagement else None
+    )
+    view.avg_cpc = float(totals.cpc) if totals.cpc else None
+    view.avg_cpm = float(totals.cpm) if totals.cpm else 0.0
+    # CTR internally is 0-1; the objective profiles expect 0-100.
+    view.avg_ctr = float(totals.ctr) * 100 if totals.ctr else 0.0
+    view.avg_roas = float(totals.roas) if totals.roas else None
+    view.avg_hook_rate = float(totals.hook_rate) * 100 if totals.hook_rate else 0.0
+    view.avg_hold_rate = float(totals.hold_rate) * 100 if totals.hold_rate else 0.0
+    view.avg_frequency = float(totals.frequency) if totals.frequency else 0.0
+    view.total_purchase_value = totals.purchase_value
+    view.lpv_rate_pct = float(totals.lpv_rate) * 100 if totals.lpv_rate else 0.0
+
+    view.prev_spend = prev.spend
+    view.prev_purchases = prev.purchases
+    view.prev_leads = prev.leads
+    view.prev_post_engagements = prev.post_engagements
+    view.prev_link_clicks = prev.link_clicks
+    view.prev_impressions = prev.impressions
+    view.prev_reach = prev.reach
+    view.prev_avg_cpa = prev.avg_cpa
+    view.prev_avg_cpl = prev.avg_cpl
+    view.prev_avg_cpe = prev.avg_cpe
+    view.prev_avg_cpc = prev.avg_cpc
+    view.prev_avg_cpm = prev.avg_cpm
+    view.prev_avg_ctr = prev.avg_ctr
+    view.prev_avg_roas = prev.avg_roas
+    return view
 
 
 # ---------------------------------------------------------------------------
@@ -234,14 +544,20 @@ class _AggregateTotals:
         "add_to_carts",
         "purchases",
         "purchase_value",
+        "leads",
+        "post_engagements",
         "ctr",
         "cpa",
+        "cpc",
         "hook_rate",
         "hold_rate",
         "cpm",
         "frequency",
         "roas",
         "cost_per_purchase",
+        "cost_per_lead",
+        "cost_per_engagement",
+        "lpv_rate",
     )
 
     def __init__(
@@ -260,6 +576,8 @@ class _AggregateTotals:
         add_to_carts: int,
         purchases: int,
         purchase_value: Decimal,
+        leads: int = 0,
+        post_engagements: int = 0,
     ) -> None:
         self.impressions = impressions
         self.clicks = clicks
@@ -274,9 +592,14 @@ class _AggregateTotals:
         self.add_to_carts = add_to_carts
         self.purchases = purchases
         self.purchase_value = purchase_value
+        self.leads = leads
+        self.post_engagements = post_engagements
 
         self.ctr = Decimal(str(clicks / impressions)) if impressions > 0 else Decimal("0")
         self.cpa = Decimal(str(float(spend) / conversions)) if conversions > 0 else None
+        self.cpc = (
+            Decimal(str(float(spend) / link_clicks)) if link_clicks > 0 else None
+        )
         self.hook_rate = (
             Decimal(str(video_views_3s / impressions)) if impressions > 0 else Decimal("0")
         )
@@ -293,12 +616,38 @@ class _AggregateTotals:
             else None
         )
         self.cost_per_purchase = Decimal(str(float(spend) / purchases)) if purchases > 0 else None
+        self.cost_per_lead = (
+            Decimal(str(float(spend) / leads)) if leads > 0 else None
+        )
+        self.cost_per_engagement = (
+            Decimal(str(float(spend) / post_engagements))
+            if post_engagements > 0
+            else None
+        )
+        self.lpv_rate = (
+            Decimal(str(landing_page_views / link_clicks)) if link_clicks > 0 else Decimal("0")
+        )
 
 
 class _PreviousDayTotals:
     """Trimmed view of the previous day's rollup for trend comparisons."""
 
-    __slots__ = ("spend", "purchases", "avg_cpa", "avg_roas")
+    __slots__ = (
+        "spend",
+        "purchases",
+        "avg_cpa",
+        "avg_roas",
+        "leads",
+        "post_engagements",
+        "link_clicks",
+        "impressions",
+        "reach",
+        "avg_cpl",
+        "avg_cpe",
+        "avg_cpc",
+        "avg_cpm",
+        "avg_ctr",
+    )
 
     def __init__(
         self,
@@ -307,11 +656,31 @@ class _PreviousDayTotals:
         purchases: int | None,
         avg_cpa: float | None,
         avg_roas: float | None,
+        leads: int | None = None,
+        post_engagements: int | None = None,
+        link_clicks: int | None = None,
+        impressions: int | None = None,
+        reach: int | None = None,
+        avg_cpl: float | None = None,
+        avg_cpe: float | None = None,
+        avg_cpc: float | None = None,
+        avg_cpm: float | None = None,
+        avg_ctr: float | None = None,
     ) -> None:
         self.spend = spend
         self.purchases = purchases
         self.avg_cpa = avg_cpa
         self.avg_roas = avg_roas
+        self.leads = leads
+        self.post_engagements = post_engagements
+        self.link_clicks = link_clicks
+        self.impressions = impressions
+        self.reach = reach
+        self.avg_cpl = avg_cpl
+        self.avg_cpe = avg_cpe
+        self.avg_cpc = avg_cpc
+        self.avg_cpm = avg_cpm
+        self.avg_ctr = avg_ctr
 
 
 async def _get_campaign_name(session: AsyncSession, campaign_id: UUID) -> str:
@@ -324,6 +693,24 @@ async def _get_campaign_name(session: AsyncSession, campaign_id: UUID) -> str:
     if not result:
         raise LookupError(f"Campaign {campaign_id} not found")
     return str(result[0])
+
+
+async def _get_campaign_meta(
+    session: AsyncSession, campaign_id: UUID
+) -> tuple[str, str]:
+    """Fetch ``(name, objective)`` for a campaign.
+
+    Used by the report builders so both fields come through a single
+    query. Raises ``LookupError`` if the campaign row doesn't exist.
+    """
+    row = await session.execute(
+        sa_text("SELECT name, objective FROM campaigns WHERE id = :id"),
+        {"id": str(campaign_id)},
+    )
+    result = row.fetchone()
+    if not result:
+        raise LookupError(f"Campaign {campaign_id} not found")
+    return str(result[0]), str(result[1]) if result[1] else "OUTCOME_SALES"
 
 
 async def _get_cycles_in_range(
@@ -371,7 +758,9 @@ async def _aggregate_metrics(
                    COALESCE(SUM(m.landing_page_views), 0),
                    COALESCE(SUM(m.add_to_carts), 0),
                    COALESCE(SUM(m.purchases), 0),
-                   COALESCE(SUM(m.purchase_value), 0)
+                   COALESCE(SUM(m.purchase_value), 0),
+                   COALESCE(SUM(m.leads), 0),
+                   COALESCE(SUM(m.post_engagements), 0)
             FROM metrics m
             JOIN variants v ON v.id = m.variant_id
             WHERE v.campaign_id = :id
@@ -395,6 +784,8 @@ async def _aggregate_metrics(
         add_to_carts=int(m[10]),
         purchases=int(m[11]),
         purchase_value=Decimal(str(m[12])),
+        leads=int(m[13]),
+        post_engagements=int(m[14]),
     )
 
 
@@ -530,7 +921,8 @@ async def _variant_leaderboard(
                    COALESCE(m.link_clicks, 0), COALESCE(m.landing_page_views, 0),
                    COALESCE(m.add_to_carts, 0), COALESCE(m.purchases, 0),
                    COALESCE(m.purchase_value, 0),
-                   v.media_type
+                   v.media_type,
+                   COALESCE(m.leads, 0), COALESCE(m.post_engagements, 0)
             FROM variants v
             LEFT JOIN LATERAL (
                 SELECT SUM(impressions) AS impressions, SUM(clicks) AS clicks,
@@ -539,7 +931,8 @@ async def _variant_leaderboard(
                        SUM(video_views_15s) AS video_views_15s, SUM(thruplays) AS thruplays,
                        SUM(link_clicks) AS link_clicks, SUM(landing_page_views) AS landing_page_views,
                        SUM(add_to_carts) AS add_to_carts, SUM(purchases) AS purchases,
-                       SUM(purchase_value) AS purchase_value
+                       SUM(purchase_value) AS purchase_value,
+                       SUM(leads) AS leads, SUM(post_engagements) AS post_engagements
                 FROM metrics WHERE variant_id = v.id
                   AND recorded_at >= :ws AND recorded_at < :we
             ) m ON TRUE
@@ -572,6 +965,8 @@ def _row_to_variant_summary(row) -> VariantSummary:
     purch = int(row[14])
     pv = Decimal(str(row[15]))
     media_type = str(row[16]) if len(row) > 16 and row[16] else "unknown"
+    leads = int(row[17]) if len(row) > 17 and row[17] is not None else 0
+    post_engagements = int(row[18]) if len(row) > 18 and row[18] is not None else 0
 
     ctr = Decimal(str(clicks / imps)) if imps > 0 else Decimal("0")
     cpa = Decimal(str(float(spend) / convs)) if convs > 0 else None
@@ -579,6 +974,27 @@ def _row_to_variant_summary(row) -> VariantSummary:
     hold = Decimal(str(vv15s / vv3s)) if vv3s > 0 else Decimal("0")
     cpp = Decimal(str(float(spend) / purch)) if purch > 0 else None
     roas = Decimal(str(float(pv) / float(spend))) if float(spend) > 0 and float(pv) > 0 else None
+
+    # Objective-aware derived fields. ``None`` for cost metrics when
+    # the denominator is zero keeps downstream em-dash rendering
+    # consistent with the sales-only behaviour (CPA/ROAS em-dash when
+    # purchases == 0).
+    cpc = Decimal(str(float(spend) / lc)) if lc > 0 else None
+    cpl = Decimal(str(float(spend) / leads)) if leads > 0 else None
+    cpe = (
+        Decimal(str(float(spend) / post_engagements))
+        if post_engagements > 0
+        else None
+    )
+    cpm = (
+        Decimal(str((float(spend) / imps) * 1000)) if imps > 0 else Decimal("0")
+    )
+    frequency = Decimal(str(imps / reach)) if reach > 0 else Decimal("0")
+
+    # Rates in 0-100 pct (convenience for the variant table).
+    hook_rate_pct = (vv3s / imps * 100) if imps > 0 else 0.0
+    hold_rate_pct = (vv15s / vv3s * 100) if vv3s > 0 else 0.0
+    ctr_pct = (lc / imps * 100) if imps > 0 else 0.0
 
     return VariantSummary(
         variant_id=row[0],
@@ -604,6 +1020,16 @@ def _row_to_variant_summary(row) -> VariantSummary:
         cost_per_purchase=cpp,
         roas=roas,
         media_type=media_type,
+        leads=leads,
+        post_engagements=post_engagements,
+        cost_per_lead=cpl,
+        cost_per_engagement=cpe,
+        cpc=cpc,
+        cpm=cpm,
+        frequency=frequency,
+        hook_rate_pct=hook_rate_pct,
+        hold_rate_pct=hold_rate_pct,
+        ctr_pct=ctr_pct,
     )
 
 
@@ -711,13 +1137,20 @@ async def _previous_day_totals(
     start: datetime,
     end: datetime,
 ) -> _PreviousDayTotals:
-    """Minimal roll-up for the previous day — only the fields the trend card needs."""
+    """Minimal roll-up for the previous day — all objective-aware
+    trend fields. Cheap because it's one SUM query."""
     row = await session.execute(
         sa_text(
             """
             SELECT COALESCE(SUM(m.spend), 0),
                    COALESCE(SUM(m.purchases), 0),
-                   COALESCE(SUM(m.purchase_value), 0)
+                   COALESCE(SUM(m.purchase_value), 0),
+                   COALESCE(SUM(m.leads), 0),
+                   COALESCE(SUM(m.post_engagements), 0),
+                   COALESCE(SUM(m.link_clicks), 0),
+                   COALESCE(SUM(m.impressions), 0),
+                   COALESCE(SUM(m.reach), 0),
+                   COALESCE(SUM(m.clicks), 0)
             FROM metrics m
             JOIN variants v ON v.id = m.variant_id
             WHERE v.campaign_id = :id
@@ -730,17 +1163,49 @@ async def _previous_day_totals(
     prev_spend = Decimal(str(prev[0])) if prev and float(prev[0]) > 0 else None
     prev_purchases = int(prev[1]) if prev else None
     prev_pv = Decimal(str(prev[2])) if prev else Decimal("0")
-    prev_avg_cpa = float(prev_spend) / int(prev[1]) if prev_spend and int(prev[1]) > 0 else None
+    prev_leads_n = int(prev[3]) if prev and prev[3] is not None else 0
+    prev_engagements_n = int(prev[4]) if prev and prev[4] is not None else 0
+    prev_link_clicks_n = int(prev[5]) if prev and prev[5] is not None else 0
+    prev_impressions_n = int(prev[6]) if prev and prev[6] is not None else 0
+    prev_reach_n = int(prev[7]) if prev and prev[7] is not None else 0
+    prev_clicks_n = int(prev[8]) if prev and prev[8] is not None else 0
+
+    spend_f = float(prev_spend) if prev_spend else 0.0
+    prev_avg_cpa = spend_f / int(prev[1]) if prev_spend and int(prev[1]) > 0 else None
     prev_avg_roas = (
-        float(prev_pv) / float(prev_spend)
-        if prev_spend and float(prev_spend) > 0 and float(prev_pv) > 0
+        float(prev_pv) / spend_f
+        if prev_spend and spend_f > 0 and float(prev_pv) > 0
         else None
     )
+    prev_avg_cpl = spend_f / prev_leads_n if prev_spend and prev_leads_n > 0 else None
+    prev_avg_cpe = (
+        spend_f / prev_engagements_n if prev_spend and prev_engagements_n > 0 else None
+    )
+    prev_avg_cpc = (
+        spend_f / prev_link_clicks_n if prev_spend and prev_link_clicks_n > 0 else None
+    )
+    prev_avg_cpm = (
+        (spend_f / prev_impressions_n) * 1000 if prev_impressions_n > 0 else None
+    )
+    prev_avg_ctr = (
+        (prev_clicks_n / prev_impressions_n) * 100 if prev_impressions_n > 0 else None
+    )
+
     return _PreviousDayTotals(
         spend=prev_spend,
         purchases=prev_purchases,
         avg_cpa=prev_avg_cpa,
         avg_roas=prev_avg_roas,
+        leads=prev_leads_n if prev_leads_n else None,
+        post_engagements=prev_engagements_n if prev_engagements_n else None,
+        link_clicks=prev_link_clicks_n if prev_link_clicks_n else None,
+        impressions=prev_impressions_n if prev_impressions_n else None,
+        reach=prev_reach_n if prev_reach_n else None,
+        avg_cpl=prev_avg_cpl,
+        avg_cpe=prev_avg_cpe,
+        avg_cpc=prev_avg_cpc,
+        avg_cpm=prev_avg_cpm,
+        avg_ctr=prev_avg_ctr,
     )
 
 
@@ -783,6 +1248,17 @@ def _variant_summary_to_variant_report(
         summary_parts.append(genome["cta_text"])
     genome_summary = " + ".join(summary_parts) if summary_parts else vs.variant_code
 
+    # Objective-aware derived metrics. Read straight off the
+    # VariantSummary (which the leaderboard query already populates)
+    # so we don't re-derive the same Decimals here.
+    leads = vs.leads
+    post_engagements = vs.post_engagements
+    cpl_v = float(vs.cost_per_lead) if vs.cost_per_lead else None
+    cpe_v = float(vs.cost_per_engagement) if vs.cost_per_engagement else None
+    cpc_v = float(vs.cpc) if vs.cpc else None
+    cpm_v = float(vs.cpm) if vs.cpm else 0.0
+    engagement_rate = compute_engagement_rate_pct(post_engagements, imps)
+
     return VariantReport(
         variant_id=vs.variant_id,
         variant_code=vs.variant_code,
@@ -810,6 +1286,13 @@ def _variant_summary_to_variant_report(
         atc_rate_pct=atc_pct,
         checkout_rate_pct=checkout_pct,
         frequency=freq,
+        leads=leads,
+        post_engagements=post_engagements,
+        cost_per_lead=cpl_v,
+        cost_per_engagement=cpe_v,
+        engagement_rate_pct=engagement_rate,
+        cpc=cpc_v,
+        cpm=cpm_v,
     )
 
 

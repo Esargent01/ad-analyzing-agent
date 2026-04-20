@@ -368,7 +368,16 @@ class EmailReporter:
             dashboard_url=dashboard_url,
             day_number=report.day_number,
             cycle_number=report.cycle_number,
-            # Top-line cards
+            # Objective-aware display lists (pre-built in the report
+            # builder per the campaign's Meta objective). Templates
+            # iterate these directly.
+            objective=report.objective,
+            headline_metrics=report.headline_metrics,
+            best_variant_summary=report.best_variant_summary,
+            best_variant_diagnostic_tiles=report.best_variant_diagnostic_tiles,
+            variant_table_columns=report.variant_table_columns,
+            # Top-line cards (legacy — left for templates we haven't
+            # migrated to the data-driven loop yet).
             total_spend=report.total_spend,
             total_purchases=report.total_purchases,
             avg_cost_per_purchase=report.avg_cost_per_purchase,
@@ -429,6 +438,13 @@ class EmailReporter:
             cycles_run=report.cycles_run,
             variants_launched=report.variants_launched,
             variants_retired=report.variants_retired,
+            # Objective-aware lists (3 metric rows, summary numbers,
+            # diagnostic tiles, variant-table columns).
+            objective=report.objective,
+            metric_rows=report.metric_rows,
+            best_variant_summary=report.best_variant_summary,
+            best_variant_diagnostic_tiles=report.best_variant_diagnostic_tiles,
+            variant_table_columns=report.variant_table_columns,
             # Metrics
             total_impressions=report.total_impressions,
             total_reach=report.total_reach,

@@ -9,7 +9,8 @@ import { SkeletonReportBody } from "@/components/ui/Skeleton";
 import { useDailyReport, useMe } from "@/lib/api/hooks";
 import { ApiError } from "@/lib/api/client";
 import type { DailyReport, FatigueAlert, ReportCycleAction } from "@/lib/api/types";
-import { formatCurrency, formatDateLabel, formatIntComma, formatOneDecimal } from "@/lib/format";
+import { formatDateLabel } from "@/lib/format";
+import { topLineLabelFor } from "@/lib/objectives";
 
 /**
  * Daily report detail page. Mirrors `daily_web.html` section-by-section:
@@ -85,10 +86,16 @@ export function DailyReportDetailRoute() {
 }
 
 function DailyReportBody({ report }: { report: DailyReport }) {
+  // Per-objective top-line eyebrow label. Matches the design-system's
+  // mono-uppercase treatment on campaign detail etc.
+  const topLineLabel = topLineLabelFor(report.objective ?? "OUTCOME_SALES");
+
   return (
     <>
-      {/* Top-line metric cards */}
-      <Section label="Top-line · today">
+      {/* Top-line metric cards — data-driven. ``report.headline_metrics``
+          is built server-side per the campaign's Meta objective so
+          every screen renders the same cards with matching labels. */}
+      <Section label={topLineLabel}>
         <div
           data-ds-grid
           style={{
@@ -97,44 +104,15 @@ function DailyReportBody({ report }: { report: DailyReport }) {
             gap: 10,
           }}
         >
-          <MetricCard
-            label="Spend"
-            value={formatCurrency(report.total_spend)}
-            trend={renderDelta(report.total_spend, report.prev_spend)}
-            tone="neutral"
-          />
-          <MetricCard
-            label="Purchases"
-            value={formatIntComma(report.total_purchases)}
-            trend={renderDelta(report.total_purchases, report.prev_purchases)}
-            tone={
-              changeTone(report.total_purchases, report.prev_purchases, "higher-is-better")
-            }
-          />
-          <MetricCard
-            label="Avg. CPA"
-            value={
-              report.avg_cost_per_purchase != null && report.avg_cost_per_purchase !== ""
-                ? formatCurrency(report.avg_cost_per_purchase)
-                : "—"
-            }
-            trend={renderDelta(report.avg_cost_per_purchase, report.prev_avg_cpa)}
-            tone={
-              changeTone(report.avg_cost_per_purchase, report.prev_avg_cpa, "lower-is-better")
-            }
-          />
-          <MetricCard
-            label="ROAS"
-            value={
-              report.avg_roas != null && report.avg_roas !== ""
-                ? `${formatOneDecimal(report.avg_roas)}x`
-                : "N/A"
-            }
-            trend={renderDelta(report.avg_roas, report.prev_avg_roas)}
-            tone={
-              changeTone(report.avg_roas, report.prev_avg_roas, "higher-is-better")
-            }
-          />
+          {report.headline_metrics.map((card, i) => (
+            <MetricCard
+              key={`${card.label}-${i}`}
+              label={card.label}
+              value={card.value}
+              trend={card.sub ?? null}
+              tone={card.tone === "good" ? "up" : card.tone === "bad" ? "down" : "neutral"}
+            />
+          ))}
         </div>
       </Section>
 
@@ -147,13 +125,18 @@ function DailyReportBody({ report }: { report: DailyReport }) {
             funnel={report.best_variant_funnel}
             diagnostics={report.best_variant_diagnostics}
             projection={report.best_variant_projection}
+            summaryNumbers={report.best_variant_summary}
+            diagnosticTiles={report.best_variant_diagnostic_tiles}
           />
         </div>
       ) : null}
 
-      {/* Other active variants */}
+      {/* Other active variants — columns are objective-aware. */}
       <Section label="Other active variants">
-        <DailyVariantTable variants={report.variants} />
+        <DailyVariantTable
+          variants={report.variants}
+          columns={report.variant_table_columns}
+        />
       </Section>
 
       {/* Fatigue alerts */}
@@ -328,40 +311,6 @@ function Section({
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-type DeltaDirection = "higher-is-better" | "lower-is-better";
-
-function toNumOrNull(v: unknown): number | null {
-  if (v === null || v === undefined || v === "") return null;
-  const n = typeof v === "number" ? v : Number(v);
-  return Number.isFinite(n) ? n : null;
-}
-
-function renderDelta(
-  current: number | string | null | undefined,
-  previous: number | string | null | undefined,
-): string | null {
-  const curr = toNumOrNull(current);
-  const prev = toNumOrNull(previous);
-  if (curr == null || prev == null || prev === 0) return null;
-  const delta = ((curr - prev) / prev) * 100;
-  const arrow = delta > 0.05 ? "↑" : delta < -0.05 ? "↓" : "→";
-  return `${arrow} ${delta.toFixed(1)}%`;
-}
-
-function changeTone(
-  current: number | string | null | undefined,
-  previous: number | string | null | undefined,
-  direction: DeltaDirection,
-): "up" | "down" | "flat" | "neutral" {
-  const curr = toNumOrNull(current);
-  const prev = toNumOrNull(previous);
-  if (curr == null || prev == null || prev === 0) return "neutral";
-  const delta = curr - prev;
-  if (Math.abs(delta) < 1e-9) return "flat";
-  const better = direction === "higher-is-better" ? delta > 0 : delta < 0;
-  return better ? "up" : "down";
-}
 
 function actionKind(
   actionType: string,

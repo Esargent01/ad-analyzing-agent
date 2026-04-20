@@ -18,9 +18,7 @@ import type { ProposedVariant, WeeklyReport } from "@/lib/api/types";
 import {
   formatCurrency,
   formatDateLabel,
-  formatIntComma,
   formatOneDecimal,
-  formatPct,
 } from "@/lib/format";
 
 /**
@@ -105,86 +103,30 @@ export function WeeklyReportDetailRoute() {
 function WeeklyReportBody({ report }: { report: WeeklyReport }) {
   return (
     <>
-      {/* Row 1 — Purchase metrics */}
-      <Section label="Purchase metrics">
-        <MetricGrid>
-          <MetricCard label="Spend" value={formatCurrency(report.total_spend)} />
-          <MetricCard
-            label="Purchases"
-            value={formatIntComma(report.total_purchases)}
-          />
-          <MetricCard
-            label="CPA"
-            value={
-              report.avg_cost_per_purchase != null &&
-              report.avg_cost_per_purchase !== ""
-                ? formatCurrency(report.avg_cost_per_purchase)
-                : "N/A"
-            }
-          />
-          <MetricCard
-            label="ROAS"
-            value={
-              report.avg_roas != null && report.avg_roas !== ""
-                ? `${formatOneDecimal(report.avg_roas)}x`
-                : "N/A"
-            }
-          />
-        </MetricGrid>
-      </Section>
-
-      {/* Row 2 — Engagement metrics. Image-only campaigns swap Hook/Hold
-          for Frequency/ATC rate; the video-specific tiles would read 0%
-          on static creatives. */}
-      <Section label="Engagement metrics">
-        <MetricGrid>
-          {report.best_variant?.media_type === "image" ? (
-            <>
+      {/* 3 metric rows — data-driven from the objective profile.
+          Row titles and the cards within each are computed server-
+          side in ``src/services/reports.py::build_weekly_report``. */}
+      {report.metric_rows.map((row) => (
+        <Section key={row.title} label={row.title.toLowerCase()}>
+          <MetricGrid>
+            {row.cards.map((card, i) => (
               <MetricCard
-                label="Frequency"
-                value={`${formatOneDecimal(report.avg_frequency)}x`}
-              />
-              <MetricCard
-                label="ATC rate"
-                value={
-                  report.total_link_clicks > 0
-                    ? formatPct(
-                        Number(report.total_add_to_carts) /
-                          Number(report.total_link_clicks),
-                      )
-                    : "N/A"
+                key={`${card.label}-${i}`}
+                label={card.label}
+                value={card.value}
+                trend={card.sub ?? undefined}
+                tone={
+                  card.tone === "good"
+                    ? "up"
+                    : card.tone === "bad"
+                      ? "down"
+                      : "neutral"
                 }
               />
-            </>
-          ) : (
-            <>
-              <MetricCard label="Hook rate" value={formatPct(report.avg_hook_rate)} />
-              <MetricCard label="Hold rate" value={formatPct(report.avg_hold_rate)} />
-            </>
-          )}
-          <MetricCard label="CTR" value={formatPct(report.avg_ctr)} />
-          <MetricCard label="CPM" value={formatCurrency(report.avg_cpm)} />
-        </MetricGrid>
-      </Section>
-
-      {/* Row 3 — Volume metrics */}
-      <Section label="Volume metrics">
-        <MetricGrid>
-          <MetricCard
-            label="Impressions"
-            value={formatIntComma(report.total_impressions)}
-          />
-          <MetricCard label="Reach" value={formatIntComma(report.total_reach)} />
-          <MetricCard
-            label="Revenue"
-            value={formatCurrency(report.total_purchase_value)}
-          />
-          <MetricCard
-            label="Frequency"
-            value={formatOneDecimal(report.avg_frequency)}
-          />
-        </MetricGrid>
-      </Section>
+            ))}
+          </MetricGrid>
+        </Section>
+      ))}
 
       {/* Full funnel breakdown */}
       {report.funnel_stages.length > 0 ? (
@@ -203,7 +145,10 @@ function WeeklyReportBody({ report }: { report: WeeklyReport }) {
       {/* Variant leaderboard */}
       {report.all_variants.length > 0 ? (
         <Section label="Variant leaderboard">
-          <WeeklyVariantTable variants={report.all_variants} />
+          <WeeklyVariantTable
+            variants={report.all_variants}
+            columns={report.variant_table_columns}
+          />
         </Section>
       ) : null}
 
