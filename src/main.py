@@ -1567,6 +1567,84 @@ def backfill_media_type(campaign_id: str) -> None:
     asyncio.run(_run())
 
 
+@cli.command(name="set-campaign-objective")
+@click.option("--campaign-id", required=True, type=str, help="Local campaign UUID.")
+@click.option(
+    "--objective",
+    required=True,
+    type=click.Choice(
+        [
+            "OUTCOME_SALES",
+            "OUTCOME_LEADS",
+            "OUTCOME_ENGAGEMENT",
+            "OUTCOME_TRAFFIC",
+            "OUTCOME_AWARENESS",
+            "OUTCOME_APP_PROMOTION",
+            "OUTCOME_UNKNOWN",
+        ],
+        case_sensitive=True,
+    ),
+    help="Canonical ODAX objective to set.",
+)
+def set_campaign_objective(campaign_id: str, objective: str) -> None:
+    """Force a campaign's ``objective`` column to a specific ODAX value.
+
+    Useful for demo / QA workflows where you want to inspect how the
+    same underlying metrics render under different objective lenses
+    without editing the campaign on Meta's side. The opportunistic
+    re-sync in ``sync_campaign_ads`` will overwrite this value on the
+    next cron tick — rerun this command after each tick if you want
+    to keep the override pinned.
+
+    Example::
+
+        python -m src.main set-campaign-objective \\
+            --campaign-id <uuid> --objective OUTCOME_LEADS
+    """
+
+    async def _run() -> None:
+        from sqlalchemy import text as sa_text
+
+        from src.db.engine import close_db, get_session, init_db
+
+        try:
+            campaign_uuid = UUID(campaign_id)
+        except ValueError:
+            click.echo(f"Error: {campaign_id!r} is not a valid UUID.")
+            return
+
+        await init_db()
+        try:
+            async with get_session() as session:
+                prev_row = await session.execute(
+                    sa_text("SELECT name, objective FROM campaigns WHERE id = :id"),
+                    {"id": str(campaign_uuid)},
+                )
+                prev = prev_row.first()
+                if prev is None:
+                    click.echo(f"Error: campaign {campaign_id} not found.")
+                    return
+
+                if prev[1] == objective:
+                    click.echo(
+                        f"{prev[0]}: already {objective} — no change."
+                    )
+                    return
+
+                await session.execute(
+                    sa_text(
+                        "UPDATE campaigns SET objective = :obj WHERE id = :id"
+                    ),
+                    {"obj": objective, "id": str(campaign_uuid)},
+                )
+                await session.commit()
+                click.echo(f"{prev[0]}: {prev[1]} → {objective}")
+        finally:
+            await close_db()
+
+    asyncio.run(_run())
+
+
 @cli.command(name="backfill-campaign-objective")
 @click.option(
     "--dry-run",
