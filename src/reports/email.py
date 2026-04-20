@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -43,6 +44,65 @@ def _format_pct(value: object) -> str:
 def _format_signed_pct(value: object) -> str:
     v = float(value) if value is not None else 0.0
     return f"{v:+.0%}"
+
+
+# ---------------------------------------------------------------------------
+# Genome rendering — mirror of frontend/src/components/dashboard/primitives.tsx
+# ::GenomeSlots so the email and the dashboard show the same labels, order,
+# and image-URL normalisation. Edit both in lockstep.
+# ---------------------------------------------------------------------------
+
+_GENOME_ORDER = ["headline", "body", "image_url", "cta_text"]
+_GENOME_LABELS = {
+    "image_url": "image",
+    "cta_text": "cta",
+}
+_IMG_TAG_RE = re.compile(r"IMG_[A-Za-z0-9]+")
+
+
+def _slot_label(slot: str) -> str:
+    return _GENOME_LABELS.get(slot, slot)
+
+
+def _normalise_slot_value(slot: str, value: str) -> str:
+    """Trim long slot values for display, with image_url getting special
+    treatment (extract the IMG_NNN tag if present, else use the basename).
+
+    Mirrors the ``normalize`` closure inside the dashboard's
+    ``GenomeSlots`` component.
+    """
+    if value is None:
+        return ""
+    if slot == "image_url":
+        match = _IMG_TAG_RE.search(value)
+        if match:
+            return match.group(0)
+        last = value.rsplit("/", 1)[-1] if "/" in value else value
+        return f"{last[:16]}…" if len(last) > 18 else last
+    return f"{value[:38]}…" if len(value) > 40 else value
+
+
+def _genome_pairs(genome: dict[str, str] | None) -> list[tuple[str, str]]:
+    """Return ``(display_label, normalised_value)`` pairs in the dashboard's
+    canonical slot order, with any extra non-canonical slots appended at
+    the end. Empty / missing slots are dropped.
+    """
+    if not genome:
+        return []
+    pairs: list[tuple[str, str]] = []
+    used: set[str] = set()
+    for slot in _GENOME_ORDER:
+        v = genome.get(slot)
+        if v:
+            pairs.append((_slot_label(slot), _normalise_slot_value(slot, v)))
+            used.add(slot)
+    # Surface any genome slots we don't have a canonical position for, so
+    # new gene-pool slots aren't silently dropped.
+    for slot, v in genome.items():
+        if slot in used or not v:
+            continue
+        pairs.append((_slot_label(slot), _normalise_slot_value(slot, v)))
+    return pairs
 
 
 class EmailReporter:
@@ -320,6 +380,11 @@ class EmailReporter:
             prev_avg_roas=report.prev_avg_roas,
             # Best ad spotlight
             best_variant=report.best_variant,
+            best_variant_genome_pairs=(
+                _genome_pairs(report.best_variant.genome)
+                if report.best_variant
+                else []
+            ),
             best_variant_funnel=report.best_variant_funnel,
             best_variant_diagnostics=report.best_variant_diagnostics,
             best_variant_projection=report.best_variant_projection,
