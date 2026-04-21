@@ -119,11 +119,21 @@
           </td>
           {# Summary numbers — 3-up driven by best_variant_summary.
              Keys swap per objective (CPA/ROAS/PURCH for SALES,
-             CPL/CTR/LEADS for LEADS, etc.). #}
+             CPL/CTR/LEADS for LEADS, etc.).
+
+             Layout: each cell has a consistent 26px left gutter (none
+             on the first), a 56px min-width so label + value can
+             breathe even when the value is a short em-dash, and
+             vertical-align:top so labels line up across columns. This
+             replaces an earlier asymmetric-padding scheme where the
+             first and last cells had only one-sided padding but the
+             middle had both — on narrow values like "—" the label
+             widths (ROAS, PURCH) were wider than their cell contents
+             and visually crashed into each other. #}
           <td valign="top" align="right" style="padding-left:16px;white-space:nowrap;">
             <table cellpadding="0" cellspacing="0" border="0"><tr>
               {% for summary in best_variant_summary %}
-              <td style="padding:0 {% if loop.last %}0 0 14px{% elif loop.first %}0 14px 0 0{% else %}0 14px{% endif %};text-align:right;">
+              <td style="padding:0 0 0 {% if loop.first %}0{% else %}26px{% endif %};text-align:right;vertical-align:top;min-width:56px;">
                 <div style="font-family:'Geist Mono',Menlo,monospace;font-size:9.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">{{ summary.label }}</div>
                 <div style="font-family:'Geist Mono',Menlo,monospace;font-size:18px;font-weight:500;margin-top:2px;color:{% if summary.tone == 'good' %}#3c6a24{% elif summary.tone == 'bad' %}#c14a2b{% elif summary.value in ('—', 'N/A') %}#9a9283{% else %}#1f1d18{% endif %};">{{ summary.value }}</div>
               </td>
