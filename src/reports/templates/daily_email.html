@@ -35,7 +35,7 @@
 <tr><td style="padding:26px 32px 20px;border-bottom:1px solid #e2dccf;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
     <td style="font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:22px;color:#1f1d18;letter-spacing:-0.01em;">Kleiber</td>
-    <td align="right" style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.12em;color:#9a9283;text-transform:uppercase;">DAILY · CYCLE {{ cycle_number }} · DAY {{ day_number }}</td>
+    <td align="right" style="text-align:right;font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.12em;color:#9a9283;text-transform:uppercase;">DAILY · CYCLE {{ cycle_number }} · DAY {{ day_number }}</td>
   </tr></table>
 </td></tr>
 
@@ -130,7 +130,7 @@
              middle had both — on narrow values like "—" the label
              widths (ROAS, PURCH) were wider than their cell contents
              and visually crashed into each other. #}
-          <td valign="top" align="right" style="padding-left:16px;white-space:nowrap;">
+          <td valign="top" align="right" style="text-align:right;padding-left:16px;white-space:nowrap;">
             <table cellpadding="0" cellspacing="0" border="0"><tr>
               {% for summary in best_variant_summary %}
               <td style="padding:0 0 0 {% if loop.first %}0{% else %}26px{% endif %};text-align:right;vertical-align:top;min-width:56px;">
@@ -189,7 +189,7 @@
               <div style="height:14px;width:{{ w_pct }}%;background:{{ stage.bar_color or '#1f1d18' }};border-radius:3px;min-width:{% if stage.count > 0 %}10px{% else %}0{% endif %};"></div>
             </td></tr></table>
           </td>
-          <td width="110" align="right" style="font-family:'Geist Mono',Menlo,monospace;font-size:11.5px;padding:6px 0 6px 10px;">{{ stage.count|intcomma }}{% if stage.rate_pct is not none and not loop.first %} <span style="color:#9a9283;">· {{ stage.rate_pct|round(1) }}%</span>{% endif %}</td>
+          <td width="110" align="right" style="text-align:right;font-family:'Geist Mono',Menlo,monospace;font-size:11.5px;padding:6px 0 6px 10px;">{{ stage.count|intcomma }}{% if stage.rate_pct is not none and not loop.first %} <span style="color:#9a9283;">· {{ stage.rate_pct|round(1) }}%</span>{% endif %}</td>
         </tr>
         {% endfor %}
       </table>
@@ -380,7 +380,7 @@
 <tr><td style="padding:18px 32px 26px;border-top:1px solid #e2dccf;background:#f3efe5;">
   <table width="100%"><tr>
     <td style="font-size:11.5px;color:#9a9283;">Generated {{ generated_at }} UTC · cycle {{ cycle_number }}</td>
-    <td align="right" style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;color:#9a9283;letter-spacing:0.1em;">KLEIBER · AUTONOMOUS AD TESTING</td>
+    <td align="right" style="text-align:right;font-family:'Geist Mono',Menlo,monospace;font-size:10px;color:#9a9283;letter-spacing:0.1em;">KLEIBER · AUTONOMOUS AD TESTING</td>
   </tr></table>
 </td></tr>
 
