@@ -196,6 +196,75 @@ class EmailReporter:
             logger.error("SendGrid request failed: %s", exc)
             return False
 
+    async def send_approval_digest(
+        self,
+        *,
+        items: list[dict[str, object]],
+        total: int,
+        review_url: str,
+    ) -> bool:
+        """Send the daily approval-queue digest email.
+
+        ``items`` is a list of ``{label, count, explainer}`` dicts —
+        one row per pending ``action_type`` grouping — in the order
+        the email should render them. ``total`` is the sum across all
+        items, used by the subject line and headline copy.
+
+        Template at ``src/reports/templates/approval_digest_email.html``.
+        """
+        template = self._jinja_env.get_template("approval_digest_email.html")
+        html_content = template.render(
+            items=items,
+            total=total,
+            review_url=review_url,
+            generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
+        )
+        subject = (
+            f"{total} pending approval"
+            f"{'' if total == 1 else 's'} awaiting your review"
+        )
+
+        payload: dict[str, object] = {
+            "personalizations": [
+                {"to": [{"email": self._to_email}], "subject": subject},
+            ],
+            "from": {"email": self._from_email},
+            "content": [{"type": "text/html", "value": html_content}],
+        }
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    _SENDGRID_API_URL, json=payload, headers=headers,
+                )
+                if response.status_code in (200, 202):
+                    logger.info(
+                        "Approval digest email sent to %s (%d pending).",
+                        self._to_email,
+                        total,
+                    )
+                    return True
+                logger.error(
+                    "SendGrid API returned HTTP %d: %s",
+                    response.status_code,
+                    response.text[:500],
+                )
+                return False
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "SendGrid API returned HTTP %d: %s",
+                exc.response.status_code,
+                exc.response.text,
+            )
+            return False
+        except httpx.RequestError as exc:
+            logger.error("SendGrid request failed: %s", exc)
+            return False
+
     async def send_daily_report(
         self,
         report: DailyReport,
