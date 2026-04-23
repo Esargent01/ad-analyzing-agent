@@ -8,16 +8,17 @@
     mono eyebrow in the top-right
   - Title block: mono eyebrow count + lowercase Geist headline + a
     one-line "nothing ships until you review" promise
-  - Item list: one row per action type with label-left / count-right,
-    thin rules between rows
-  - Primary dark-pill CTA → authed dashboard ``/experiments`` page
+  - One white card per campaign with pending approvals, each card
+    listing its action-type breakdown and a "Review <campaign> →"
+    deep link straight to that campaign's ``/campaigns/<id>/experiments``
+    page on the authed dashboard
   - Warm-paper footer stamp
 
   Context:
-  - ``total``              int            — sum of all pending rows
-  - ``items``              list[dict]     — each: {label, count, explainer}
-  - ``review_url``         str            — dashboard /experiments URL
-  - ``generated_at``       str            — "YYYY-MM-DD HH:MM" UTC
+  - ``total``       int            — sum of all pending rows across campaigns
+  - ``campaigns``   list[dict]     — each: {name, review_url, rows[], total}
+                                    rows[] = [{label, count, explainer}, ...]
+  - ``generated_at`` str           — "YYYY-MM-DD HH:MM" UTC
 #}
 <!DOCTYPE html>
 <html>
@@ -43,39 +44,50 @@
 <tr><td style="padding:32px 36px 8px;">
   <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;letter-spacing:0.1em;color:#6d6558;text-transform:uppercase;margin-bottom:10px;">{{ total }} PENDING &middot; AWAITING YOUR REVIEW</div>
   <div style="font-size:28px;line-height:1.1;letter-spacing:-0.02em;font-weight:500;color:#1f1d18;">time to review.</div>
-  <div style="font-size:14px;color:#6d6558;margin-top:10px;line-height:1.55;">Kleiber has {{ total }} proposed move{% if total != 1 %}s{% endif %} waiting on your sign-off. Nothing ships until you confirm or decline {% if total == 1 %}it{% else %}them{% endif %}.</div>
+  <div style="font-size:14px;color:#6d6558;margin-top:10px;line-height:1.55;">Kleiber has {{ total }} proposed move{% if total != 1 %}s{% endif %} waiting on your sign-off across {{ campaigns|length }} campaign{% if campaigns|length != 1 %}s{% endif %}. Nothing ships until you confirm or decline {% if total == 1 %}it{% else %}them{% endif %}.</div>
 </td></tr>
 
-<!-- Item breakdown -->
-<tr><td style="padding:24px 36px 8px;">
+<!-- Per-campaign cards -->
+{% for camp in campaigns %}
+<tr><td style="padding:{% if loop.first %}24px{% else %}12px{% endif %} 36px 0;">
   <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#ffffff;border:1px solid #e2dccf;border-radius:10px;overflow:hidden;">
-    {% for item in items %}
-    <tr>
-      <td style="padding:14px 18px;{% if not loop.last %}border-bottom:1px solid #e2dccf;{% endif %}">
-        <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
-          <td valign="middle">
-            <div style="font-family:'Geist Mono',Menlo,monospace;font-size:10.5px;letter-spacing:0.1em;color:#9a9283;text-transform:uppercase;">{{ item.label }}</div>
-            {% if item.explainer %}
-            <div style="font-size:12.5px;color:#6d6558;margin-top:3px;">{{ item.explainer }}</div>
-            {% endif %}
-          </td>
-          <td align="right" valign="middle" style="text-align:right;white-space:nowrap;padding-left:12px;">
-            <span style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;color:#1f1d18;">{{ item.count }}</span>
-          </td>
-        </tr></table>
-      </td>
-    </tr>
+    <!-- Campaign header row -->
+    <tr><td style="padding:14px 18px 12px;border-bottom:1px solid #e2dccf;">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td valign="middle">
+          <div style="font-size:14.5px;font-weight:500;color:#1f1d18;letter-spacing:-0.005em;">{{ camp.name }}</div>
+        </td>
+        <td align="right" valign="middle" style="text-align:right;white-space:nowrap;padding-left:12px;">
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:10.5px;letter-spacing:0.08em;color:#9a9283;text-transform:uppercase;">{{ camp.total }} PENDING</span>
+        </td>
+      </tr></table>
+    </td></tr>
+    <!-- Action-type rows -->
+    {% for item in camp.rows %}
+    <tr><td style="padding:12px 18px;{% if not loop.last %}border-bottom:1px solid #e2dccf;{% endif %}">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0"><tr>
+        <td valign="middle">
+          <div style="font-family:'Geist Mono',Menlo,monospace;font-size:10.5px;letter-spacing:0.1em;color:#9a9283;text-transform:uppercase;">{{ item.label }}</div>
+          {% if item.explainer %}
+          <div style="font-size:12.5px;color:#6d6558;margin-top:3px;">{{ item.explainer }}</div>
+          {% endif %}
+        </td>
+        <td align="right" valign="middle" style="text-align:right;white-space:nowrap;padding-left:12px;">
+          <span style="font-family:'Geist Mono',Menlo,monospace;font-size:22px;font-weight:500;color:#1f1d18;">{{ item.count }}</span>
+        </td>
+      </tr></table>
+    </td></tr>
     {% endfor %}
+    <!-- Per-campaign CTA -->
+    <tr><td style="padding:14px 18px 18px;border-top:1px solid #e2dccf;background:#f3efe5;" align="center">
+      <a href="{{ camp.review_url }}" style="display:inline-block;background:#1f1d18;color:#fafaf7;font-size:13.5px;font-weight:500;text-decoration:none;padding:10px 20px;border-radius:99px;">Review {{ camp.name|truncate(30) }} &rarr;</a>
+    </td></tr>
   </table>
 </td></tr>
-
-<!-- Primary CTA -->
-<tr><td style="padding:28px 36px 12px;" align="center">
-  <a href="{{ review_url }}" style="display:inline-block;background:#1f1d18;color:#fafaf7;font-size:15px;font-weight:500;text-decoration:none;padding:13px 26px;border-radius:99px;">Review in dashboard &rarr;</a>
-</td></tr>
+{% endfor %}
 
 <!-- Skip-if-nothing copy -->
-<tr><td style="padding:14px 36px 30px;" align="center">
+<tr><td style="padding:24px 36px 30px;" align="center">
   <div style="font-size:12.5px;color:#9a9283;line-height:1.55;max-width:380px;margin:0 auto;">You&rsquo;ll get one of these each day while anything&rsquo;s pending. Clear the queue and it stops.</div>
 </td></tr>
 

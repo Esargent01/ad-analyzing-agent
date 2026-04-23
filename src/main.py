@@ -3276,6 +3276,8 @@ def send_approval_digests(dry_run: bool) -> None:
                     """
                     SELECT c.owner_user_id,
                            u.email,
+                           c.id AS campaign_id,
+                           c.name AS campaign_name,
                            aq.action_type::text AS action_type,
                            COUNT(*) AS cnt
                     FROM approval_queue aq
@@ -3283,20 +3285,36 @@ def send_approval_digests(dry_run: bool) -> None:
                     JOIN users u ON u.id = c.owner_user_id
                     WHERE aq.approved IS NULL
                       AND aq.reviewed_at IS NULL
-                    GROUP BY c.owner_user_id, u.email, aq.action_type
-                    ORDER BY u.email, aq.action_type
+                    GROUP BY c.owner_user_id, u.email,
+                             c.id, c.name, aq.action_type
+                    ORDER BY u.email, c.name, aq.action_type
                     """
                 )
             )
+            # Build a nested per-user → per-campaign → per-action map
+            # so the email can render one card per campaign with its
+            # own action-type breakdown + deep-link.
             per_user: dict[str, dict[str, object]] = {}
-            for owner_id, email, action_type, cnt in rows.fetchall():
+            for owner_id, email, campaign_id, campaign_name, action_type, cnt in rows.fetchall():
                 entry = per_user.setdefault(
                     str(owner_id),
-                    {"email": email, "by_action_type": {}, "total": 0},
+                    {"email": email, "campaigns": {}, "total": 0},
                 )
-                by_action = entry["by_action_type"]
+                campaigns = entry["campaigns"]
+                assert isinstance(campaigns, dict)
+                camp = campaigns.setdefault(
+                    str(campaign_id),
+                    {
+                        "id": str(campaign_id),
+                        "name": str(campaign_name),
+                        "by_action_type": {},
+                        "total": 0,
+                    },
+                )
+                by_action = camp["by_action_type"]
                 assert isinstance(by_action, dict)
                 by_action[str(action_type)] = int(cnt)
+                camp["total"] = int(camp["total"]) + int(cnt)  # type: ignore[arg-type]
                 entry["total"] = int(entry["total"]) + int(cnt)  # type: ignore[arg-type]
 
         if not per_user:
@@ -3306,10 +3324,14 @@ def send_approval_digests(dry_run: bool) -> None:
 
         click.echo(f"{len(per_user)} owner(s) have pending approvals:")
         for _, entry in per_user.items():
-            by_action = entry["by_action_type"]
-            assert isinstance(by_action, dict)
-            parts = ", ".join(f"{k}={v}" for k, v in by_action.items())
-            click.echo(f"  - {entry['email']}: {entry['total']} pending ({parts})")
+            campaigns = entry["campaigns"]
+            assert isinstance(campaigns, dict)
+            click.echo(f"  - {entry['email']}: {entry['total']} pending across {len(campaigns)} campaign(s)")
+            for camp in campaigns.values():
+                by_action = camp["by_action_type"]
+                assert isinstance(by_action, dict)
+                parts = ", ".join(f"{k}={v}" for k, v in by_action.items())
+                click.echo(f"      · {camp['name']}: {camp['total']} ({parts})")
 
         if dry_run:
             click.echo("Dry run — no emails sent.")
@@ -3323,8 +3345,6 @@ def send_approval_digests(dry_run: bool) -> None:
 
         from src.reports.email import EmailReporter
 
-        review_url = f"{settings.frontend_base_url.rstrip('/')}/experiments"
-
         # Per-action_type display copy. ``label`` is the mono eyebrow
         # the row card shows; ``explainer`` is the small grey line
         # under it. Singular / plural variants picked at render time
@@ -3336,24 +3356,45 @@ def send_approval_digests(dry_run: bool) -> None:
             "promote_winner": ("WINNER TO PROMOTE", "WINNERS TO PROMOTE", "Confirm and the agent will scale."),
         }
 
+        frontend = settings.frontend_base_url.rstrip("/")
+
         sent = 0
         failed: list[tuple[str, str]] = []
         for _, entry in per_user.items():
             owner_email = str(entry["email"])
-            by_action = entry["by_action_type"]
-            assert isinstance(by_action, dict)
+            campaigns = entry["campaigns"]
+            assert isinstance(campaigns, dict)
             total = int(entry["total"])  # type: ignore[arg-type]
 
-            items: list[dict[str, object]] = []
-            for action, cnt in by_action.items():
-                singular, plural, explainer = label_specs.get(
-                    action, (action.upper(), action.upper(), "")
-                )
-                items.append(
+            # Build the per-campaign cards the template iterates over.
+            # Each card carries a deep-link straight to that campaign's
+            # ``/campaigns/<id>/experiments`` page on the dashboard so
+            # the user lands where they can act.
+            campaign_cards: list[dict[str, object]] = []
+            for camp in campaigns.values():
+                by_action = camp["by_action_type"]
+                assert isinstance(by_action, dict)
+                items: list[dict[str, object]] = []
+                for action, cnt in by_action.items():
+                    singular, plural, explainer = label_specs.get(
+                        action, (action.upper(), action.upper(), "")
+                    )
+                    items.append(
+                        {
+                            "label": singular if int(cnt) == 1 else plural,
+                            "count": int(cnt),
+                            "explainer": explainer,
+                        }
+                    )
+                campaign_cards.append(
                     {
-                        "label": singular if int(cnt) == 1 else plural,
-                        "count": int(cnt),
-                        "explainer": explainer,
+                        "name": camp["name"],
+                        "review_url": f"{frontend}/campaigns/{camp['id']}/experiments",
+                        # Key name is ``rows`` (not ``items``) because
+                        # Jinja resolves ``camp.items`` to the dict's
+                        # built-in ``.items()`` method, not the value.
+                        "rows": items,
+                        "total": int(camp["total"]),  # type: ignore[arg-type]
                     }
                 )
 
@@ -3364,9 +3405,8 @@ def send_approval_digests(dry_run: bool) -> None:
             )
             try:
                 ok = await reporter.send_approval_digest(
-                    items=items,
+                    campaigns=campaign_cards,
                     total=total,
-                    review_url=review_url,
                 )
             except Exception as exc:  # noqa: BLE001
                 failed.append((owner_email, str(exc)))

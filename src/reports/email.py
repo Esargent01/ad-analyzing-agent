@@ -199,24 +199,26 @@ class EmailReporter:
     async def send_approval_digest(
         self,
         *,
-        items: list[dict[str, object]],
+        campaigns: list[dict[str, object]],
         total: int,
-        review_url: str,
     ) -> bool:
         """Send the daily approval-queue digest email.
 
-        ``items`` is a list of ``{label, count, explainer}`` dicts —
-        one row per pending ``action_type`` grouping — in the order
-        the email should render them. ``total`` is the sum across all
-        items, used by the subject line and headline copy.
+        ``campaigns`` is a list of ``{name, review_url, total, items}``
+        dicts — one card per campaign with pending approvals. Each
+        ``items`` is a list of ``{label, count, explainer}`` dicts,
+        one row per pending ``action_type`` for that campaign.
+        ``total`` is the global sum across all campaigns + action
+        types, used by the subject line and headline copy. Each
+        campaign card carries its own ``review_url`` deep-linking to
+        ``/campaigns/<id>/experiments`` on the authed dashboard.
 
         Template at ``src/reports/templates/approval_digest_email.html``.
         """
         template = self._jinja_env.get_template("approval_digest_email.html")
         html_content = template.render(
-            items=items,
+            campaigns=campaigns,
             total=total,
-            review_url=review_url,
             generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
         )
         subject = (
