@@ -913,7 +913,6 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
     """Generate and send a weekly report for a campaign."""
 
     async def _run() -> None:
-        from src.dashboard.tokens import create_review_token
         from src.db.engine import close_db, get_session, init_db
         from src.services.reports import build_weekly_report, default_last_full_week
         from src.services.weekly import run_weekly_generation
@@ -962,8 +961,17 @@ def weekly_report(campaign_id: str, send_email: bool) -> None:
                 {"id": campaign_id},
             )
             pending_count = int(pending_row.scalar_one() or 0)
+            # Route the "Review & approve" CTA straight to the authed
+            # dashboard's experiments page for this campaign. Previously
+            # we minted an HMAC-signed review token and linked to the
+            # backend's ``/review/{token}`` no-login HTML page, but that
+            # URL shipped under ``settings.report_base_url`` which
+            # points at the public GitHub Pages archive — 404s there.
+            # Dashboard users are already authed via the magic-link
+            # session cookie; no tokenized no-login path is needed.
             review_url = (
-                f"{settings.report_base_url.rstrip('/')}/review/{create_review_token(campaign_uuid)}"
+                f"{settings.frontend_base_url.rstrip('/')}"
+                f"/campaigns/{campaign_uuid}/experiments"
                 if pending_count > 0
                 else None
             )
@@ -3092,7 +3100,6 @@ def send_weekly_reports(week_start: str | None, dry_run: bool) -> None:
         from sqlalchemy import select
         from sqlalchemy import text as sa_text
 
-        from src.dashboard.tokens import create_review_token
         from src.db.engine import close_db, get_session, init_db
         from src.db.tables import Campaign, User
         from src.services.reports import build_weekly_report, default_last_full_week
@@ -3171,9 +3178,15 @@ def send_weekly_reports(week_start: str | None, dry_run: bool) -> None:
                         {"id": str(campaign.id)},
                     )
                     pending_count = int(pending_row.scalar_one() or 0)
+                    # Per-owner weekly-report email: send users to the
+                    # authed dashboard's experiments page for this
+                    # campaign. The old ``{report_base_url}/review/<token>``
+                    # legacy path 404'd on GitHub Pages; the dashboard
+                    # is authed via magic-link cookie, so the tokenised
+                    # no-login flow isn't needed.
                     review_url = (
-                        f"{settings.report_base_url.rstrip('/')}/review/"
-                        f"{create_review_token(campaign.id)}"
+                        f"{settings.frontend_base_url.rstrip('/')}"
+                        f"/campaigns/{campaign.id}/experiments"
                         if pending_count > 0
                         else None
                     )
