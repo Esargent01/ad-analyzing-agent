@@ -13,7 +13,7 @@ import logging
 import traceback
 import uuid
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
 import anthropic
@@ -43,6 +43,26 @@ from src.services.stats import compare_variants, element_significance, has_suffi
 from src.services.usage import AgentContext
 
 logger = logging.getLogger(__name__)
+
+
+# Minimum gap between consecutive scale_budget proposals per campaign.
+# Thompson sampling is a single Beta draw per variant per cycle — at
+# the target user's $5–100/day budgets each variant gets only a few
+# hundred impressions a day, so a fresh draw every 24 hours is
+# dominated by sampling noise rather than underlying CTR signal. A
+# weekly cadence lets the Beta posteriors actually tighten between
+# draws. Applies campaign-wide (not per-variant) because Thompson
+# re-splits the full budget set — it doesn't make sense to queue a
+# new split for variant A while the prior split for B is still
+# pending.
+#
+# pause_variant and promote_winner paths deliberately stay daily —
+# they're already gated on ``campaigns.min_impressions_for_significance``
+# (default 1000) + ``campaigns.confidence_threshold`` (default 95%),
+# so they only fire on statistically meaningful outliers. Audience
+# fatigue also stays daily (a 3-day decline is a daily-cadence
+# signal by definition).
+SCALE_BUDGET_COOLDOWN: timedelta = timedelta(days=7)
 
 
 @dataclass
@@ -579,14 +599,46 @@ class Orchestrator:
                             )
                         )
 
-        # Thompson sampling budget reallocation — also propose-only
-        # now. We compute the new allocations, skip variants with a
-        # pending pause proposal (no point proposing to scale
-        # something we're proposing to pause), and queue a scale
-        # proposal per meaningful change.
+        # Thompson sampling budget reallocation — propose-only AND
+        # rate-limited to at most once per ``SCALE_BUDGET_COOLDOWN``
+        # (7 days). Skip the block entirely when the most recent
+        # scale_budget proposal for this campaign (pending, approved,
+        # or declined) was submitted within the cooldown window.
+        #
+        # See ``SCALE_BUDGET_COOLDOWN`` at the top of the module for
+        # the full rationale; short version is that Thompson's single
+        # Beta draw per variant per cycle is dominated by sampling
+        # noise at small-advertiser budgets, and letting a week of
+        # fresh impressions accumulate between draws is the cleanest
+        # way to keep the queue signal-to-noise high.
         still_active = [v for v in variant_data if v.variant_id not in proposed_pauses]
 
-        if len(still_active) >= 2:
+        recent_scale = await session.execute(
+            text(
+                """
+                SELECT MAX(submitted_at)
+                FROM approval_queue
+                WHERE campaign_id = :id
+                  AND action_type = 'scale_budget'
+                """
+            ),
+            {"id": campaign_id},
+        )
+        last_scale_at: datetime | None = recent_scale.scalar()
+        scale_cooldown_active = (
+            last_scale_at is not None
+            and (datetime.now(UTC) - last_scale_at) < SCALE_BUDGET_COOLDOWN
+        )
+        if scale_cooldown_active:
+            logger.info(
+                "Skipping scale_budget proposals for campaign %s — last "
+                "proposal at %s is within %d-day cooldown.",
+                campaign_id,
+                last_scale_at,
+                SCALE_BUDGET_COOLDOWN.days,
+            )
+
+        if not scale_cooldown_active and len(still_active) >= 2:
             campaign_budget_row = await session.execute(
                 text("SELECT daily_budget FROM campaigns WHERE id = :id"),
                 {"id": campaign_id},
