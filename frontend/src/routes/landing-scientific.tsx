@@ -37,7 +37,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
 import { api } from "@/lib/api/client";
-import { trackSignupEvent } from "@/lib/analytics";
+import { captureUserSignup, trackSignupEvent } from "@/lib/analytics";
 
 import "./landing-scientific.css";
 
@@ -2119,6 +2119,9 @@ function SignupSection() {
       await api.post("/api/beta-signup", { email: normalized });
       setStatus("success");
       trackSignupEvent("beta_signup_success", "scientific");
+      // KLEIBER-6: identify + fire the unified user_signed_up event so
+      // the PostHog Slack CDP function can alert #new-signups.
+      captureUserSignup({ email: normalized, variant: "scientific" });
     } catch {
       setErrorMsg("Something went wrong. Please try again.");
       setStatus("error");

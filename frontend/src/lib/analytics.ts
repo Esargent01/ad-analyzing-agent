@@ -49,7 +49,13 @@ export type LandingVariant = "original" | "scientific";
 export type AnalyticsEvent =
   | "beta_signup_submit_attempt"
   | "beta_signup_success"
-  | "beta_signup_error";
+  | "beta_signup_error"
+  // KLEIBER-6: unified signup event fired on every successful signup
+  // regardless of source (organic, ad campaign, referral, etc.). The
+  // PostHog Slack CDP function in the "Kleiber" project is wired to
+  // this event name — renaming it requires updating the destination
+  // filter too.
+  | "user_signed_up";
 
 /**
  * Initialize PostHog. Safe to call in any environment — if the script
@@ -118,4 +124,120 @@ export function trackSignupEvent(
   extra?: Record<string, unknown>,
 ): void {
   trackEvent(event, { landing_variant: variant, ...(extra ?? {}) });
+}
+
+/**
+ * KLEIBER-6 — categorical signup-source bucket. Derived from URL
+ * params + referrer so the Slack alert can show "organic" vs. "ad
+ * campaign" without grepping UTM strings every time. The taxonomy
+ * intentionally mirrors the values referenced in the JIRA ticket.
+ */
+export type SignupSource =
+  | "organic"
+  | "ad_campaign"
+  | "referral"
+  | "beta_request";
+
+/**
+ * Inspect the current URL + referrer and bucket the signup source.
+ *
+ * Order of precedence (first match wins):
+ *  1. ``utm_medium`` smells like paid ad → ``ad_campaign``.
+ *  2. ``utm_source`` is set (any non-empty value) → ``referral``.
+ *  3. Referrer is set and points off-site → ``referral``.
+ *  4. Otherwise → ``organic``.
+ *
+ * Pure function so it's trivially unit-testable in isolation.
+ */
+export function deriveSignupSource(input: {
+  search?: string;
+  referrer?: string;
+  hostname?: string;
+}): SignupSource {
+  const params = new URLSearchParams(input.search ?? "");
+  const utmMedium = (params.get("utm_medium") ?? "").toLowerCase();
+  const utmSource = (params.get("utm_source") ?? "").toLowerCase();
+  const paidMediums = new Set([
+    "cpc",
+    "ppc",
+    "paid",
+    "paid_social",
+    "paidsocial",
+    "paid-social",
+    "display",
+    "social-paid",
+  ]);
+  if (paidMediums.has(utmMedium)) return "ad_campaign";
+  const paidSources = new Set([
+    "facebook",
+    "meta",
+    "instagram",
+    "fb",
+    "google",
+    "google-ads",
+    "googleads",
+    "tiktok",
+    "linkedin",
+    "twitter",
+    "x",
+    "reddit",
+  ]);
+  if (paidMediums.has(utmMedium) || paidSources.has(utmSource)) {
+    return "ad_campaign";
+  }
+  if (utmSource) return "referral";
+  const referrer = input.referrer ?? "";
+  if (referrer) {
+    try {
+      const refHost = new URL(referrer).hostname;
+      if (refHost && refHost !== (input.hostname ?? "")) return "referral";
+    } catch {
+      // Bad referrer URL — treat as no referrer.
+    }
+  }
+  return "organic";
+}
+
+/**
+ * KLEIBER-6 — fire the unified ``user_signed_up`` event after a
+ * successful signup, and ``identify()`` the person so PostHog
+ * creates the person profile (today's organic signup never created
+ * one because ``identify()`` was never called).
+ *
+ * The Slack CDP function reads ``email`` + ``signup_source`` from
+ * the event properties to format the alert.
+ */
+export function captureUserSignup(input: {
+  email: string;
+  variant: LandingVariant;
+}): void {
+  const email = input.email.trim().toLowerCase();
+  const props = {
+    email,
+    landing_variant: input.variant,
+    signup_source: deriveSignupSource({
+      search: typeof window !== "undefined" ? window.location.search : "",
+      referrer: typeof document !== "undefined" ? document.referrer : "",
+      hostname:
+        typeof window !== "undefined" ? window.location.hostname : "",
+    }),
+    utm_source: getQueryParam("utm_source"),
+    utm_medium: getQueryParam("utm_medium"),
+    utm_campaign: getQueryParam("utm_campaign"),
+    utm_content: getQueryParam("utm_content"),
+    referrer: typeof document !== "undefined" ? document.referrer : "",
+  };
+  try {
+    // identify() must come BEFORE capture() so the event lands on the
+    // identified person profile rather than the anonymous distinct_id.
+    posthog.identify(email, { email });
+    posthog.capture("user_signed_up", props);
+  } catch {
+    // Same fail-open contract as trackEvent — never break the form.
+  }
+}
+
+function getQueryParam(name: string): string {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get(name) ?? "";
 }

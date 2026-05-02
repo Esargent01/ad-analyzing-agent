@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { api } from "@/lib/api/client";
-import { trackSignupEvent } from "@/lib/analytics";
+import { captureUserSignup, trackSignupEvent } from "@/lib/analytics";
 import { FeatureSection } from "@/components/landing/FeatureSection";
 import { DecomposeAnimation } from "@/components/landing/DecomposeAnimation";
 import { GenomeAnimation } from "@/components/landing/GenomeAnimation";
@@ -43,6 +43,9 @@ export function LandingRoute() {
       await api.post("/api/beta-signup", { email: normalized });
       setStatus("success");
       trackSignupEvent("beta_signup_success", "original");
+      // KLEIBER-6: identify the person + fire the unified event so the
+      // Slack CDP function in PostHog can post a #new-signups alert.
+      captureUserSignup({ email: normalized, variant: "original" });
     } catch {
       setErrorMsg("Something went wrong. Please try again.");
       setStatus("error");
