@@ -77,12 +77,15 @@ export function WeeklyReportDetailRoute() {
     ? `${formatDateLabel(report.data.week_start)} – ${formatDateLabel(report.data.week_end)}`
     : formatDateLabel(weekStart);
 
+  const inProgress = report.data?.is_in_progress ?? false;
+
   const sub = report.data ? (
     <>
       {report.data.campaign_name ?? campaign?.name} ·{" "}
       <span style={{ fontFamily: "var(--font-mono)", fontSize: 12 }}>
         {report.data.cycles_run} cycles · {report.data.variants_launched} launched
         · {report.data.variants_retired} retired
+        {inProgress ? " · in progress" : ""}
       </span>
     </>
   ) : null;
@@ -90,7 +93,12 @@ export function WeeklyReportDetailRoute() {
   return (
     <DashPage
       crumb={crumb}
-      title={<>weekly · <span className="serif">{rangeLabel}</span></>}
+      title={
+        <>
+          {inProgress ? "current week" : "weekly"} ·{" "}
+          <span className="serif">{rangeLabel}</span>
+        </>
+      }
       sub={sub}
     >
       {report.isLoading && !report.data ? <SkeletonReportBody /> : null}
@@ -103,6 +111,25 @@ export function WeeklyReportDetailRoute() {
 function WeeklyReportBody({ report }: { report: WeeklyReport }) {
   return (
     <>
+      {report.is_in_progress ? (
+        <div
+          style={{
+            background: "#f3efe5",
+            border: "1px solid #e2dccf",
+            borderRadius: 10,
+            padding: "10px 14px",
+            marginBottom: 16,
+            fontFamily: "var(--font-mono)",
+            fontSize: 11,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            color: "#6d6558",
+          }}
+        >
+          Current week — numbers will keep moving until Sunday closes. This
+          isn&rsquo;t the finalized weekly report yet.
+        </div>
+      ) : null}
       {/* 3 metric rows — data-driven from the objective profile.
           Row titles and the cards within each are computed server-
           side in ``src/services/reports.py::build_weekly_report``. */}

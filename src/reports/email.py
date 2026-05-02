@@ -503,6 +503,7 @@ class EmailReporter:
             week_label=week_label,
             week_start=report.week_start.isoformat(),
             week_end=report.week_end.isoformat(),
+            is_in_progress=report.is_in_progress,
             generated_at=datetime.now(UTC).strftime("%Y-%m-%d %H:%M"),
             base_url=base_url,
             # Activity

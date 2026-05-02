@@ -602,6 +602,8 @@ export interface WeeklyReport {
   campaign_name: string;
   week_start: string;
   week_end: string;
+  /** True when the week hasn't fully elapsed (week_end >= today UTC). */
+  is_in_progress?: boolean;
   /** Canonical ODAX objective. */
   objective: string;
 

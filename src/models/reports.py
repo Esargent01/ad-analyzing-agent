@@ -420,6 +420,12 @@ class WeeklyReport(BaseModel):
     week_start: date
     week_end: date
 
+    # True when this report covers a week that hasn't fully elapsed yet
+    # (week_end >= today UTC). The dashboard and email templates relabel
+    # the report as "Current week" instead of presenting it as the
+    # finalized weekly roll-up. KLEIBER-4.
+    is_in_progress: bool = False
+
     # Canonical ODAX objective — drives the objective-aware display lists.
     objective: str = "OUTCOME_SALES"
 

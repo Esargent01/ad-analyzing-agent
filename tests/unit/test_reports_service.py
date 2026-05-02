@@ -11,7 +11,7 @@ The service has two layers:
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID, uuid4
 
@@ -448,6 +448,58 @@ class TestBuildWeeklyReport:
         assert report.expired_count == 0
         assert report.generation_paused is False
         assert report.review_url is None
+        # Week 2026-03-30 → 2026-04-05 is in the past relative to any
+        # plausible run-date for this test, so is_in_progress is False.
+        assert report.is_in_progress is False
+
+    @pytest.mark.asyncio
+    async def test_in_progress_when_week_end_is_today_or_later(
+        self, campaign_id, monkeypatch
+    ):
+        """KLEIBER-4: is_in_progress flips True when the week hasn't
+        fully elapsed yet (week_end >= today UTC)."""
+        from src.services import reports as reports_module
+
+        async def _fake_load_proposed_variants(session, cid):
+            return []
+
+        monkeypatch.setattr(
+            reports_module, "load_proposed_variants", _fake_load_proposed_variants
+        )
+
+        # Pin "today" to a Wednesday inside the test week.
+        class _FrozenDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):  # type: ignore[override]
+                return datetime(2026, 5, 6, 12, 0, tzinfo=tz)
+
+        monkeypatch.setattr(reports_module, "datetime", _FrozenDateTime)
+
+        session = _FakeSession(
+            [
+                (
+                    "FROM campaigns WHERE id",
+                    _FakeResult([("Test Campaign", "OUTCOME_SALES")]),
+                ),
+                ("FROM test_cycles", _FakeResult([])),
+                (
+                    "FROM metrics m\n            JOIN variants v",
+                    _FakeResult([(0,) * 15]),
+                ),
+                ("FROM variants v\n            LEFT JOIN LATERAL", _FakeResult([])),
+                ("FROM element_performance", _FakeResult([])),
+                ("FROM element_interactions", _FakeResult([])),
+            ]
+        )
+
+        # Week 2026-05-04 (Mon) → 2026-05-10 (Sun); today is 2026-05-06.
+        report = await build_weekly_report(
+            session,
+            campaign_id,
+            date(2026, 5, 4),
+            week_end=date(2026, 5, 10),
+        )
+        assert report.is_in_progress is True
 
     @pytest.mark.asyncio
     async def test_passes_through_generation_side_effects(self, campaign_id, monkeypatch):

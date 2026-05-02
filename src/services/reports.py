@@ -90,6 +90,12 @@ async def build_weekly_report(
     if week_end is None:
         week_end = week_start + timedelta(days=6)
 
+    # KLEIBER-4: a week is "in progress" until midnight after its Sunday.
+    # We compare against today's UTC date so the label flips at the same
+    # boundary the cron uses to roll the week over.
+    today_utc = datetime.now(UTC).date()
+    is_in_progress = week_end >= today_utc
+
     week_start_ts = datetime(week_start.year, week_start.month, week_start.day, tzinfo=UTC)
     week_end_ts = datetime(week_end.year, week_end.month, week_end.day, tzinfo=UTC) + timedelta(
         days=1
@@ -147,6 +153,7 @@ async def build_weekly_report(
         campaign_name=campaign_name,
         week_start=week_start,
         week_end=week_end,
+        is_in_progress=is_in_progress,
         objective=objective,
         total_spend=totals.spend,
         total_impressions=totals.impressions,
