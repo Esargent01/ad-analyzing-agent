@@ -643,9 +643,16 @@ class BetaSignupRequest(BaseModel):
 async def api_beta_signup(request: Request, body: BetaSignupRequest) -> JSONResponse:
     """Collect an email for the beta waitlist. Public, rate-limited.
 
-    First-time signups trigger a Kleiber-branded confirmation email.
+    KLEIBER-9 — first-time signups trigger a Kleiber-branded onboarding
+    email that doubles as the user's first sign-in. We mint a magic-link
+    token here and embed it in the email so the user can go from form
+    submission → signed-in dashboard in one click. Closes the gap that
+    previously required an out-of-band ``send-magic-link`` CLI run and
+    was costing us conversions.
+
     Duplicates return 201 silently (no info leak) and are *not* re-sent.
     """
+    from src.dashboard.auth import create_magic_link_token
     from src.db.tables import BetaSignup
     from src.reports.auth_email import send_beta_signup_confirmation
 
@@ -666,16 +673,25 @@ async def api_beta_signup(request: Request, body: BetaSignupRequest) -> JSONResp
 
     logger.info("Beta signup: %s", email)
 
-    # Fire-and-forget confirmation email. Failures are logged inside the
-    # sender; we never surface them to the caller so an email outage
-    # doesn't break signups.
-    async def _send_confirmation() -> None:
-        try:
-            await send_beta_signup_confirmation(email)
-        except Exception as exc:  # noqa: BLE001
-            logger.exception("Beta confirmation send failed for %s: %s", email, exc)
+    # Mint the magic link inline — the token is derived from the email
+    # via HMAC, so we don't need to round-trip the DB.
+    settings = get_settings()
+    token = create_magic_link_token(email)
+    magic_link = (
+        f"{settings.api_base_url.rstrip('/')}/api/auth/verify?token={token}"
+    )
 
-    asyncio.create_task(_send_confirmation())
+    # Fire-and-forget onboarding email. Failures are logged inside the
+    # sender; we never surface them to the caller so a SendGrid outage
+    # doesn't break signups (the user can request a fresh link from the
+    # /sign-in page later).
+    async def _send_onboarding() -> None:
+        try:
+            await send_beta_signup_confirmation(email, magic_link=magic_link)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Beta onboarding send failed for %s: %s", email, exc)
+
+    asyncio.create_task(_send_onboarding())
 
     return JSONResponse({"status": "ok"}, status_code=201)
 

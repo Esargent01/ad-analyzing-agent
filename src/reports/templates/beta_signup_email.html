@@ -1,19 +1,30 @@
 {#
-  Beta waitlist confirmation email. Visual port of the warm-editorial
-  design in `Kleiber Emails.html`:
+  Beta onboarding email. KLEIBER-9: replaces the "we'll review your
+  application within 3 business days" waitlist template. Now ships
+  alongside an auto-generated magic link so the user can sign in
+  immediately and start onboarding without an out-of-band nudge.
+
+  Visual port of the warm-editorial design in `Kleiber Emails.html`:
 
   - 560px centered card on warm-paper page
   - Masthead with Instrument Serif "Kleiber" wordmark
-  - Title block: mono eyebrow ("PRIVATE BETA · WAITLIST CONFIRMED") +
-    lowercase Geist headline + muted copy with bold "3 business days"
-  - "What happens next" list: 3 steps, each with a mono ordinal in
-    terracotta accent + title + muted subcopy, separated by thin rules
+  - Title block: mono eyebrow ("PRIVATE BETA · YOU'RE IN") +
+    lowercase Geist headline + sub-line
+  - Dark pill "Sign in to Kleiber" button (only when magic_link is
+    provided — legacy callers without it degrade to a no-CTA
+    confirmation)
+  - "What happens next" list: 3 steps walking the user from sign-in
+    to first daily report
   - Reply-to-this-email invitation and italic-serif sign-off
   - Warm-paper footer with "PRIVATE BETA" stamp
+
+  Context:
+  - magic_link    str | None  — full magic-link URL or None
+  - ttl_minutes   int | None  — minutes until the link expires
 #}
 <!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Welcome to the Kleiber waitlist</title></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Welcome to Kleiber</title></head>
 <body style="margin:0;padding:0;background:#f3efe5;font-family:-apple-system,BlinkMacSystemFont,'Geist',Arial,Helvetica,sans-serif;color:#1f1d18;">
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f3efe5;">
 <tr><td align="center" style="padding:48px 16px;">
@@ -24,10 +35,20 @@
 </td></tr>
 
 <tr><td style="padding:36px 36px 8px;">
-  <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;letter-spacing:0.1em;color:#6d6558;text-transform:uppercase;margin-bottom:12px;">PRIVATE BETA &middot; WAITLIST CONFIRMED</div>
-  <div style="font-size:30px;line-height:1.05;letter-spacing:-0.03em;font-weight:500;">you&rsquo;re on the list.</div>
-  <div style="font-size:15px;color:#6d6558;margin-top:14px;line-height:1.55;">Thanks for requesting access. We review new applications every Monday and reach out within <b style="color:#1f1d18;">3 business days</b>.</div>
+  <div style="font-family:'Geist Mono',Menlo,monospace;font-size:11px;letter-spacing:0.1em;color:#6d6558;text-transform:uppercase;margin-bottom:12px;">PRIVATE BETA &middot; YOU&rsquo;RE IN</div>
+  <div style="font-size:30px;line-height:1.05;letter-spacing:-0.03em;font-weight:500;">welcome to kleiber.</div>
+  {% if magic_link %}
+  <div style="font-size:15px;color:#6d6558;margin-top:14px;line-height:1.55;">Click below to sign in and connect your first Meta campaign. The link is single-use and expires in <b style="color:#1f1d18;">{{ ttl_minutes }} minutes</b>.</div>
+  {% else %}
+  <div style="font-size:15px;color:#6d6558;margin-top:14px;line-height:1.55;">You&rsquo;re on the list. We&rsquo;ll send your sign-in link as soon as your account is ready.</div>
+  {% endif %}
 </td></tr>
+
+{% if magic_link %}
+<tr><td style="padding:24px 36px 8px;">
+  <a href="{{ magic_link }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#1f1d18;color:#fafaf7;font-size:15px;font-weight:500;text-decoration:none;padding:13px 26px;border-radius:99px;">Sign in to Kleiber &rarr;</a>
+</td></tr>
+{% endif %}
 
 <tr><td style="padding:28px 36px 8px;">
   <div style="font-family:'Geist Mono',Menlo,monospace;font-size:10px;letter-spacing:0.1em;color:#9a9283;text-transform:uppercase;margin-bottom:14px;">WHAT HAPPENS NEXT</div>
@@ -37,8 +58,8 @@
       <table width="100%"><tr>
         <td width="40" valign="top"><div style="font-family:'Geist Mono',Menlo,monospace;font-size:12px;color:#c46f3f;font-weight:500;">01</div></td>
         <td>
-          <div style="font-size:14px;font-weight:500;color:#1f1d18;">We review your application</div>
-          <div style="font-size:12.5px;color:#6d6558;margin-top:3px;line-height:1.5;">We&rsquo;re matching accounts to the current cohort size &mdash; usually a few days.</div>
+          <div style="font-size:14px;font-weight:500;color:#1f1d18;">Sign in</div>
+          <div style="font-size:12.5px;color:#6d6558;margin-top:3px;line-height:1.5;">{% if magic_link %}Use the button above &mdash; no password to remember.{% else %}We&rsquo;ll send your sign-in link shortly.{% endif %}</div>
         </td>
       </tr></table>
     </td></tr>
@@ -46,8 +67,8 @@
       <table width="100%"><tr>
         <td width="40" valign="top"><div style="font-family:'Geist Mono',Menlo,monospace;font-size:12px;color:#c46f3f;font-weight:500;">02</div></td>
         <td>
-          <div style="font-size:14px;font-weight:500;">You get an onboarding call</div>
-          <div style="font-size:12.5px;color:#6d6558;margin-top:3px;line-height:1.5;">30 minutes &mdash; we connect your Meta account and map your first campaign.</div>
+          <div style="font-size:14px;font-weight:500;">Connect your Meta ad account</div>
+          <div style="font-size:12.5px;color:#6d6558;margin-top:3px;line-height:1.5;">One click on the dashboard &mdash; we read your campaigns, never your inbox.</div>
         </td>
       </tr></table>
     </td></tr>
@@ -55,8 +76,8 @@
       <table width="100%"><tr>
         <td width="40" valign="top"><div style="font-family:'Geist Mono',Menlo,monospace;font-size:12px;color:#c46f3f;font-weight:500;">03</div></td>
         <td>
-          <div style="font-size:14px;font-weight:500;">Kleiber starts testing</div>
-          <div style="font-size:12.5px;color:#6d6558;margin-top:3px;line-height:1.5;">Your first daily report arrives the morning after launch. 14-day trial included.</div>
+          <div style="font-size:14px;font-weight:500;">Import your first campaign</div>
+          <div style="font-size:12.5px;color:#6d6558;margin-top:3px;line-height:1.5;">Pick a live campaign and Kleiber starts testing. Your first daily report arrives the morning after launch.</div>
         </td>
       </tr></table>
     </td></tr>
@@ -64,7 +85,7 @@
 </td></tr>
 
 <tr><td style="padding:26px 36px 8px;">
-  <div style="font-size:13px;color:#6d6558;line-height:1.55;">Anything we should know? Just reply to this email &mdash; it goes to a real person.</div>
+  <div style="font-size:13px;color:#6d6558;line-height:1.55;">Stuck on any of this? Just reply to this email &mdash; it goes to a real person.</div>
   <div style="font-family:'Instrument Serif',Georgia,serif;font-style:italic;font-size:16px;color:#1f1d18;margin-top:16px;">&mdash; The Kleiber team</div>
 </td></tr>
 
