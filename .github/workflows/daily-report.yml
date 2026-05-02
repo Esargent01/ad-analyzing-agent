@@ -51,6 +51,11 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           REPORT_EMAIL_FROM: ${{ secrets.REPORT_EMAIL_FROM }}
+          # KLEIBER-8: Without this the "Open full report" button in
+          # every daily email pointed at localhost:5173 (the config
+          # default). The repo-level secret is the source of truth and
+          # must be set to ``https://agent.kleiber.ai``.
+          FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
           # The settled-metrics backfill polls Meta before rendering so
           # daily reports reflect yesterday's final numbers instead of
           # the partial-day snapshot from run-all-user-campaigns.

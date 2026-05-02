@@ -41,6 +41,9 @@ jobs:
           SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
           REPORT_EMAIL_FROM: ${{ secrets.REPORT_EMAIL_FROM }}
           REPORT_BASE_URL: ${{ secrets.REPORT_BASE_URL }}
+          # KLEIBER-8: drives both the "Open full report" CTA and the
+          # tokenised "Review & approve" link in the weekly email.
+          FRONTEND_BASE_URL: ${{ secrets.FRONTEND_BASE_URL }}
 
       - name: Send approval digest after weekly generation
         if: always()

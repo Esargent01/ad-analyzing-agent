@@ -104,8 +104,15 @@ class Settings(BaseSettings):
     # "http://localhost:5173,https://app.example.com").
     frontend_origins: str = ""
     # Public URL of the frontend — used for post-verify redirects to
-    # ``/dashboard`` and ``/sign-in?error=...``.
-    frontend_base_url: str = "http://localhost:5173"
+    # ``/dashboard`` and ``/sign-in?error=...`` AND for every email-CTA
+    # deep link (daily/weekly report buttons, approval-digest "Review"
+    # buttons, magic-link landing). Defaulting to the production host
+    # so that a missing/empty ``FRONTEND_BASE_URL`` env var (e.g. an
+    # unset GitHub Actions secret) still produces a working link
+    # instead of shipping ``http://localhost:5173/...`` or, worse, a
+    # bare path that Gmail rewrites to ``http:///...`` (KLEIBER-8).
+    # Local dev should override this in ``.env`` to point at vite.
+    frontend_base_url: str = "https://agent.kleiber.ai"
     # Public URL of the backend — used to build the magic-link target
     # (``{api_base_url}/api/auth/verify?token=...``). The backend needs
     # its own external URL because the verify endpoint must be reached
