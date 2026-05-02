@@ -193,7 +193,7 @@
 
   {% if proposed_variants and review_url %}
   <div style="margin-top:16px;" align="center">
-    <a href="{{ review_url }}" style="display:inline-block;background:#c46f3f;color:#fafaf7;font-size:13.5px;font-weight:500;text-decoration:none;padding:11px 20px;border-radius:99px;">Review &amp; approve →</a>
+    <a href="{{ review_url }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#c46f3f;color:#fafaf7;font-size:13.5px;font-weight:500;text-decoration:none;padding:11px 20px;border-radius:99px;">Review &amp; approve →</a>
   </div>
   {% endif %}
 </td></tr>
@@ -202,7 +202,7 @@
 {# Primary dashboard CTA — deep link to the authenticated weekly detail #}
 {% if dashboard_url %}
 <tr><td style="padding:28px 32px 24px;" align="center">
-  <a href="{{ dashboard_url }}" style="display:inline-block;background:#1f1d18;color:#fafaf7;font-size:14px;font-weight:500;text-decoration:none;padding:12px 22px;border-radius:99px;">Open full report →</a>
+  <a href="{{ dashboard_url }}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background:#1f1d18;color:#fafaf7;font-size:14px;font-weight:500;text-decoration:none;padding:12px 22px;border-radius:99px;">Open full report →</a>
 </td></tr>
 {% endif %}
 
